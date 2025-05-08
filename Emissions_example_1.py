@@ -51,3 +51,29 @@ f.show()
 f.save(output, name="multi", description="solution with multicomponent transport")
 
 f.save('burner_flame.csv', basis="mole", overwrite=True)
+
+# Load the saved data
+data = ct.SolutionArray(gas)
+data.read_csv('burner_flame.csv')
+
+# Plot temperature profile
+plt.figure()
+plt.plot(f.grid, data.T, label='Temperature (K)')
+plt.xlabel('Distance (m)')
+plt.ylabel('Temperature (K)')
+plt.title('Temperature Profile')
+plt.legend()
+plt.grid()
+
+# Plot species mole fractions
+plt.figure()
+for species in ['H2', 'O2', 'H2O', 'OH']:
+    plt.plot(f.grid, data(species).X, label=f'{species} Mole Fraction')
+plt.xlabel('Distance (m)')
+plt.ylabel('Mole Fraction')
+plt.title('Species Mole Fractions')
+plt.legend()
+plt.grid()
+
+# Show the plots
+plt.show()
