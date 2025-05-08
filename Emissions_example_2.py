@@ -83,7 +83,7 @@ for phi_rb in vector_phi_rb:
     t = 0.0433  # Initial time (s)
     dt = 5.0e-5
     network = ct.ReactorNet([combustor1, combustor2])
-    #network.initial_time(t)
+    # network.initial_time(t)
     stop = 0
     temp = []
 
