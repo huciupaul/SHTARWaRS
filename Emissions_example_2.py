@@ -69,19 +69,21 @@ vector_temperature = []
 
 for phi_rb in vector_phi_rb:
     # Reset reactors' network to initial state
-    network.set_initial_time(0.0)
+    network.reinitialize()
 
     # Calculating variable air flow rates
     mdot_air_rb = AFR_st / phi_rb * mdot_fuel
     mdot_air_lb = mdot_air_total - mdot_air_rb
 
     # Set computed air-flow rates to combustors
-    m2.mdot = mdot_air_rb
-    m3.mdot = mdot_air_lb
+    m2.mass_flow_rate = mdot_air_rb
+    m3.mass_flow_rate = mdot_air_lb
 
     # Solve ODEs
-    t = 0.0
+    t = 0.0433  # Initial time (s)
     dt = 5.0e-5
+    network = ct.ReactorNet([combustor1, combustor2])
+    #network.initial_time(t)
     stop = 0
     temp = []
 
