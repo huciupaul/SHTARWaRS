@@ -1,9 +1,12 @@
 import cantera as ct
+import numpy as np
+
 from mixture_properties import mixture_properties
 from typing import Union, Mapping
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+MECH = ""
 
 
 
@@ -43,7 +46,7 @@ def air_mass_flow_for_phi(
     phi: float,
     *,
     X_air: Union[str, Mapping[str, float]] ,
-    mech: str = "SanDiego.yaml",
+    mech: str = "SanDiegoNitrogen.yaml",
     T: float = 298.15,
     P: float = 101_325.0,
 ) -> float:
@@ -130,7 +133,7 @@ def air_mass_flow_for_phi(
 
 ############################ Inlet conditions ###################################################
 
-X_air = 'N2:0.78084,  O2:0.20946,  AR:0.00934,  CO2:0.000407 '
+X_air = 'N2:0.78084,  O2:0.20946,  AR:0.00934 '
 X_H2 = 'H2:1'
 
 mdot_Kerosene = 0.0818986224 #Kg/s at take-off
@@ -162,25 +165,31 @@ print(mdot_air)
 (X_mix,mdot_mixture,M_mix) = mixture_properties(X1=X_H2,X2=X_air,mdot1=mdot_H2,mdot2=mdot_air)
 
 
+width = 0.05  # m
+
+initial_grid= np.linspace(0,width,300)
+gas = ct.Solution('SanDiegoNitrogen.yaml')
+gas.TPX = T_0_kelvin, P_0_pascals, X_mix
+print(gas())
 
 
 
-gas = ct.Solution('SanDiego.yaml')
-gas.TPX = T_0, P_0_pascals, X_mix
-
-
-width = 0.2  # m
-
-f = ct.BurnerFlame(gas, width=width)
+f = ct.BurnerFlame(gas, grid=initial_grid)
 f.burner.mdot = mdot_mixture
-f.set_refine_criteria(ratio=3.0, slope=0.05, curve=0.05)
+
+f.set_refine_criteria(ratio=3.0, slope=0.02, curve=0.02)
 f.show()
 
 loglevel = 1
 
+
+
+
+
 ################# First Solve ######################
 f.transport_model = 'mixture-averaged'
-f.solve(loglevel, auto=True)
+
+f.solve(loglevel=1, refine_grid=True, auto=False)
 
 if "native" in ct.hdf_support():
     output = Path() / "burner_flame.h5"
@@ -190,15 +199,17 @@ output.unlink(missing_ok=True)
 
 f.save(output, name="mix", description="solution with mixture-averaged transport")
 
-
-
-################# Subsequent Solves #########################
 f.transport_model = 'multicomponent'
 f.solve(loglevel)  # don't use 'auto' on subsequent solves
+
+
 f.show()
 f.save(output, name="multi", description="solution with multicomponent transport")
 
 f.save('burner_flame.csv', basis="mole", overwrite=True)
+
+
+
 
 # Load the saved data
 data = ct.SolutionArray(gas)
@@ -213,6 +224,23 @@ plt.title('Temperature Profile')
 plt.legend()
 plt.grid()
 
+
+
+
+
+
+fig, ax1 = plt.subplots()
+
+ax1.plot(f.grid, f.heat_release_rate / 1e6, color='C4')
+ax1.set_ylabel('heat release rate [MW/m³]', color='C4')
+ax1.set_xlim(0, width)
+ax1.set(xlabel='distance from burner [m]')
+
+ax2 = ax1.twinx()
+ax2.plot(f.grid, f.T, color='C3')
+ax2.set_ylabel('temperature [K]', color='C3')
+plt.show()
+
 # Plot species mole fractions
 plt.figure()
 for species in ['H2', 'O2', 'H2O', 'OH']:
@@ -222,6 +250,9 @@ plt.ylabel('Mole Fraction')
 plt.title('Species Mole Fractions')
 plt.legend()
 plt.grid()
+
+
+
 
 # Show the plots
 plt.show()

@@ -21,7 +21,7 @@ import cantera as ct
 
 
 
-_DEFAULT_MECH = "SanDiego.yaml"
+_DEFAULT_MECH = "SanDiegoNitrogen.yaml"
 
 
 def _to_mole_fraction_str(x: Union[str, Mapping[str, float]]) -> str:
