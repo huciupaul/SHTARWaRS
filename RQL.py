@@ -147,7 +147,7 @@ TOTAL_mdot_air = 12
 
 
 P_0_pascals = P_0 * 101325
-T_0_kelvin = T_0 +273.15
+T_0_kelvin = T_0 +1673.15
 
 
 RICH_EQUIVALENCE_RATIO = 2.5
