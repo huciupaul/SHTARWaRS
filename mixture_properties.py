@@ -74,7 +74,7 @@ def mixture_properties(
     gas = ct.Solution(mech)
 
     # ---------------------------------------------------------------------
-    # Stream 1
+    # Stream1
     # ---------------------------------------------------------------------
     gas.TPX = T, P, _to_mole_fraction_str(X1)
     M1 = gas.mean_molecular_weight / 1000.0  # kg mol⁻¹
@@ -82,7 +82,7 @@ def mixture_properties(
     n1_vec = n1_total * gas.X
 
     # ---------------------------------------------------------------------
-    # Stream 2
+    # Stream2
     # ---------------------------------------------------------------------
     gas.TPX = T, P, _to_mole_fraction_str(X2)
     M2 = gas.mean_molecular_weight / 1000.0
@@ -110,12 +110,3 @@ def mixture_properties(
     return X_mix_str, mdot_tot, M_mix
 
 
-
-X_air = 'N2:0.78084,  O2:0.20946,  AR:0.00934,  CO2:0.000407 '
-
-X_H2 = 'H2: 1'
-
-m_air = 1
-m_H2= 1
-
-print(mixture_properties(X1=X_air,X2=X_H2,mdot1=m_air,mdot2=m_H2))
