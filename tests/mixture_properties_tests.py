@@ -12,7 +12,7 @@ import pytest
 # ──────────────────────────────────────────────────────────────────────────────
 # Import the functions under test
 # ──────────────────────────────────────────────────────────────────────────────
-from DSE.DSE_1.mixture_properties import mixture_properties, _to_mole_fraction_str
+from mixture_properties import _to_mole_fraction_str
 
 # ------------------------------------------------------------------------------
 # 1.  Helper must convert dict → Cantera string exactly
