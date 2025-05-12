@@ -1,92 +1,95 @@
 import cantera as ct
 import numpy as np
-import scipy.integrate
+import matplotlib.pyplot as plt
 
+# --------------------
+# Parameters
+# --------------------
+P = 12.1 * ct.one_atm         # Pressure [Pa]
+T_initial = 603.25            # Initial temperature [K]
+T_spark = 1500.0              # Spark reservoir temperature [K]
+phi = 2.5                     # Equivalence ratio
+# mechanism = 'H2_pNOX_15_94_TC.yaml' 
+mechanism = 'gri30.yaml'
 
-class ReactorOde:
-    def __init__(self, gas):
-        # Parameters of the ODE system and auxiliary data are stored in the
-        # ReactorOde object.
-        self.gas = gas
-        self.P = gas.P
+# --------------------
+# Setup gas mixture
+# --------------------
+gas = ct.Solution(mechanism)
+oxidizer = 'O2:1, N2:3.76'
+gas.set_equivalence_ratio(phi=phi, fuel='H2', oxidizer=oxidizer)
+gas.TP = T_initial, P
 
-    def __call__(self, t, y):
-        """the ODE function, y' = f(t,y) """
-        self.gas.set_unnormalized_mass_fractions(y[1:])
-        self.gas.TP = y[0], self.P
-        rho = self.gas.density
+# --------------------
+# Reactor setup
+# --------------------
+# Main reacting gas reactor
+reactor = ct.IdealGasConstPressureReactor(gas)
 
-        wdot = self.gas.net_production_rates
-        heat_source = 1e6 if t < 1e-5 else 0  # Energy input during the first 10 microseconds
-        dTdt = - (np.dot(self.gas.partial_molar_enthalpies, wdot) /
-                  (rho * self.gas.cp)) + heat_source / (rho * self.gas.cp)
-        dYdt = wdot * self.gas.molecular_weights / rho
+# Hot reservoir simulating the spark
+spark_gas = ct.Solution(mechanism)
+spark_gas.TP = T_spark, P
+spark_reservoir = ct.Reservoir(spark_gas)
 
-        return np.hstack((dTdt, dYdt))
+# Wall between spark reservoir and reactor — simulates heat input
+wall = ct.Wall(left=reactor, right=spark_reservoir, A=1.0)
 
+# Reactor network
+sim = ct.ReactorNet([reactor])
+# --------------------
+# Time integration
+# --------------------
+time = 0.0
+dt = 1e-6
+max_time = 1  # seconds
 
-gas = ct.Solution('gri30.yaml')
+times = []
+temperatures = []
+species_to_track = ['H2', 'O2', 'H2O', 'NO', 'NO2']
+species_data = {sp: [] for sp in species_to_track if sp in gas.species_names}
 
-# Initial condition
-P = 12.5 * ct.one_atm
-T_spark = 630  # K
-# Hydrogen as fuel and air with O2:21, N2:79
-gas.TPX = T_spark, P, 'H2:2,O2:1,N2:3.76'
-y0 = np.hstack((gas.T, gas.Y))
+wall.heat_transfer_coeff = 2e6 if time < 2e-4 else 0.0  # High heat flux for a short time
 
-# Set up objects representing the ODE and the solver
-ode = ReactorOde(gas)
-solver = scipy.integrate.ode(ode)
-solver.set_integrator('vode', method='bdf', with_jacobian=True)
-solver.set_initial_value(y0, 0.0)
+while time < max_time:
+    time += dt
+    sim.advance(time)
 
-# Integrate the equations, keeping T(t) and Y(k,t)
-t_end = 1e-3
-states = ct.SolutionArray(gas, 1, extra={'t': [0.0]})
-dt = 1e-5
-temperature_tolerance = 1e-3  # Steady-state temperature change threshold (K)
-previous_temperature = gas.T
+    times.append(time)
+    temperatures.append(reactor.T)
+    for sp in species_data:
+        species_data[sp].append(reactor.thermo[sp].X[0])
 
-while solver.successful() and solver.t < t_end:
-    solver.integrate(solver.t + dt)
-    gas.TPY = solver.y[0], P, solver.y[1:]
-    states.append(gas.state, t=solver.t)
+    # Stop early if temperature stabilizes
+    if time > 0.01 and abs(temperatures[-1] - temperatures[-2]) < 1e-4:
+        break
 
-    # Check for steady-state temperature
-    #temperature_change = abs(gas.T - previous_temperature)
-    #if temperature_change < temperature_tolerance:
-    #    print(f"Steady-state temperature reached at t = {solver.t:.6f} s")
-    #    break
-    #previous_temperature = gas.T
+# --------------------
+# Results
+# --------------------
+print(f"\nFinal Temperature: {reactor.T:.2f} K")
+print("Final Composition (mole fractions):")
+for sp in species_data:
+    print(f"  {sp}: {reactor.thermo[sp].X[0]:.5f}")
 
-# Plot the results
-try:
-    import matplotlib.pyplot as plt
+print(f"Total NOx: {reactor.thermo['NO'].X[0] + reactor.thermo['NO2'].X[0]:.5f}")
 
-    # Plot temperature vs. time
-    plt.figure()
-    plt.plot(states.t, states.T, color='r', label='Temperature', lw=2)
-    plt.xlabel('Time (s)')
-    plt.ylabel('Temperature (K)')
-    plt.title('Temperature vs. Time')
-    plt.legend()
-    plt.grid()
-    plt.show()
+# --------------------
+# Plotting
+# --------------------
+plt.figure(figsize=(10, 6))
+plt.subplot(2, 1, 1)
+plt.plot(times, temperatures, color='red', label='Temperature [K]')
+plt.ylabel('Temperature [K]')
+plt.grid()
+plt.legend()
 
-    # Plot concentration of H2O, NOx, and other intermediate species vs. time
-    plt.figure()
-    plt.plot(states.t, states('H2O').Y, label='H2O', lw=2)
-    plt.plot(states.t, states('NO').Y, label='NO', lw=2)
-    plt.plot(states.t, states('NO2').Y, label='NO2', lw=2)
-    plt.plot(states.t, states('OH').Y, label='OH', lw=2)
-    plt.plot(states.t, states('H').Y, label='H', lw=2)
-    plt.plot(states.t, states('O').Y, label='O', lw=2)
-    plt.xlabel('Time (s)')
-    plt.ylabel('Mass Fraction')
-    plt.title('Concentration of H2O, NOx, and Intermediate Species vs. Time')
-    plt.legend()
-    plt.grid()
-    plt.show()
+plt.subplot(2, 1, 2)
+for sp, values in species_data.items():
+    plt.plot(times, values, label=sp)
+plt.xlabel('Time [s]')
+plt.ylabel('Mole Fraction')
+plt.grid()
+plt.legend()
 
-except ImportError:
-    print('Matplotlib not found. Unable to plot results.')
+plt.tight_layout()
+plt.show()
