@@ -1,12 +1,9 @@
 import cantera as ct
-import numpy as np
-
 from mixture_properties import mixture_properties
 from typing import Union, Mapping
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-MECH = ""
 
 
 
@@ -121,19 +118,21 @@ def air_mass_flow_for_phi(
 
 
 """
-
+This script simulates a burner flame using Cantera. It sets up the initial conditions, 
+calculates the required mass flow rates for hydrogen and air, and then solves the burner flame problem. 
+The results are saved to a file and plotted.
 
 0: At CC inlet. Inlet conditions
 1: At Rich Combustion exhaust
 2: At mixer inlet
-3:At mixer outlet.
+3: At mixer outlet.
 4: At Lean Burn inlet
 5: At Lean Burn Outlet
 """
 
 ############################ Inlet conditions ###################################################
 
-X_air = 'N2:0.78084,  O2:0.20946,  AR:0.00934 '
+X_air = 'N2:0.78084,  O2:0.20946,  AR:0.00934,  CO2:0.000407 '
 X_H2 = 'H2:1'
 
 mdot_Kerosene = 0.0818986224 #Kg/s at take-off
@@ -147,7 +146,7 @@ TOTAL_mdot_air = 12
 
 
 P_0_pascals = P_0 * 101325
-T_0_kelvin = T_0 +1673.15
+T_0_kelvin = T_0 + 273.15
 
 
 RICH_EQUIVALENCE_RATIO = 2.5
@@ -165,31 +164,25 @@ print(mdot_air)
 (X_mix,mdot_mixture,M_mix) = mixture_properties(X1=X_H2,X2=X_air,mdot1=mdot_H2,mdot2=mdot_air)
 
 
-width = 0.05  # m
-
-initial_grid= np.linspace(0,width,300)
-gas = ct.Solution('SanDiegoNitrogen.yaml')
-gas.TPX = T_0_kelvin, P_0_pascals, X_mix
-print(gas())
 
 
 
-f = ct.BurnerFlame(gas, grid=initial_grid)
+gas = ct.Solution('SanDiego.yaml')
+gas.TPX = T_0, P_0_pascals, X_mix
+
+
+width = 0.2  # m
+
+f = ct.BurnerFlame(gas, width=width)
 f.burner.mdot = mdot_mixture
-
-f.set_refine_criteria(ratio=3.0, slope=0.02, curve=0.02)
+f.set_refine_criteria(ratio=3.0, slope=0.05, curve=0.05)
 f.show()
 
 loglevel = 1
 
-
-
-
-
 ################# First Solve ######################
 f.transport_model = 'mixture-averaged'
-
-f.solve(loglevel=1, refine_grid=True, auto=False)
+f.solve(loglevel, auto=True)
 
 if "native" in ct.hdf_support():
     output = Path() / "burner_flame.h5"
@@ -199,17 +192,15 @@ output.unlink(missing_ok=True)
 
 f.save(output, name="mix", description="solution with mixture-averaged transport")
 
+
+
+################# Subsequent Solves #########################
 f.transport_model = 'multicomponent'
 f.solve(loglevel)  # don't use 'auto' on subsequent solves
-
-
 f.show()
 f.save(output, name="multi", description="solution with multicomponent transport")
 
 f.save('burner_flame.csv', basis="mole", overwrite=True)
-
-
-
 
 # Load the saved data
 data = ct.SolutionArray(gas)
@@ -224,23 +215,6 @@ plt.title('Temperature Profile')
 plt.legend()
 plt.grid()
 
-
-
-
-
-
-fig, ax1 = plt.subplots()
-
-ax1.plot(f.grid, f.heat_release_rate / 1e6, color='C4')
-ax1.set_ylabel('heat release rate [MW/m³]', color='C4')
-ax1.set_xlim(0, width)
-ax1.set(xlabel='distance from burner [m]')
-
-ax2 = ax1.twinx()
-ax2.plot(f.grid, f.T, color='C3')
-ax2.set_ylabel('temperature [K]', color='C3')
-plt.show()
-
 # Plot species mole fractions
 plt.figure()
 for species in ['H2', 'O2', 'H2O', 'OH']:
@@ -250,9 +224,6 @@ plt.ylabel('Mole Fraction')
 plt.title('Species Mole Fractions')
 plt.legend()
 plt.grid()
-
-
-
 
 # Show the plots
 plt.show()

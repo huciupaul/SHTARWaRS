@@ -12,6 +12,7 @@ import pytest
 # ──────────────────────────────────────────────────────────────────────────────
 # Import the functions under test
 # ──────────────────────────────────────────────────────────────────────────────
+from mixture_properties import mixture_properties
 from mixture_properties import _to_mole_fraction_str
 
 # ------------------------------------------------------------------------------
