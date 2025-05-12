@@ -27,56 +27,56 @@ import numpy as np
 
 
 # Design option names
-design_option_names = [
+design_option_names = np.array([
     'Design Option 1',
     'Design Option 2',
     'Design Option 3',
     'Design Option 4',
     'Design Option 5'
-]
+])
 
 # Tradeoff criteria names
-tradeoff_criteria_names = [
+tradeoff_criteria_names = np.array([
     'Sustainability',           # Sustainability
     'Cost',                     # Cost
     'Tradeoff Criterion 3',     # Tradeoff Criterion 3
     'Tradeoff Criterion 4',     # Tradeoff Criterion 4
     'Tradeoff Criterion 5'      # Tradeoff Criterion 5
-]
+])
 
 # Tradeoff criteria weights
-tradeoff_criteria_weights = [
+tradeoff_criteria_weights = np.array([
     0.15, # Sustainability
     0.1,  # Cost
     0.2,  # Tradeoff Criterion 3
     0.45, # Tradeoff Criterion 4
     0.1   # Tradeoff Criterion 5
-]
+])
 
 # Tradeoff criteria weight margins
-tradeoff_criteria_weight_margins = [
+tradeoff_criteria_weight_margins = np.array([
     0.05,  # Sustainability
     0.05,  # Cost
     0.05,  # Tradeoff Criterion 3
     0.05,  # Tradeoff Criterion 4
     0.05   # Tradeoff Criterion 5
-]
+])
 
 # Tradeoff criteria values
 
-tradeoff_criteria_values = [
+tradeoff_criteria_values = np.array([
     [0.8, 0.7, 0.6, 0.5, 0.4],  # Design Option 1
     [0.7, 0.6, 0.5, 0.4, 0.3],  # Design Option 2
-    [0.6, 0.5, 0.4, 0.3, 0.2],  # Design Option 3
+    [0.0, 0.0, 0.0, 0.0, 0.0],  # Design Option 3
     [0.5, 0.4, 0.3, 0.2, 0.1],  # Design Option 4
     [0.4, 0.3, 0.2, 0.1, 0]     # Design Option 5
-]
+])
 
 # Tradeoff criteria value margins
-tradeoff_criteria_value_margins = [
+tradeoff_criteria_value_margins = np.array([
     [0.1, 0.1, 0.1, 0.1, 0.1],  # Design Option 1
     [0.1, 0.1, 0.1, 0.1, 0.1],  # Design Option 2
     [0.1, 0.1, 0.1, 0.1, 0.1],  # Design Option 3
     [0.1, 0.1, 0.1, 0.1, 0.1],  # Design Option 4
     [0.1, 0.1, 0.1, 0.1, 0.1]   # Design Option 5
-]
+])

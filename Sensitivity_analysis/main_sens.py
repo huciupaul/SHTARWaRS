@@ -92,13 +92,39 @@ def calculate_tradeoff_values(tradeoff_values, tradeoff_weights):
 
 output['Initial Tradeoff Values'] = calculate_tradeoff_values(sens_input.tradeoff_criteria_values, sens_input.tradeoff_criteria_weights)
 
+# Initialize total tradeoff values
+total_tradeoff_values = np.array([])
 
 # Analyze the sensitivity of the tradeoff values to changes in the tradeoff criteria weights
+# Loop over each tradeoff criterion
 for i in range(len(sens_input.tradeoff_criteria_weights)):
-    # 
+
+    value_array = np.linspace(sens_input.tradeoff_criteria_weights[i] - sens_input.tradeoff_criteria_weight_margins[i],
+                               sens_input.tradeoff_criteria_weights[i] + sens_input.tradeoff_criteria_weight_margins[i], 21)
+    
+    # Initialize tradeoff values for the current criterion
+    tradeoff_values_this_criterion = np.array([])
+
+    # Loop over each weight margin
+    for j in range(len(value_array)):
+        # Create a copy of the weights
+        weights = np.copy(sens_input.tradeoff_criteria_weights)
+        # Set the current weight to the new value
+        weights[i] = value_array[j]
+        # Calculate the tradeoff values
+        tradeoff_values = calculate_tradeoff_values(sens_input.tradeoff_criteria_values, weights)
+        
+        # Append the tradeoff values to the tradeoff values for this criterion
+        tradeoff_values_this_criterion = np.append(tradeoff_values_this_criterion, tradeoff_values, axis = 0)
+        
+        # Append the tradeoff values to the total tradeoff values array
+        total_tradeoff_values = np.append(total_tradeoff_values, tradeoff_values, axis=0)
+    # Store the tradeoff values in the output dictionary
+    output[f'Tradeoff Values for {sens_input.tradeoff_criteria_names[i]}'] = tradeoff_values_this_criterion
+
+# Store the total tradeoff values in the output dictionary
+output['Total Tradeoff Values'] = total_tradeoff_values
 
 
+print(output)
 
-print("Calculating tradeoff values...")
-tradeoff_values = calculate_tradeoff_values(sens_input.tradeoff_criteria_values, sens_input.tradeoff_criteria_weights)
-print(tradeoff_values)
