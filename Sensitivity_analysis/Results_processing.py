@@ -75,7 +75,7 @@ plt.show()
 
 
 
-def visualize_redness(data):
+def visualize_redness(data, row_labels, col_labels):
     data = np.array(data)
     if data.shape != (3, 5):
         raise ValueError("Input array must be 3x5")
@@ -83,15 +83,21 @@ def visualize_redness(data):
     # Normalize data to range [0, 1], where 0 = minimum (reddest), 1 = max (least red)
     norm = (data - np.min(data)) / (np.max(data) - np.min(data) + 1e-5)
 
+    # Add labels: one top row, one left column
+    cell_text = [[''] + col_labels]  # top header row
+    cell_colors = [[(1, 1, 1)] * (data.shape[1] + 1)]  # white background for header
+
+    for i in range(data.shape[0]):
+        row = [row_labels[i]] + list(data[i].astype(int))
+        colors = [(1, 1, 1)] + [(1, norm[i, j], norm[i, j]) for j in range(data.shape[1])]
+        cell_text.append(row)
+        cell_colors.append(colors)
+
     fig, ax = plt.subplots()
     ax.set_axis_off()
 
-    # Create the table cell colors
-    cell_colors = [[(1, norm[i, j], norm[i, j]) for j in range(data.shape[1])] for i in range(data.shape[0])]
-
-    # Create table
     table = ax.table(
-        cellText=data.astype(int),
+        cellText=cell_text,
         cellColours=cell_colors,
         cellLoc='center',
         loc='center'
@@ -101,11 +107,13 @@ def visualize_redness(data):
     plt.title("Redder = Lower Value", fontsize=14)
     plt.show()
 
-# Example input
+# Example usage
 data_input = win_matrix
 
+row_labels = ["LT-PEM", "HT-PEM", "SOFC"]
+col_labels = ["Sustainability", "Cost", "Efficiency", "Spec. P", "Integration"]
 
-visualize_redness(data_input)
+visualize_redness(data_input, row_labels, col_labels)
 
 
 
