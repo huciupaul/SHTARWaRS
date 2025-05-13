@@ -4,9 +4,20 @@ from docutils.parsers.rst.directives.tables import ListTable
 
 # Check if the input file is in the same directory
 try:
-    import main_sens as main
+    import sens_input_fuel_cell as sens_input
 except ImportError:
     raise ImportError("The input file 'sens_input_template.py' is not in the same directory. Please copy the template and modify it as instructed.")
+
+try:
+    import main_sens as main
+except ImportError:
+    raise ImportError("The input file 'main_sens' is not in the same directory. Please copy the template and modify it as instructed.")
+
+
+# input is what design will be selected for the table to check how many wins it has
+Which_to_check = 1
+
+
 '''
 dict_keys(['design_option_names', 'tradeoff_criteria_names', 'tradeoff_criteria_weights', 'tradeoff_criteria_weight_margins', 'tradeoff_criteria_values', 'tradeoff_criteria_value_margins', 'Tradeoff Wins',
            'Initial Tradeoff Values', 'Tradeoff Values for Sustainability', 'Tradeoff Wins for Sustainability', 'Tradeoff Values for Cost', 'Tradeoff Wins for Cost',
@@ -24,6 +35,31 @@ win_frac_eff = 100 * main.output['Tradeoff Wins for Efficiency'][1] /  sum(main.
 win_frac_spp = 100 * main.output['Tradeoff Wins for Specific power'][1] /  sum(main.output['Tradeoff Wins for Specific power'])
 win_frac_cost = 100 * main.output['Tradeoff Wins for Cost'][1] /  sum(main.output['Tradeoff Wins for Cost'])
 win_frac_int = 100 * main.output['Tradeoff Wins for Aircraft integration'][1] /  sum(main.output['Tradeoff Wins for Aircraft integration'])
+'''
+'design_option_names': sens_input.design_option_names,
+    'tradeoff_criteria_names': sens_input.tradeoff_criteria_names,
+    'tradeoff_criteria_weights': sens_input.tradeoff_criteria_weights,
+    'tradeoff_criteria_weight_margins': sens_input.tradeoff_criteria_weight_margins,
+    'tradeoff_criteria_values': sens_input.tradeoff_criteria_values,
+    'tradeoff_criteria_value_margins': sens_input.tradeoff_criteria_value_margins
+}
+'''
+
+
+win_matrix = []
+for j in range(len(sens_input.design_option_names)):
+    d = []
+    for i in range(len(sens_input.tradeoff_criteria_names)):
+        x = main.output['Tradeoff Wins for ' + sens_input.design_option_names[j] + ' and ' + sens_input.tradeoff_criteria_names[i]][Which_to_check]
+        d.append(x)
+    win_matrix.append(d)
+win_matrix = np.array(win_matrix)
+print(win_matrix)
+
+
+
+
+
 
 win_matrix = [
     [
@@ -49,7 +85,6 @@ win_matrix = [
     ]
 ]
 
-print(main.output['Tradeoff Wins for LTPEM and Aircraft integration'])
 
 
 
@@ -77,43 +112,47 @@ plt.show()
 
 def visualize_redness(data, row_labels, col_labels):
     data = np.array(data)
-    if data.shape != (3, 5):
-        raise ValueError("Input array must be 3x5")
 
-    # Normalize data to range [0, 1], where 0 = minimum (reddest), 1 = max (least red)
+    if data.shape != (len(row_labels), len(col_labels)):
+        raise ValueError("Shape of data does not match number of row and column labels")
+
+    # Normalize values for color (lower values = more red)
     norm = (data - np.min(data)) / (np.max(data) - np.min(data) + 1e-5)
-
-    # Add labels: one top row, one left column
-    cell_text = [[''] + col_labels]  # top header row
-    cell_colors = [[(1, 1, 1)] * (data.shape[1] + 1)]  # white background for header
-
-    for i in range(data.shape[0]):
-        row = [row_labels[i]] + list(data[i].astype(int))
-        colors = [(1, 1, 1)] + [(1, norm[i, j], norm[i, j]) for j in range(data.shape[1])]
-        cell_text.append(row)
-        cell_colors.append(colors)
+    cell_colors = [[(1, norm[i, j], norm[i, j]) for j in range(data.shape[1])] for i in range(data.shape[0])]
 
     fig, ax = plt.subplots()
     ax.set_axis_off()
 
     table = ax.table(
-        cellText=cell_text,
+        cellText=data.astype(int),
         cellColours=cell_colors,
-        cellLoc='center',
-        loc='center'
+        rowLabels=row_labels,
+        colLabels=col_labels,
+        loc='center',
+        cellLoc='center'
     )
 
-    table.scale(1, 2)  # Adjust table size
+    table.scale(1, 2)  # Adjust for better visibility
     plt.title("Redder = Lower Value", fontsize=14)
     plt.show()
 
-# Example usage
-data_input = win_matrix
 
-row_labels = ["LT-PEM", "HT-PEM", "SOFC"]
-col_labels = ["Sustainability", "Cost", "Efficiency", "Spec. P", "Integration"]
+data = win_matrix
+names = []
+criteria = []
+for i in range(len(sens_input.design_option_names)):
+    names.append(sens_input.design_option_names[i])
 
-visualize_redness(data_input, row_labels, col_labels)
+for i in range(len(sens_input.tradeoff_criteria_names)):
+    criteria.append(sens_input.tradeoff_criteria_names[i])
+
+
+sens_input.design_option_names[j]
+
+row_labels = names
+col_labels = criteria
+
+visualize_redness(data, row_labels, col_labels)
 
 
 
