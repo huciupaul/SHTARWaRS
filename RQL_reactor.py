@@ -2,6 +2,11 @@ import cantera as ct
 import numpy as np
 import matplotlib.pyplot as plt
 
+"""
+This script models spark ignition of H2 and air.
+Tracked params: temperature, H2, O2, H2O, NO, NO2
+"""
+
 #------Mechanism Selection------
 mechanism_1 = 'gri30.yaml'  # Mechanism for H2 combustion with NOx
 mechanism_2 = 'CapursoMechanism.yaml'  # Mechanism for H2 combustion with NOx
