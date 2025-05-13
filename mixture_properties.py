@@ -1,3 +1,14 @@
+from typing import Tuple, Union, Mapping
+import cantera as ct
+from RQL import MECH
+
+
+
+
+LHV_KEROSENE = 43.15e6   # J kg⁻¹
+LHV_H2       = 120.0e6   # J kg⁻¹
+
+
 """
 General utilities for mixing two arbitrary gas streams on a *mass‑flow* basis
 using Cantera.  Each stream is characterised by:
@@ -16,12 +27,10 @@ species listed in X₁ and X₂ are present.
 
 """
 
-from typing import Tuple, Union, Mapping
-import cantera as ct
 
 
 
-_DEFAULT_MECH = "SanDiegoNitrogen.yaml"
+
 
 
 def _to_mole_fraction_str(x: Union[str, Mapping[str, float]]) -> str:
@@ -41,7 +50,7 @@ def mixture_properties(
     *,
     T: float = 298.15,
     P: float = 101_325.0,
-    mech: str = _DEFAULT_MECH,
+    mech: str = MECH,
 ) -> Tuple[str, float, float]:
     """Return (X_mix_str, mdot_tot, M_mix) for two arbitrary streams.
 
@@ -110,3 +119,73 @@ def mixture_properties(
     return X_mix_str, mdot_tot, M_mix
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def kerosene_to_h2(mdot_kerosene: float,
+                   *,
+                   lhv_kerosene: float = LHV_KEROSENE,
+                   lhv_h2: float = LHV_H2) -> float:
+    """
+        This function inputs the amount of kerosene burnt and outputs the equivalent ammount
+        of hydrogen needed for combustion using LHV.
+    """
+    if mdot_kerosene < 0:
+        raise ValueError("Mass-flow must be non-negative.")
+    return mdot_kerosene * lhv_kerosene / lhv_h2
+
+
+def _as_mole_str(x: Union[str, Mapping[str, float]]) -> str:
+    """
+    Returns a mapping as a format of Cantera readable string library.
+    """
+    if isinstance(x, str):
+        return x
+    return ", ".join(f"{k}:{v}" for k, v in x.items())
+
+
+def air_mass_flow_for_phi(
+    mdot_H2: float,
+    phi: float,
+    *,
+    X_air: Union[str, Mapping[str, float]],
+    mech: str = MECH,
+    T: float = 298.15,
+    P: float = 101_325.0,
+) -> float:
+    """
+    Given an equivalence ratio, and a mass flow rate of hydrogen, (and a dictionary of the mole fraction of air desired)
+    this function delivers the ammount of mass flow of air necesary.
+    """
+    if mdot_H2 < 0:
+        raise ValueError("mdot_H2 must be non-negative.")
+    if phi <= 0:
+        raise ValueError("phi must be positive.")
+
+    gas = ct.Solution(mech)
+    i_H2 = gas.species_index("H2")
+    MW_H2 = gas.molecular_weights[i_H2] / 1000.0  # kg mol⁻¹
+
+    n_H2 = mdot_H2 / MW_H2           # mol s⁻¹ H2
+    n_O2_stoich = 0.5 * n_H2         # mol s⁻¹ O2
+
+    MW_O2 = gas.molecular_weights[gas.species_index("O2")] / 1000.0
+    mdot_O2_req = n_O2_stoich * MW_O2
+
+    gas.TPX = T, P, _as_mole_str(X_air)
+    Y_O2_air = gas.mass_fraction_dict()["O2"]
+
+    mdot_air_stoich = mdot_O2_req / Y_O2_air
+    return mdot_air_stoich / phi
