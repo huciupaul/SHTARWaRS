@@ -27,7 +27,7 @@ dict_keys(['design_option_names', 'tradeoff_criteria_names', 'tradeoff_criteria_
            'Tradeoff Values for HTPEM', 'Tradeoff Wins for HTPEM and Sustainability', 'Tradeoff Wins for HTPEM and Cost', 'Tradeoff Wins for HTPEM and Efficiency', 'Tradeoff Wins for HTPEM and Specific power',
            'Tradeoff Wins for HTPEM and Aircraft integration', 'Tradeoff Values for SOFC', 'Tradeoff Wins for SOFC and Sustainability', 'Tradeoff Wins for SOFC and Cost', 
            'Tradeoff Wins for SOFC and Efficiency', 'Tradeoff Wins for SOFC and Specific power', 'Tradeoff Wins for SOFC and Aircraft integration', 'Total Tradeoff Values'])
-'''
+
 
 # total effect on winners
 win_frac_sus = 100 * main.output['Tradeoff Wins for Sustainability'][1] /  sum(main.output['Tradeoff Wins for Sustainability'])
@@ -35,7 +35,7 @@ win_frac_eff = 100 * main.output['Tradeoff Wins for Efficiency'][1] /  sum(main.
 win_frac_spp = 100 * main.output['Tradeoff Wins for Specific power'][1] /  sum(main.output['Tradeoff Wins for Specific power'])
 win_frac_cost = 100 * main.output['Tradeoff Wins for Cost'][1] /  sum(main.output['Tradeoff Wins for Cost'])
 win_frac_int = 100 * main.output['Tradeoff Wins for Aircraft integration'][1] /  sum(main.output['Tradeoff Wins for Aircraft integration'])
-'''
+
 'design_option_names': sens_input.design_option_names,
     'tradeoff_criteria_names': sens_input.tradeoff_criteria_names,
     'tradeoff_criteria_weights': sens_input.tradeoff_criteria_weights,
@@ -58,36 +58,7 @@ print(win_matrix)
 
 
 
-
-
-
-win_matrix = [
-    [
-        main.output['Tradeoff Wins for LTPEM and Sustainability'][1],
-        main.output['Tradeoff Wins for LTPEM and Cost'][1],
-        main.output['Tradeoff Wins for LTPEM and Efficiency'][1],
-        main.output['Tradeoff Wins for LTPEM and Specific power'][1],
-        main.output['Tradeoff Wins for LTPEM and Aircraft integration'][1],
-    ],
-    [
-        main.output['Tradeoff Wins for HTPEM and Sustainability'][1],
-        main.output['Tradeoff Wins for HTPEM and Cost'][1],
-        main.output['Tradeoff Wins for HTPEM and Efficiency'][1],
-        main.output['Tradeoff Wins for HTPEM and Specific power'][1],
-        main.output['Tradeoff Wins for HTPEM and Aircraft integration'][1],
-    ],
-    [
-        main.output['Tradeoff Wins for SOFC and Sustainability'][1],
-        main.output['Tradeoff Wins for SOFC and Cost'][1],
-        main.output['Tradeoff Wins for SOFC and Efficiency'][1],
-        main.output['Tradeoff Wins for SOFC and Specific power'][1],
-        main.output['Tradeoff Wins for SOFC and Aircraft integration'][1],
-    ]
-]
-
-
-
-
+'''
 wins = main.output['Tradeoff Wins']
 namesw = ['LT-PEM', 'HT-PEM', 'SOFC']
 
@@ -107,7 +78,7 @@ plt.bar(names, percent, color='green')
 plt.title('Percentage of wins')
 plt.ylabel("Values")
 plt.show()
-
+'''
 
 
 def visualize_redness(data, row_labels, col_labels):
