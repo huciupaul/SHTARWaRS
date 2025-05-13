@@ -17,6 +17,14 @@ except ImportError:
 # input is what design will be selected for the table to check how many wins it has
 Which_to_check = 1
 
+names = []
+criteria = []
+for i in range(len(sens_input.design_option_names)):
+    names.append(sens_input.design_option_names[i])
+
+for i in range(len(sens_input.tradeoff_criteria_names)):
+    criteria.append(sens_input.tradeoff_criteria_names[i])
+
 
 '''
 dict_keys(['design_option_names', 'tradeoff_criteria_names', 'tradeoff_criteria_weights', 'tradeoff_criteria_weight_margins', 'tradeoff_criteria_values', 'tradeoff_criteria_value_margins', 'Tradeoff Wins',
@@ -58,27 +66,32 @@ print(win_matrix)
 
 
 
-'''
+
 wins = main.output['Tradeoff Wins']
-namesw = ['LT-PEM', 'HT-PEM', 'SOFC']
+
 
 
 #graph winner total and percentage per weight in bar chart
 plt.figure()
-plt.bar(namesw, wins, color='blue')
-plt.title("W")
-plt.ylabel("Values")
+plt.bar(names, wins, color='blue')
+plt.title("Number of wins per design option")
 plt.show()
 
-names = ['Sustainability', 'efficiency', 'Specific power', 'lifetime cost', 'integration']
-percent = [win_frac_sus, win_frac_eff, win_frac_spp, win_frac_cost, win_frac_int]
+
+
+win_frac_sus = 100 * main.output['Tradeoff Wins for Sustainability'][1] /  sum(main.output['Tradeoff Wins for Sustainability'])
+percent = []
+for i in range(len(sens_input.tradeoff_criteria_names)):
+    percent.append(100 * main.output['Tradeoff Wins for ' + sens_input.tradeoff_criteria_names[i]][Which_to_check] /  sum(main.output['Tradeoff Wins for ' + sens_input.tradeoff_criteria_names[i]]))
+
+
 
 plt.figure()
-plt.bar(names, percent, color='green')
+plt.bar(criteria, percent, color='green')
 plt.title('Percentage of wins')
 plt.ylabel("Values")
 plt.show()
-'''
+
 
 
 def visualize_redness(data, row_labels, col_labels):
@@ -109,13 +122,7 @@ def visualize_redness(data, row_labels, col_labels):
 
 
 data = win_matrix
-names = []
-criteria = []
-for i in range(len(sens_input.design_option_names)):
-    names.append(sens_input.design_option_names[i])
 
-for i in range(len(sens_input.tradeoff_criteria_names)):
-    criteria.append(sens_input.tradeoff_criteria_names[i])
 
 
 sens_input.design_option_names[j]
