@@ -11,7 +11,8 @@ T_spark = 1500.0              # Spark reservoir temperature [K]
 phi = 2.5                     # Equivalence ratio
 # mechanism = 'H2_pNOX_15_94_TC.yaml' 
 # mechanism = 'gri30.yaml'
-mechanism = 'H2_pNOX_15_94_TC.yaml'  # Mechanism for H2 combustion with NOx
+# mechanism = 'H2_pNOX_15_94_TC.yaml'  # Mechanism for H2 combustion with NOx
+mechanism = 'CapursoMechanism.yaml'  # Mechanism for H2 combustion with NOx
 
 # --------------------
 # Setup gas mixture
@@ -72,7 +73,7 @@ print("Final Composition (mole fractions):")
 for sp in species_data:
     print(f"  {sp}: {reactor.thermo[sp].X[0]:.5f}")
 
-print(f"Total NOx: {reactor.thermo['NO'].X[0]:.5f}")
+print(f"Total NOx: {reactor.thermo['NO'].X[0] + reactor.thermo['N2O'].X[0]:.5f}")
 
 # --------------------
 # Plotting
