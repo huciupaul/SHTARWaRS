@@ -21,6 +21,9 @@ LHV_H2       = 120.0e6   # J kg⁻¹
 ATM2PA       = 101_325.0
 C2K          = 273.15     # °C → K
 
+
+TOTAL_Air = 6
+
 def kerosene_to_h2(mdot_kerosene: float,
                    *,
                    lhv_kerosene: float = LHV_KEROSENE,
@@ -106,7 +109,7 @@ X_mix, mdot_mix, _ = mixture_properties(X1=X_H2, X2=X_air,
 # -----------------------------------------------------------------------------
 # # 3 – GRID
 # # -----------------------------------------------------------------------------
-width        = 0.001                        # m
+width        = 0.01                        # m
 initial_grid = np.linspace(0.0, width, 800)
 
 # -----------------------------------------------------------------------------
@@ -120,9 +123,14 @@ gas.transport_model = "multicomponent"
 print(gas())
 
 
-flame = ct.BurnerFlame(gas, grid=initial_grid)
+flame = ct.BurnerFlame(gas,width=width)
 flame.burner.mdot = mdot_mix
 
+# Set refinement criteria (you can tweak these tolerances)
+flame.set_refine_criteria(ratio=6.0, slope=0.005, curve=0.01)
+
+# Solve with automatic grid refinement
+flame.solve(loglevel=1, auto=True, refine_grid=True)
 
 # enable reacting solution
 flame.energy_enabled = True
@@ -172,132 +180,83 @@ plt.show()
 
 
 
+
+
+
+###############################################################################
+# 6 – MIX EXHAUST  +  QUENCH AIR  +  WATER   (with mixture_properties)
+###############################################################################
+# ===== USER INPUTS for the quench stage ======================================
+mdot_air2 = TOTAL_Air - mdot_air   # kg/s  (remaining or quench air)
+T_air2    = 400   # K     (temperature of that air)
+mdot_H2O  = 0.5   # kg/s  (water vapour; if liquid, pre-convert to vapour mass)
+T_H2O     = 400  # K     (≥ 373 K so it is gas phase)
+P_mix     = flame.P        # keep the same pressure for the mixer
+# ============================================================================
+
+# ---------------------------------------------------------------------------
+# 6.1  Build Solution objects for each feed stream
+# ---------------------------------------------------------------------------
+# --- exhaust from the rich burner-flame -------------------------------------
+gas_exh = ct.Solution(MECH)
+gas_exh.TPX = flame.T[-1], P_mix, flame.X[:, -1]   # exit state
+print(gas_exh())
+
+# --- quench air stream ------------------------------------------------------
+gas_air2 = ct.Solution(MECH)
+print(T_air2,"....", P_mix,"....", X_air)
+gas_air2.TPX = T_air2, P_mix, X_air
 quit()
+# --- water vapour stream ----------------------------------------------------
+gas_H2O = ct.Solution(MECH)
+gas_H2O.TPX = T_H2O, P_mix, "H2O:1"
+
+# ---------------------------------------------------------------------------
+# 6.2  Use mixture_properties  (two streams at a time)
+# ---------------------------------------------------------------------------
+# First mix: (exhaust + quench-air)  →  X_mix1 , mdot_mix1
+X_exh = _as_mole_str(
+    {sp: x for sp, x in zip(gas_exh.species_names, gas_exh.X) if x > 0.0}
+)
+X_mix1, mdot_mix1, _ = mixture_properties(
+    X1=X_exh,
+    X2=X_air,
+    mdot1=mdot_mix,      # from the rich flame
+    mdot2=mdot_air2
+)
+
+# Second mix: (previous mixture + water)  →  X_mix_final
+X_mix_final, mdot_mix_final, _ = mixture_properties(
+    X1=X_mix1,
+    X2="H2O:1",
+    mdot1=mdot_mix1,
+    mdot2=mdot_H2O
+)
+
+# ---------------------------------------------------------------------------
+# 6.3  Compute adiabatic-mix temperature (mass-weighted enthalpy)
+# ---------------------------------------------------------------------------
+h_mix = (
+    mdot_mix      * gas_exh.enthalpy_mass +
+    mdot_air2     * gas_air2.enthalpy_mass +
+    mdot_H2O      * gas_H2O.enthalpy_mass
+) / mdot_mix_final
+
+# ---------------------------------------------------------------------------
+# 6.4  Create the final mixed gas Solution object
+# ---------------------------------------------------------------------------
+mixed_gas = ct.Solution(MECH)
+mixed_gas.TPX = 500.0, P_mix, X_mix_final      # rough initial T
+mixed_gas.HP  = h_mix, P_mix                   # enforce adiabatic mix
+
+print("\n===== MIXER RESULTS =====")
+print(f"Mass-flow total      : {mdot_mix_final:10.4f}  kg/s")
+print(f"Adiabatic mix T      : {mixed_gas.T:10.2f}  K")
+print(f"Lean-stage φ (air only): {mixed_gas.equivalence_ratio():6.3f}")
+print("=========================\n")
 
 
+print(mixed_gas())
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-##########################################################################################################################################
-##########################################################################################################################################
-##########################################################################################################################################
-
-
-
-
-
-
-
-import pandas as pd
-import cantera as ct
-
-# ────────────────────────────────────────────────────────────────────────────────
-# 1) Read your combustion results from CSV
-# ────────────────────────────────────────────────────────────────────────────────
-# Assume 'combustion_results.csv' has columns: time, T (K), P (Pa), and species mass
-df = pd.read_csv('burner_flame.csv')
-
-# Take the last row as the "combustion product" state
-prod = df.iloc[-1]
-T_prod = prod['T']
-
-# build a dict of species mass fractions
-species_cols = [c for c in df.columns if c not in ('time','T','P')]
-Y_prod = {s: prod[s] for s in species_cols}
-
-# Create a Cantera Solution for the product
-gas_prod = ct.Solution('SanDiegoNitrogen.yaml')
-gas_prod.TPX = T_prod, P_0_pascals, Y_prod
-
-# ────────────────────────────────────────────────────────────────────────────────
-# 2) Define the “air” and “water” streams
-# ────────────────────────────────────────────────────────────────────────────────
-# Air: 21% O2, 79% N2 by mole, at T_air
-T_air = 350.0  # K, your choice
-gas_air = ct.Solution('gri30.yaml')
-gas_air.TPX = T_air, P_0_pascals, 'O2:0.21, N2:0.79'
-
-# Water vapor: pure H2O at T_water
-T_water = 300.0  # K, your choice
-gas_water = ct.Solution('gri30.yaml')
-gas_water.TPX = T_water, P_0_pascals, 'H2O:1.0'
-
-# ────────────────────────────────────────────────────────────────────────────────
-# 3) Set up the 0D mixer reactor network (no reaction)
-# ────────────────────────────────────────────────────────────────────────────────
-# Create reservoirs for each stream
-res_prod  = ct.Reservoir(gas_prod)
-res_air   = ct.Reservoir(gas_air)
-res_water = ct.Reservoir(gas_water)
-
-# Create the “mixer” reactor: IdealGasReactor at constant volume
-gas_mix = ct.Solution('gri30.yaml')
-reactor = ct.IdealGasReactor(gas_mix, energy='on', volume=1.0)
-
-# Hook up three MassFlowControllers to feed the reactor
-# (choose mass flow rates in kg/s to get the mix ratio you want)
-mdot_prod  = 1.0    # e.g. 1 kg/s of product
-mdot_air   = 0.5    # 0.5 kg/s of air
-mdot_water = 0.1    # 0.1 kg/s of water
-
-mfc1 = ct.MassFlowController(res_prod,  reactor, mdot=mdot_prod)
-mfc2 = ct.MassFlowController(res_air,   reactor, mdot=mdot_air)
-mfc3 = ct.MassFlowController(res_water, reactor, mdot=mdot_water)
-
-# Use a PressureController (valve) to let the mixed gas escape
-# and hold the reactor near P_prod
-outlet = ct.Reservoir(gas_mix)
-# “master” can be any upstream controller; here we link it to mfc1
-pc = ct.PressureController(reservoir=outlet, reactor=reactor, master=mfc1, K=1.0)
-
-# Build the network and advance to steady‐state (e.g. 2 s)
-net = ct.ReactorNet([reactor])
-net.advance(2.0)
-
-# ────────────────────────────────────────────────────────────────────────────────
-# 4) Report the mixed‐stream state
-# ────────────────────────────────────────────────────────────────────────────────
-print(f"Mixed reactor temperature: {reactor.T:.2f} K")
-print(f"Mixed reactor pressure:    {reactor.thermo.P/ct.one_atm:.3f} atm")
-print("Mixed composition (mole fractions):")
-for i, sp in enumerate(gas_mix.species_names):
-    x = reactor.thermo.X[i]
-    if x > 1e-6:
-        print(f"  {sp:6s}: {x:.4f}")
 
 
