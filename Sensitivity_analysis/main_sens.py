@@ -130,7 +130,7 @@ output['Initial Tradeoff Values'] = calculate_tradeoff_values(sens_input.tradeof
 
 
 # Initialize total tradeoff values
-total_tradeoff_values = np.array([[0,0,0]])
+total_tradeoff_values = np.zeros((1,len(sens_input.design_option_names)))
 
 # Analyze the sensitivity of the tradeoff values to changes in the tradeoff criteria weights
 # Loop over each tradeoff criterion
@@ -140,7 +140,7 @@ for i in range(len(sens_input.tradeoff_criteria_weights)):
                                sens_input.tradeoff_criteria_weights[i] + sens_input.tradeoff_criteria_weight_margins[i], 21)
     
     # Initialize tradeoff values for the current criterion
-    tradeoff_values_this_criterion = np.array([[0,0,0]])
+    tradeoff_values_this_criterion = np.zeros((1,len(sens_input.design_option_names)))
 
     # Initialize wins array for the current criterion
     tradeoff_wins_this_criterion = np.zeros((len(sens_input.design_option_names)))
@@ -175,34 +175,37 @@ for i in range(len(sens_input.tradeoff_criteria_weights)):
 # Analyze the sensitivity of the tradeoff values to changes in the tradeoff scores for each design option
 # Loop over each design option
 for i in range(len(sens_input.design_option_names)):
-    # Create a copy of the tradeoff values
-    tradeoff_values = np.copy(sens_input.tradeoff_criteria_values)
     
     # Loop over each tradeoff criterion
     for j in range(len(sens_input.tradeoff_criteria_names)):
+
+        # Create a copy of the tradeoff values
+        tradeoff_values = np.copy(sens_input.tradeoff_criteria_values)
+
         # Create a copy of the tradeoff values for this design option
         tradeoff_values_this_design_option = np.copy(tradeoff_values[i])
         
         # Create an array of values for the current design option
-        value_array = np.linspace(tradeoff_values_this_design_option[j] * (1 - 2*sens_input.tradeoff_criteria_value_margins[i][j]),
-                                   tradeoff_values_this_design_option[j] * (1 + 2*sens_input.tradeoff_criteria_value_margins[i][j]), 21)
+        value_array = np.linspace(tradeoff_values[i][j] * (1 - sens_input.tradeoff_criteria_value_margins[i][j]),
+                                   tradeoff_values[i][j] * (1 + sens_input.tradeoff_criteria_value_margins[i][j]), 21)
+        
         
         # Initialize tradeoff values for the current design option
-        tradeoff_values_this_design_option = np.array([[0,0,0]])
+        tradeoff_values_this_design_option = np.zeros((1,len(sens_input.design_option_names)))
 
         # Initialize wins array for the current design option
         tradeoff_wins_this_design_option = np.zeros((len(sens_input.design_option_names)))
 
-        tradeoff_values[i][j] = 1
         
         # Loop over each value margin
         for k in range(len(value_array)):
             # Set the current value to the new value
             # print(f"Design Option: {i}, Tradeoff Criterion: {j}, Value: {value_array[k]}")
+            
             tradeoff_values[i][j] = value_array[k]
             # Calculate the tradeoff values
             tradeoff_scores = calculate_tradeoff_values(tradeoff_values, sens_input.tradeoff_criteria_weights)
-
+            # print("tradeoff scores: ", tradeoff_scores)
             # Find the winning design option
             winning_design_option = find_winner(tradeoff_scores)
             # Increment the tradeoff wins for the winning design option
