@@ -63,9 +63,9 @@ tradeoff_criteria_weight_margins = np.array([
 # Tradeoff criteria values
 
 tradeoff_criteria_values = np.array([
-    [10, 1.067615658362990000, 60, 2.75, 7],  # Design Option 1
-    [10, 0.859598853868195000, 60, 2.75, 10],  # Design Option 2
-    [5, 0.480769230769231000, 65, 2,  3]  # Design Option 3
+    [10, 50, 65, 3.25, 7],  # Design Option 1
+    [10, 50, 65, 5.5, 10],  # Design Option 2
+    [5, 16.67, 70, 5,  3]  # Design Option 3
 ])
 
 # Tradeoff criteria value margins
