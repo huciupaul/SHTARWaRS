@@ -11,11 +11,12 @@ Tracked params: temperature, H2, O2, H2O, NO, NO2
 mechanism_1 = 'gri30.yaml'  # Mechanism for H2 combustion with NOx
 mechanism_2 = 'CapursoMechanism.yaml'  # Mechanism for H2 combustion with NOx
 mechanism_3 = 'H2_pNOX_15_94_TC.yaml'  # Mechanism for H2 combustion with NOx
+mechanism = mechanism_1
 
 #------Parameters------
 P = 12.1 * ct.one_atm         # Pressure [Pa]
 T_initial = 603.25            # Initial temperature [K]
-gas = ct.Solution(mechanism_1)
+gas = ct.Solution(mechanism)
 gas.TP = T_initial, P
 gas.set_equivalence_ratio(2.5, 'H2', 'O2:2.1, N2:7.9')
 gas_copy = gas
