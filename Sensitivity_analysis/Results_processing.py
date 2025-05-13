@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from docutils.parsers.rst.directives.tables import ListTable
 
 # Check if the input file is in the same directory
 try:
@@ -16,21 +17,50 @@ dict_keys(['design_option_names', 'tradeoff_criteria_names', 'tradeoff_criteria_
            'Tradeoff Wins for HTPEM and Aircraft integration', 'Tradeoff Values for SOFC', 'Tradeoff Wins for SOFC and Sustainability', 'Tradeoff Wins for SOFC and Cost', 
            'Tradeoff Wins for SOFC and Efficiency', 'Tradeoff Wins for SOFC and Specific power', 'Tradeoff Wins for SOFC and Aircraft integration', 'Total Tradeoff Values'])
 '''
-print(main.output['Tradeoff Wins for Specific power'])
 
-# sustainability total effect on winners
+# total effect on winners
 win_frac_sus = 100 * main.output['Tradeoff Wins for Sustainability'][1] /  sum(main.output['Tradeoff Wins for Sustainability'])
 win_frac_eff = 100 * main.output['Tradeoff Wins for Efficiency'][1] /  sum(main.output['Tradeoff Wins for Efficiency'])
 win_frac_spp = 100 * main.output['Tradeoff Wins for Specific power'][1] /  sum(main.output['Tradeoff Wins for Specific power'])
 win_frac_cost = 100 * main.output['Tradeoff Wins for Cost'][1] /  sum(main.output['Tradeoff Wins for Cost'])
 win_frac_int = 100 * main.output['Tradeoff Wins for Aircraft integration'][1] /  sum(main.output['Tradeoff Wins for Aircraft integration'])
 
+win_matrix = [
+    [
+        main.output['Tradeoff Wins for LTPEM and Sustainability'][1],
+        main.output['Tradeoff Wins for LTPEM and Cost'][1],
+        main.output['Tradeoff Wins for LTPEM and Efficiency'][1],
+        main.output['Tradeoff Wins for LTPEM and Specific power'][1],
+        main.output['Tradeoff Wins for LTPEM and Aircraft integration'][1],
+    ],
+    [
+        main.output['Tradeoff Wins for HTPEM and Sustainability'][1],
+        main.output['Tradeoff Wins for HTPEM and Cost'][1],
+        main.output['Tradeoff Wins for HTPEM and Efficiency'][1],
+        main.output['Tradeoff Wins for HTPEM and Specific power'][1],
+        main.output['Tradeoff Wins for HTPEM and Aircraft integration'][1],
+    ],
+    [
+        main.output['Tradeoff Wins for SOFC and Sustainability'][1],
+        main.output['Tradeoff Wins for SOFC and Cost'][1],
+        main.output['Tradeoff Wins for SOFC and Efficiency'][1],
+        main.output['Tradeoff Wins for SOFC and Specific power'][1],
+        main.output['Tradeoff Wins for SOFC and Aircraft integration'][1],
+    ]
+]
+
+print(main.output['Tradeoff Wins for LTPEM and Aircraft integration'])
+
+
+
 wins = main.output['Tradeoff Wins']
 namesw = ['LT-PEM', 'HT-PEM', 'SOFC']
 
+
+#graph winner total and percentage per weight in bar chart
 plt.figure()
 plt.bar(namesw, wins, color='blue')
-plt.title("Set 1")
+plt.title("W")
 plt.ylabel("Values")
 plt.show()
 
@@ -42,6 +72,41 @@ plt.bar(names, percent, color='green')
 plt.title('Percentage of wins')
 plt.ylabel("Values")
 plt.show()
+
+
+
+def visualize_redness(data):
+    data = np.array(data)
+    if data.shape != (3, 5):
+        raise ValueError("Input array must be 3x5")
+
+    # Normalize data to range [0, 1], where 0 = minimum (reddest), 1 = max (least red)
+    norm = (data - np.min(data)) / (np.max(data) - np.min(data) + 1e-5)
+
+    fig, ax = plt.subplots()
+    ax.set_axis_off()
+
+    # Create the table cell colors
+    cell_colors = [[(1, norm[i, j], norm[i, j]) for j in range(data.shape[1])] for i in range(data.shape[0])]
+
+    # Create table
+    table = ax.table(
+        cellText=data.astype(int),
+        cellColours=cell_colors,
+        cellLoc='center',
+        loc='center'
+    )
+
+    table.scale(1, 2)  # Adjust table size
+    plt.title("Redder = Lower Value", fontsize=14)
+    plt.show()
+
+# Example input
+data_input = win_matrix
+
+
+visualize_redness(data_input)
+
 
 
 #print(main.total_tradeoff_values)
