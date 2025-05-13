@@ -3,6 +3,7 @@ from mixture_properties import mixture_properties
 from typing import Union, Mapping
 import matplotlib.pyplot as plt
 from pathlib import Path
+import numpy as np
 
 
 """
@@ -20,7 +21,6 @@ LHV_KEROSENE = 43.15e6   # J kg⁻¹
 LHV_H2       = 120.0e6   # J kg⁻¹
 ATM2PA       = 101_325.0
 C2K          = 273.15     # °C → K
-
 
 TOTAL_Air = 6
 
@@ -118,126 +118,13 @@ initial_grid = np.linspace(0.0, width, 800)
 gas = ct.Solution(MECH)
 gas.TPX = T_0_C + C2K, P_0_atm * ATM2PA, X_mix
 
-
-<<<<<<< HEAD
-<<<<<<< HEAD
-
-
-
-
-
-
-"""
-This script simulates a burner flame using Cantera. It sets up the initial conditions, 
-calculates the required mass flow rates for hydrogen and air, and then solves the burner flame problem. 
-The results are saved to a file and plotted.
-
-0: At CC inlet. Inlet conditions
-1: At Rich Combustion exhaust
-2: At mixer inlet
-3: At mixer outlet.
-4: At Lean Burn inlet
-5: At Lean Burn Outlet
-"""
-
-############################ Inlet conditions ###################################################
-
-X_air = 'N2:0.78084,  O2:0.20946,  AR:0.00934,  CO2:0.000407 '
-X_H2 = 'H2:1'
-
-mdot_Kerosene = 0.0818986224 #Kg/s at take-off
-
-
-# Quantities @ CC entrance
-P_0 = 12.1 #Atmospheres
-T_0 = 330 # CELSIUS
-TOTAL_mdot_air = 12
-
-
-
-P_0_pascals = P_0 * 101325
-T_0_kelvin = T_0 + 273.15
-
-
-RICH_EQUIVALENCE_RATIO = 2.5
-
-
-
-
-
-mdot_H2 = kerosene_to_h2(mdot_Kerosene)
-print(mdot_H2)
-mdot_air = air_mass_flow_for_phi(mdot_H2=mdot_H2,phi=RICH_EQUIVALENCE_RATIO,X_air=X_air)
-
-print(mdot_air)
-
-(X_mix,mdot_mixture,M_mix) = mixture_properties(X1=X_H2,X2=X_air,mdot1=mdot_H2,mdot2=mdot_air)
-
-
-
-
-
-gas = ct.Solution('SanDiego.yaml')
-gas.TPX = T_0, P_0_pascals, X_mix
-
-
-width = 0.2  # m
-
-f = ct.BurnerFlame(gas, width=width)
-f.burner.mdot = mdot_mixture
-f.set_refine_criteria(ratio=3.0, slope=0.05, curve=0.05)
-f.show()
-
-loglevel = 1
-
-################# First Solve ######################
-f.transport_model = 'mixture-averaged'
-f.solve(loglevel, auto=True)
-
-if "native" in ct.hdf_support():
-    output = Path() / "burner_flame.h5"
-else:
-    output = Path() / "burner_flame.yaml"
-output.unlink(missing_ok=True)
-
-f.save(output, name="mix", description="solution with mixture-averaged transport")
-
-
-
-################# Subsequent Solves #########################
-f.transport_model = 'multicomponent'
-f.solve(loglevel)  # don't use 'auto' on subsequent solves
-f.show()
-f.save(output, name="multi", description="solution with multicomponent transport")
-
-f.save('burner_flame.csv', basis="mole", overwrite=True)
-
-# Load the saved data
-data = ct.SolutionArray(gas)
-data.read_csv('burner_flame.csv')
-
-# Plot temperature profile
-=======
-=======
->>>>>>> af1e39737ec0a5ccd90e2399aff2223894492a21
 gas.transport_model = "multicomponent"
 print(gas())
 
 
-<<<<<<< HEAD
 flame = ct.BurnerFlame(gas, grid=initial_grid)
 flame.burner.mdot = mdot_mix
 
-=======
-flame = ct.BurnerFlame(gas,width=width)
-flame.burner.mdot = mdot_mix
-
-# Set refinement criteria (you can tweak these tolerances)
-flame.set_refine_criteria(ratio=6.0, slope=0.005, curve=0.01)
-
-# Solve with automatic grid refinement
-flame.solve(loglevel=1, auto=True, refine_grid=True)
->>>>>>> af1e39737ec0a5ccd90e2399aff2223894492a21
 
 # enable reacting solution
 flame.energy_enabled = True
@@ -252,10 +139,7 @@ flame.save("burner_flame_clean.csv",
            basis="mole",       # or "mass" or "siu"
            overwrite=True)
 
-<<<<<<< HEAD
->>>>>>> b3dfde696c6dceaa02ce7c3ce14dea7522bec72f
-=======
->>>>>>> af1e39737ec0a5ccd90e2399aff2223894492a21
+
 plt.figure()
 plt.plot(flame.grid, flame.T)
 plt.xlabel("Distance from burner [m]")
@@ -265,8 +149,6 @@ plt.grid(True)
 plt.tight_layout()
 plt.show()
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 # Plot species mole fractions
 plt.figure()
 for species in ['H2', 'O2', 'H2O', 'OH']:
@@ -278,9 +160,6 @@ plt.legend()
 plt.grid()
 
 # Show the plots
-=======
-=======
->>>>>>> af1e39737ec0a5ccd90e2399aff2223894492a21
 fig, ax = plt.subplots()
 major = ('O2', 'N2O', 'NO','H2','H2O')
 states = flame.to_array()
@@ -303,10 +182,6 @@ ax1.set(xlabel='distance from burner [mm]')
 ax2 = ax1.twinx()
 ax2.plot(flame.grid * 1000, flame.T, color='C3')
 ax2.set_ylabel('temperature [K]', color='C3')
-<<<<<<< HEAD
->>>>>>> b3dfde696c6dceaa02ce7c3ce14dea7522bec72f
-=======
->>>>>>> af1e39737ec0a5ccd90e2399aff2223894492a21
 plt.show()
 
 
