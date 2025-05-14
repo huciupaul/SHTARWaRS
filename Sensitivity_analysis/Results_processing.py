@@ -43,7 +43,7 @@ win_matrix = []
 for j in range(len(sens_input.design_option_names)):
     d = []
     for i in range(len(sens_input.tradeoff_criteria_names)):
-        x = main.output['Tradeoff Wins for ' + sens_input.design_option_names[j] + ' and ' + sens_input.tradeoff_criteria_names[i]][Which_to_check]
+        x = 100/(np.shape(main.output['Tradeoff Values for ' + sens_input.tradeoff_criteria_names[0]])[0] - 1) * main.output['Tradeoff Wins for ' + sens_input.design_option_names[j] + ' and ' + sens_input.tradeoff_criteria_names[i]][Which_to_check]
         d.append(x)
     win_matrix.append(d)
 win_matrix = np.array(win_matrix)
@@ -58,7 +58,7 @@ plt.show()
 
 
 #compares the wins of one design to the total amount it could have won
-win_frac_sus = 100 * main.output['Tradeoff Wins for Sustainability'][1] /  sum(main.output['Tradeoff Wins for Sustainability'])
+
 percent = []
 for i in range(len(sens_input.tradeoff_criteria_names)):
     percent.append(100 * main.output['Tradeoff Wins for ' + sens_input.tradeoff_criteria_names[i]][Which_to_check] /  sum(main.output['Tradeoff Wins for ' + sens_input.tradeoff_criteria_names[i]]))
