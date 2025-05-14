@@ -140,6 +140,7 @@ class Tank:
     def heat_influx(self, L_in_max, Q_str):
         T_tank = [self.T0]
         T_amb = 300 # K
+        P_amb = 101325 # Pa
         r_in = [self.R_in]
         t1 = self.inner_tank_thickness(self)
         t2 = t1
@@ -188,9 +189,11 @@ class Tank:
         # Solve for dv...
         dv_solution = fsolve(equation, dv_initial_guess)
 
-        dv_sol = dv_solution[0]  # Extract the solution from the array
+        dv = dv_solution[0]  # Extract the solution from the array
 
-        return dv_sol
+        t2 = min(t1, P_amb * (r_in+t1+dv) / self.mat_property[1])
+
+        return dv, t2
 
 
 
