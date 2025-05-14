@@ -5,10 +5,10 @@ import matplotlib.pyplot as plt
 # Q_leak is the amount of heat leakage entering the vessel.
 # Fill ratio is the percentage of LH2 at the start.
 scenarios = [
-{'fill_ratio': 0.40, 'Q_leak': 36.5},
-{'fill_ratio': 0.80, 'Q_leak': 36.5},
-{'fill_ratio': 0.40, 'Q_leak': 1.5},
-{'fill_ratio': 0.80, 'Q_leak': 1.5}
+{'fill_ratio': 0.80, 'Q_leak': 0.7},
+{'fill_ratio': 0.80, 'Q_leak': 2.1},
+{'fill_ratio': 0.80, 'Q_leak': 0.3},
+{'fill_ratio': 0.80, 'Q_leak': 0.3 }
 ]
 Pvent = 6.5*100000 # Convert from Bar to Pa for the venting pressure
 stratification_factor = 2 #Doubles the pressure rate for each increment
