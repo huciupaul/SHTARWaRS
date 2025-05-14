@@ -55,17 +55,17 @@ tradeoff_criteria_weights = np.array([
 tradeoff_criteria_weight_margins = np.array([
     0.1,  # Sustainability
     0.1,  # Cost
-    0.1,  # Tradeoff Criterion 3
-    0.1,  # Tradeoff Criterion 4
+    0.15,  # Tradeoff Criterion 3
+    0.2,  # Tradeoff Criterion 4
     0.1   # Tradeoff Criterion 5
 ])
 
 # Tradeoff criteria values
 
 tradeoff_criteria_values = np.array([
-    [10, 1.067615658362990000, 60, 2.75, 7],  # Design Option 1
-    [10, 0.859598853868195000, 60, 2.75, 10],  # Design Option 2
-    [5, 0.480769230769231000, 65, 2,  3]  # Design Option 3
+    [1, 0.886120996441281, .6, 0.677987421383648, .7],  # Design Option 1
+    [1, 0.713467048710602, .6, 0.677987421383648, 1],  # Design Option 2
+    [.5, 0.399038461538462, .65, 0.493081761006289,  .3]  # Design Option 3
 ])
 
 # Tradeoff criteria value margins

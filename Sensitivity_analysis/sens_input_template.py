@@ -63,7 +63,7 @@ tradeoff_criteria_weight_margins = np.array([
 ])
 
 # Tradeoff criteria values
-
+# MUST BE BETWEEN 0 AND 1
 tradeoff_criteria_values = np.array([
     [0.8, 0.7, 0.6, 0.5, 0.4],  # Design Option 1
     [0.7, 0.6, 0.5, 0.4, 0.3],  # Design Option 2
