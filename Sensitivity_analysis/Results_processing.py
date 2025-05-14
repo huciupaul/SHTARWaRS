@@ -36,24 +36,9 @@ dict_keys(['design_option_names', 'tradeoff_criteria_names', 'tradeoff_criteria_
            'Tradeoff Wins for HTPEM and Aircraft integration', 'Tradeoff Values for SOFC', 'Tradeoff Wins for SOFC and Sustainability', 'Tradeoff Wins for SOFC and Cost', 
            'Tradeoff Wins for SOFC and Efficiency', 'Tradeoff Wins for SOFC and Specific power', 'Tradeoff Wins for SOFC and Aircraft integration', 'Total Tradeoff Values'])
 
-
-# total effect on winners
-win_frac_sus = 100 * main.output['Tradeoff Wins for Sustainability'][1] /  sum(main.output['Tradeoff Wins for Sustainability'])
-win_frac_eff = 100 * main.output['Tradeoff Wins for Efficiency'][1] /  sum(main.output['Tradeoff Wins for Efficiency'])
-win_frac_spp = 100 * main.output['Tradeoff Wins for Specific power'][1] /  sum(main.output['Tradeoff Wins for Specific power'])
-win_frac_cost = 100 * main.output['Tradeoff Wins for Cost'][1] /  sum(main.output['Tradeoff Wins for Cost'])
-win_frac_int = 100 * main.output['Tradeoff Wins for Aircraft integration'][1] /  sum(main.output['Tradeoff Wins for Aircraft integration'])
-
-'design_option_names': sens_input.design_option_names,
-    'tradeoff_criteria_names': sens_input.tradeoff_criteria_names,
-    'tradeoff_criteria_weights': sens_input.tradeoff_criteria_weights,
-    'tradeoff_criteria_weight_margins': sens_input.tradeoff_criteria_weight_margins,
-    'tradeoff_criteria_values': sens_input.tradeoff_criteria_values,
-    'tradeoff_criteria_value_margins': sens_input.tradeoff_criteria_value_margins
-}
 '''
 
-
+#compiles the amount of time a design has won for sensitivity analysis of criteria
 win_matrix = []
 for j in range(len(sens_input.design_option_names)):
     d = []
@@ -62,14 +47,8 @@ for j in range(len(sens_input.design_option_names)):
         d.append(x)
     win_matrix.append(d)
 win_matrix = np.array(win_matrix)
-print(win_matrix)
-
-
-
 
 wins = main.output['Tradeoff Wins']
-
-
 
 #graph winner total and percentage per weight in bar chart
 plt.figure()
@@ -78,20 +57,17 @@ plt.title("Number of wins per design option")
 plt.show()
 
 
-
+#compares the wins of one design to the total amount it could have won
 win_frac_sus = 100 * main.output['Tradeoff Wins for Sustainability'][1] /  sum(main.output['Tradeoff Wins for Sustainability'])
 percent = []
 for i in range(len(sens_input.tradeoff_criteria_names)):
     percent.append(100 * main.output['Tradeoff Wins for ' + sens_input.tradeoff_criteria_names[i]][Which_to_check] /  sum(main.output['Tradeoff Wins for ' + sens_input.tradeoff_criteria_names[i]]))
-
-
 
 plt.figure()
 plt.bar(criteria, percent, color='green')
 plt.title('Percentage of wins')
 plt.ylabel("Values")
 plt.show()
-
 
 
 def visualize_redness(data, row_labels, col_labels):
@@ -120,10 +96,7 @@ def visualize_redness(data, row_labels, col_labels):
     plt.title("Redder = Lower Value", fontsize=14)
     plt.show()
 
-
 data = win_matrix
-
-
 
 sens_input.design_option_names[j]
 
