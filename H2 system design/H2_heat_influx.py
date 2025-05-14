@@ -41,8 +41,8 @@ class Tank:
 
         # ---------------------------------------------- Constraint ---------------------------------------------------
         self.R_in = 0.8 #m
-        self.Q_leak_min = 100 #W (determined from Nicolas's thesis)
-        self.Q_leak_max = 500 #W (determined from Nicolas's thesis)
+        self.Q_leak_min = 50 #W (determined from Nicolas's thesis)
+        self.Q_leak_max = 600 #W (determined from Nicolas's thesis)
 
     
     # ----------------------------------------------- Maximum Heat Load ---------------------------------------------------
@@ -71,7 +71,7 @@ class Tank:
             delhg_delT = CP.PropsSI('d(H)/d(T)|P', 'P', P[-1], 'Q', 1, 'ParaHydrogen')
             delhl_delT = CP.PropsSI('d(H)/d(T)|P', 'P', P[-1], 'Q', 0, 'ParaHydrogen')
             # Small temperature increment to calculate the rate of pressure change with temperature
-            T_increment = 6.5e-06 *100
+            T_increment = 6.5e-06
             T_new = T[-1]+T_increment
             P_new = CP.PropsSI('P', 'T', T_new, 'Q', 0.1, 'ParaHydrogen')
             dPs_dT = (P_new-P[-1])/(T_new-T[-1])
@@ -134,22 +134,18 @@ class Tank:
 
     # ------------------------------------------------ Vacuum and Outer tank  ---------------------------------------------------
 
-    # f5
-    
 
-    def heat_influx(self, L_in_max, Q_str):
-        T_tank = [self.T0]
+    def heat_influx(self, L_in_max, Q_str,t1,emis_mli,k_vac,t_mli):
+        T_tank = self.T0
         T_amb = 300 # K
         P_amb = 101325 # Pa
-        r_in = [self.R_in]
-        t1 = self.inner_tank_thickness(self)
+        r_in = self.R_in
         t2 = t1
-        Q_in_max = [self.Q_leak_max]
-        k1 = [self.mat_property[2]]
-        k2 = [self.mat_property[2]]
-        k_vac = [0.0001] # W/mK
-        eps1 = [self.mat_property[3]]
-        eps2 = [self.mat_property[3]]
+        Q_in_max = self.Q_leak_max
+        k_1 = self.mat_property[2]
+        k_2 = self.mat_property[2]
+        eps1 = emis_mli
+        eps2 = self.mat_property[3]
 
         # Conduction...
         def Q_cond(dv):
@@ -162,7 +158,7 @@ class Tank:
 
         # Radiation...
         def Q_rad(dv):
-            r1 = r_in + t1        # Outer surface of inner tank
+            r1 = r_in + t1 + t_mli        # Outer surface of inner tank
             r2 = r1 + dv          # Inner surface of outer tank
 
             # Surface areas (cylinder + two hemispherical caps)
@@ -191,34 +187,37 @@ class Tank:
 
         dv = dv_solution[0]  # Extract the solution from the array
 
-        t2 = min(t1, P_amb * (r_in+t1+dv) / self.mat_property[1])
+        t2 = max(t1, P_amb * (r_in+t1+dv) / self.mat_property[1])
 
         return dv, t2
 
 
 
     # ------------------------------------------------ Tank Dimensions ---------------------------------------------------
-    def total_volume(self, l,dv):
-        R_out = self.R_in + dv
+    def total_volume(self, l,dv,t1,t2,t_mli):
+        R_out = self.R_in + dv +t1 +t2 +t_mli
         V = np.pi * R_out**2 * (l-2*self.R_in) + (4/3) * np.pi * R_out**3
         return V
     
-    def total_mass(self, l, dv, t1, t2):
-        R_out = self.R_in + dv
+    def total_mass(self, l, dv, t1, t2,t_mli,dens_mli):
+        R_out = self.R_in + dv +t1 +t2 +t_mli
         L_cyl = l - 2 * self.R_in  
         surface_inner = 2 * np.pi * self.R_in * L_cyl + 4 * np.pi * self.R_in**2
         surface_outer = 2 * np.pi * R_out * L_cyl + 4 * np.pi * R_out**2
         mass_inner = surface_inner * t1 * self.mat_density
         mass_outer = surface_outer * t2 * self.mat_density
-        return mass_inner + mass_outer + self.mass_h2
+        mass_mli = surface_inner * t_mli * dens_mli
+        return mass_inner + mass_outer + self.mass_h2 + mass_mli
 
 
 
 # -------------------------------------------------------------------------------------------------------------------
 # ------------------------------------------------- Tank Database ---------------------------------------------------
-materials = ['Aluminium']
-mat_properties = [[2643,240*1e6, 237, 0.09]]  #density in kg/m^3, yield strength in Pa, thermal conductivity in W/mK, emissivity in [-]
-MAWPS = [650000,800000] #bar to Pa
+materials = ['Al-7075-T6','G10']
+SF = 0.9
+mat_properties = [[2800,495*1e6*SF,134,0.05],[1900,298*1e6*SF,0.5,0.95]]  #density in kg/m^3, yield strength in Pa, thermal conductivity in W/mK, emissivity in [-]
+#MAWPS = [400000,650000,800000,1000000,1200000,1280000] #bar to Pa
+MAWPS = [600000,850000,1280000] #test
 
 
 # ------------------------------------------------- Structure ------------------------------------------------------
@@ -232,11 +231,16 @@ grav_idx = 0.35 #from NASA report
 #Our values
 mass_h2 = 250 #kg
 estimated_mass = mass_h2/grav_idx - mass_h2
-ratio = og_str_mass / (4.8+3.15+og_lh2)
-str_mass = estimated_mass * ratio 
-Q_str = Q_og_str * np.sqrt(ratio/ratio) #Assuming Volume increase with the same ratio as the mass
 
-def compute_tank_volume(material, mat_property, MAWP,mass_h2):
+#Insulation
+t_mli = 5 *1e-3
+dens_mli = 20 #kg/m^3
+emis_mli = 0.03
+k_vac = 0.01 # W/mK
+
+
+
+def compute_tank_volume(material, mat_property, MAWP,mass_h2, Q_str):
     tankh2 = Tank(MAWP, material, mat_property,mass_h2)
 
     # -----------------------------Maximum allowable heat load -----------------------------------
@@ -259,13 +263,14 @@ def compute_tank_volume(material, mat_property, MAWP,mass_h2):
 
     t1 = tankh2.inner_tank_thickness()
     print(f"Inner tank thickness: {t1:.4f} m")
+    print(f"MAWP:",MAWP)
+    print(f"R_in:",tankh2.R_in)
+    print(f"Strength:",tankh2.mat_property[1])
 
-    #f5
-    dv = 0.3 #placeholder
-    t2 = t1 #placeholder
-
-    Vt = tankh2.total_volume(L_in, dv)
-    Mt = tankh2.total_mass(L_in, dv, t1, t2) 
+    dv, t2 = tankh2.heat_influx(L_in, Q_str,t1,emis_mli,k_vac,t_mli)
+    
+    Vt = tankh2.total_volume(L_in, dv,t1,t2,t_mli)
+    Mt = tankh2.total_mass(L_in, dv, t1, t2,t_mli,dens_mli) 
     Mt += str_mass
     mass_error = Mt - estimated_mass - mass_h2
 
@@ -283,7 +288,14 @@ plot_mass_errors = []
 
 for MAWP in MAWPS:
     for material, mat_property in zip(materials, mat_properties):
-        Vt, Mt, mass_error = compute_tank_volume(material, mat_property, MAWP,mass_h2)
+        if material == 'G10': #Composite materials
+            og_tank_mass = 4.8+3.15
+        else: #Metallic materials
+            og_tank_mass = 8.4+3.6
+        ratio = og_str_mass / (og_tank_mass+og_lh2)
+        str_mass = estimated_mass * ratio 
+        Q_str = Q_og_str * np.sqrt(ratio/ratio) #Assuming Volume increase with the same ratio as the mass
+        Vt, Mt, mass_error = compute_tank_volume(material, mat_property, MAWP,mass_h2,Q_str)
         print(f"Material: {material}, MAWP: {MAWP} Pa")
         print(f"Tank Volume: {Vt:.4f} m^3")
         print(f"Tank Mass: {Mt:.4f} kg")
@@ -297,18 +309,45 @@ for MAWP in MAWPS:
 
 
 # ------------------------------------------------- Plotting ------------------------------------------------------
-#Volume vs MAWP
-plt.figure(figsize=(10, 6))
+fig, axs = plt.subplots(1, 3, figsize=(18, 6))
+
+# Plot 1: Volume vs MAWP
 for material in materials:
     material_volumes = [plot_volumes[i] for i in range(len(plot_mats)) if plot_mats[i] == material]
     material_MAWPS = [plot_MAWPS[i] for i in range(len(plot_mats)) if plot_mats[i] == material]
-    plt.plot(material_MAWPS, material_volumes, label=material, marker='o')
+    axs[0].plot(material_MAWPS, material_volumes, label=material, marker='o')
 
-plt.xlabel('MAWP (Pa)')
-plt.ylabel('Tank Volume (m^3)')
-plt.title('Tank Volume vs MAWP for Different Materials')
-plt.legend()
-plt.grid(True)
+axs[0].set_xlabel('MAWP (Pa)')
+axs[0].set_ylabel('Tank Volume (m^3)')
+axs[0].set_title('Tank Volume vs MAWP')
+axs[0].legend()
+axs[0].grid(True)
+
+# Plot 2: Mass vs MAWP
+for material in materials:
+    material_masses = [plot_masses[i] for i in range(len(plot_mats)) if plot_mats[i] == material]
+    material_MAWPS = [plot_MAWPS[i] for i in range(len(plot_mats)) if plot_mats[i] == material]
+    axs[1].plot(material_MAWPS, material_masses, label=material, marker='o')
+
+axs[1].set_xlabel('MAWP (Pa)')
+axs[1].set_ylabel('Tank Mass (kg)')
+axs[1].set_title('Tank Mass vs MAWP')
+axs[1].legend()
+axs[1].grid(True)
+
+# Plot 3: Mass Error vs MAWP
+for material in materials:
+    material_mass_errors = [plot_mass_errors[i] for i in range(len(plot_mats)) if plot_mats[i] == material]
+    material_MAWPS = [plot_MAWPS[i] for i in range(len(plot_mats)) if plot_mats[i] == material]
+    axs[2].plot(material_MAWPS, material_mass_errors, label=material, marker='o')
+
+axs[2].set_xlabel('MAWP (Pa)')
+axs[2].set_ylabel('Mass Error (kg)')
+axs[2].set_title('Mass Error vs MAWP')
+axs[2].legend()
+axs[2].grid(True)
+
+plt.tight_layout()
 plt.show()
 
 
