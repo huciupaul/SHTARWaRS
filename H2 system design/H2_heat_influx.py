@@ -11,6 +11,8 @@ class Tank:
         self.mat_property = mat_property
         self.mat_density = mat_property[0] 
         self.mat_yield_strength = mat_property[1]
+        self.mat_thermal_conductivity = mat_property[2]
+        self.mat_emissivity = mat_property[3]
 
         # ---------------------------------------------Constants ----------------------------------------------------------------
         self.dormancy = 24 #hours
@@ -135,12 +137,19 @@ class Tank:
     # f5
     
 
-    def heat_influx(Q_in_max, L_in_max, t1, T_amb, T_tank, r_in, k_1, k_vac, k_2, eps1, eps2, Q_structure):
+    def heat_influx(self, L_in_max, Q_str):
         T_tank = [self.T0]
         T_amb = 300 # K
         r_in = [self.R_in]
-
+        t1 = self.inner_tank_thickness(self)
         t2 = t1
+        Q_in_max = [self.Q_leak_max]
+        k1 = [self.mat_property[2]]
+        k2 = [self.mat_property[2]]
+        k_vac = [0.0001] # W/mK
+        eps1 = [self.mat_property[3]]
+        eps2 = [self.mat_property[3]]
+
         # Conduction...
         def Q_cond(dv):
             # Conduction resistance
@@ -167,7 +176,7 @@ class Tank:
         def total_heat_influx(dv):
             Q_cond_value = Q_cond(dv)
             Q_rad_value = Q_rad(dv)
-            return Q_cond_value + Q_rad_value + Q_structure
+            return Q_cond_value + Q_rad_value + Q_str
 
         # Optimization eq...
         def equation(dv):
@@ -205,7 +214,7 @@ class Tank:
 # -------------------------------------------------------------------------------------------------------------------
 # ------------------------------------------------- Tank Database ---------------------------------------------------
 materials = ['Aluminium']
-mat_properties = [[2643,240*10^6]]  #density in kg/m^3, yield strength in Pa
+mat_properties = [[2643,240*1e6, 237, 0.09]]  #density in kg/m^3, yield strength in Pa, thermal conductivity in W/mK, emissivity in [-]
 MAWPS = [650000,800000] #bar to Pa
 
 
