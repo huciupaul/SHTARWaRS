@@ -5,8 +5,8 @@ Instructions:
 1. Copy the sens_input_template.py file to a new file named sens_input<<your_tradeoff>>.py.
 2. Modify the new file to include your tradeoff criteria and weights, following the instructions given in the template.
 3. Ensure that the new file is in the same directory as this script.
-4. Run this script to see the results.
-
+4. Change the input file name in results_processing.py to the new file name.
+5. Run the results_processing.py script to see the results.
 '''
 
 
@@ -104,9 +104,6 @@ def calculate_tradeoff_values(tradeoff_values, tradeoff_weights):
     """
     # Preprocess weights so they sum to 1
     tradeoff_weights = tradeoff_weights / np.sum(tradeoff_weights)
-
-    # Preprocess values so the maximum value of each column is 1
-    tradeoff_values = tradeoff_values / np.max(tradeoff_values, axis=0)
 
     # print("tradeoff values: ", tradeoff_values)
 
