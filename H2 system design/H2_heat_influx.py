@@ -167,6 +167,7 @@ class Tank:
 
     def heat_influx(self, L_in_max, Q_str,t1,emis_mli,k_vac,t_mli, k_mli,Qmax):
         T_tank = self.T0
+        print(f"Initial tank temperature: {T_tank} K")
         T_amb = 300 # K
         P_amb = 101325 # Pa
         r_in = self.R_in
@@ -192,12 +193,16 @@ class Tank:
             r2 = r1 + dv          # Inner surface of outer tank
 
             # Surface areas (cylinder + two hemispherical caps)
-            A1 = 2 * np.pi * r1 * (L_in_max + 4 * r1 / 3)
-            A2 = 2 * np.pi * r2 * (L_in_max + 4 * r2 / 3)
+            A1 = 2 * np.pi * r1 * (L_in_max + 2 * r1)
+            A2 = 2 * np.pi * r2 * (L_in_max + 2 * r2)
 
             # Radiation heat transfer
-            denom = (1 / emis_mli) + (A1 / A2) * (1 / eps2 - 1)
-            return 5.670374419e-8 * A1 * (T_amb**4 - T_tank**4) / denom
+            
+            #denom = (1 / (eps2)) + (A2 / A1) * (1 / emis_mli - 1)
+            #return 5.670374419e-8 * A2 * (T_amb**4 - T_tank**4) / denom
+            num = 5.670374419e-8 * (T_amb**4 - T_tank**4)
+            denom = 1/emis_mli + (1/eps2) - 1
+            return num * A2 / denom
 
         # Total heat influx...
         def total_heat_influx(dv):
@@ -239,7 +244,7 @@ class Tank:
         else:
             t2_min = P_amb * (r_in+t1+dv+t_mli) / self.mat2_property[1]
 
-        return dv, t2_min, alpha, Q_in_max, Q_cond(dv), Q_rad(dv)
+        return dv, t2_min, alpha, Q_in_max, Q_cond(dv),  Q_rad(dv)
 
     # ------------------------------------------------ Tank Dimensions ---------------------------------------------------
     def total_volume(self, l,dv,t1,t2,t_mli):
@@ -278,11 +283,11 @@ class Tank:
 materials = ['Al-7075-T6','G10','SS-304','Carbon Fibre Woven Prepreg (QI)','SS-316'] #From Granta and Engineering Toolbox
 SF = 0.9
 #density in kg/m^3, yield strength in Pa, thermal conductivity in W/mK, emissivity in [-], CO2 [kg/kg], Embodied Energy in MJ/kg, Fibre Ratio
-mat_properties = [[2800,495*1e6*SF,134,0.048,7.795,106,0], 
+mat_properties = [[2800,495*1e6*SF,134,0.11,7.795,106,0], 
                   [1900,298*1e6*SF,0.5,0.95,15.25,369,0.4],
-                  [7955,257.5*1e6*SF,15.5,0.075,3,42.75,0],
+                  [7955,257.5*1e6*SF,15.5,0.35,3,42.75,0],
                   [1575,549.5*1e6*SF,1.64,0.77,47.8,686.5,0.625],
-                  [7970,257.5*1e6*SF,15,0.075,4.265,49.75,0]]
+                  [7970,257.5*1e6*SF,15,0.35,4.265,49.75,0]]
 #MAWPS = [600000,650000,800000,1000000,1200000,1280000] #bar to Pa
 MAWP = 1200000
 P_vents = [600000,800000,1000000]
@@ -309,9 +314,9 @@ t_limit = 0.001 #m (minimum thickness of the tank wall)
 #Insulation
 t_mli = 10 *1e-3 #https://www.sciencedirect.com/science/article/pii/S135943112200391X
 dens_mli = 180 #kg/m^3 https://www.sciencedirect.com/science/article/pii/S135943112200391X
-emis_mli = 0.03 *10e-3 #https://www.thermalengineer.com/library/effective_emittance.htm
-k_vac = 10.44*1e-4 # W/mK (CEC Hawaii Presentation)
-k_mli = 0.035 #*1e-3 # W/mK 
+emis_mli = 0.23  #https://www.thermalengineer.com/library/effective_emittance.htm
+k_vac = 0.015*1e-1#3 # W/mK https://www.researchgate.net/publication/321219004_Cylindrical_Cryogenic_Calorimeter_Testing_of_Six_Types_of_Multilayer_Insulation_Systems
+k_mli = 0.035 # W/mK  https://www.sciencedirect.com/science/article/pii/S135943112200391X
 mli_co2 = 8.03 #kg/kg (for Aluminium 6463 T6)
 mli_ee = 108.4 #MJ/kg (Embodied Energy for Aluminium 6463 T6)
 
@@ -376,8 +381,8 @@ def compute_tank_volume(material, material2, mat_property, MAWP,mass_h2, Q_str,m
 
 # ------------------------------------------------- Main ------------------------------------------------------
 
-RUN = True #Run new design
-OPEN = False #Open previous design
+RUN = False #Run new design
+OPEN = True #Open previous design
 
 plot_mats = []
 plot_mats2 = []
@@ -388,6 +393,7 @@ plot_mass_errors = []
 plot_co2 = []
 plot_embodied_energy = []
 plot_P_vents = []
+plot_vh2 = []
 
 if RUN:
     for P_vent in P_vents:
@@ -418,6 +424,7 @@ if RUN:
                 plot_co2.append(co2_kg)
                 plot_embodied_energy.append(emb_energy)
                 plot_P_vents.append(P_vent)
+                plot_vh2.append(Vh2)
 
                 # CSV file
                 file_exists = False
@@ -449,7 +456,7 @@ if OPEN:
             plot_volumes.append(float(row[3]))
             plot_masses.append(float(row[4]))
             plot_mass_errors.append(float(row[5]))
-            Vh2 = float(row[10])
+            plot_vh2.append(float(row[10]))
             plot_co2.append(float(row[12]))
             plot_embodied_energy.append(float(row[13]))
             plot_P_vents.append(float(row[16]))
@@ -461,9 +468,19 @@ plot3 = True
 
 if plot1:
     plt.figure(figsize=(10, 6))
-    for i in range(len(materials)**2):
-        for j in range(len(P_vents)):
-            plt.scatter(plot_P_vents[i + j * len(materials)**2], plot_volumes[i + j * len(materials)**2], label=f"{plot_mats[i]}-{plot_mats2[i]}")
+    unique_combinations = len(materials)**2
+    colors = plt.cm.tab20(np.linspace(0, 1, unique_combinations))
+    markers = ['o', 's', 'D', '^', 'v', '<', '>', 'p', '*', 'h', 'H', 'X', 'd']
+
+    for idx, (material, material2) in enumerate([(m1, m2) for m1 in materials for m2 in materials]):
+        color = colors[idx % len(colors)]
+        marker = markers[idx % len(markers)]
+        label = f"{material}-{material2}"
+        x_values = [plot_P_vents[k] for k in range(len(plot_P_vents)) if plot_mats[k] == material and plot_mats2[k] == material2]
+        y_values = [plot_volumes[k] for k in range(len(plot_volumes)) if plot_mats[k] == material and plot_mats2[k] == material2]
+        if x_values and y_values:
+            plt.plot(x_values, y_values, label=label, color=color, marker=marker, linestyle='-')
+
     plt.xlabel("P_vent (Pa)")
     plt.ylabel("Tank Volume (m^3)")
     plt.title("Tank Volume vs P_vent")
@@ -483,8 +500,8 @@ if plot2:
         marker = markers[idx % len(markers)]
         plt.scatter(
             mass_h2 / plot_masses[i + j * len(materials)**2],
-            Vh2 / plot_volumes[i + j * len(materials)**2],
-            label=f"{plot_mats[i]}-{plot_mats2[i]}",
+            plot_vh2[i + j * len(materials)**2] / plot_volumes[i + j * len(materials)**2],
+            label=f"{plot_mats[i]}-{plot_mats2[i]}-PVENT={plot_P_vents[i + j * len(materials)**2]/100000} Bar",
             color=color,
             marker=marker
         )
@@ -507,7 +524,7 @@ if plot3:
     for idx, (i, j) in enumerate([(i, j) for i in range(len(materials)**2) for j in range(len(P_vents))]):
         color = colors[idx % len(colors)]
         marker = markers[idx % len(markers)]
-        eta_v = Vh2 / plot_volumes[i + j * len(materials)**2]
+        eta_v = plot_vh2[i + j * len(materials)**2] / plot_volumes[i + j * len(materials)**2]
         eta_g = mass_h2 / plot_masses[i + j * len(materials)**2]
         metric = eta_g * eta_v
 
@@ -523,7 +540,7 @@ if plot3:
         ax2.scatter(
             metric,
             plot_embodied_energy[i + j * len(materials)**2],
-            label=f"{plot_mats[i]}-{plot_mats2[i]}",
+            label=f"{plot_mats[i]}-{plot_mats2[i]}-PVENT={plot_P_vents[i + j * len(materials)**2]/100000} Bar",
             color=color,
             marker=marker
         )
@@ -547,7 +564,7 @@ if plot3:
     plt.show()
     
 #-------------------------------------------------- Draw Tank ---------------------------------------------------
-draw1 = False
+draw1 = True
 
 if draw1:
     for i, (material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2, R_in,co2_kg) in enumerate(
