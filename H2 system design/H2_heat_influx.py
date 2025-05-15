@@ -143,8 +143,9 @@ class Tank:
     def inner_tank_thickness(self):
         if self.material == 'G10' or self.material == 'Carbon Fibre Woven Prepreg (QI)':
             #Calc membrane loads
-            N_theta_p = MAWP * self.R_in
-            N_phi_p = MAWP * self.R_in / 2
+            P_test = (MAWP + 0.2*100000) * 1.3 #Safety factor
+            N_theta_p = P_test * self.R_in
+            N_phi_p = P_test * self.R_in / 2
             self.mat_property[1] = self.mat_property[1] * 0.38 * 0.57 * 0.75 #may add safety factors
             angle = [0,90,0.1] #helical winding angle in degrees
             t_min = 1000
@@ -158,8 +159,7 @@ class Tank:
                     t_min = t
             return t_min
         else:
-            return MAWP * self.R_in / self.mat_property[1]
-        return None
+            return P_test * self.R_in / self.mat_property[1]
 
     # ------------------------------------------------ Vacuum and Outer tank  ---------------------------------------------------
 
@@ -281,6 +281,7 @@ kevlar_ee = 257 #MJ/kg (Embodied Energy for Kevlar 149)
 #Our values
 mass_h2 = 532.65 #kg
 estimated_mass = mass_h2/grav_idx - mass_h2
+t_limit = 0.001 #m (minimum thickness of the tank wall)
 
 #Insulation
 t_mli = 10 *1e-3 #https://www.sciencedirect.com/science/article/pii/S135943112200391X
@@ -313,9 +314,10 @@ def compute_tank_volume(material, mat_property, MAWP,mass_h2, Q_str,mat2_propert
     else:
         print("Failed to find an inner length. Adjust the bounds.")
 
-    t1 = tankh2.inner_tank_thickness()
+    t1 = max(tankh2.inner_tank_thickness(),t_limit)
 
     dv, t2 = tankh2.heat_influx(L_in, Q_str,t1,emis_mli,k_vac,t_mli,k_mli)
+    t2 = max(t2,t_limit)
     
     Vt = tankh2.total_volume(L_in, dv,t1,t2,t_mli)
     mass_inner,mass_outer,mass_mli = tankh2.total_mass(L_in, dv, t1, t2,t_mli,dens_mli) 
@@ -331,8 +333,8 @@ def compute_tank_volume(material, mat_property, MAWP,mass_h2, Q_str,mat2_propert
 
 # ------------------------------------------------- Main ------------------------------------------------------
 
-RUN = False #Run new design
-OPEN = True #Open previous design
+RUN = True #Run new design
+OPEN = False #Open previous design
 
 plot_mats = []
 plot_mats2 = []
@@ -450,7 +452,54 @@ if plot2:
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
     plt.show()
 
+if plot3:
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    unique_combinations = len(materials)**2 * len(MAWPS)
+    colors = plt.cm.tab20(np.linspace(0, 1, unique_combinations))
+    markers = ['o', 's', 'D', '^', 'v', '<', '>', 'p', '*', 'h', 'H', 'X', 'd']
 
+    for idx, (i, j) in enumerate([(i, j) for i in range(len(materials)**2) for j in range(len(MAWPS))]):
+        color = colors[idx % len(colors)]
+        marker = markers[idx % len(markers)]
+        eta_v = Vh2 / plot_volumes[i + j * len(materials)**2]
+        eta_g = mass_h2 / plot_masses[i + j * len(materials)**2]
+        metric = eta_g * eta_v
+
+        # Plot kg of CO2 vs metric
+        ax1.scatter(
+            metric,
+            plot_co2[i + j * len(materials)**2],
+            color=color,
+            marker=marker
+        )
+
+        # Plot embodied energy vs metric
+        ax2.scatter(
+            metric,
+            plot_embodied_energy[i + j * len(materials)**2],
+            label=f"{plot_mats[i]}-{plot_mats2[i]}",
+            color=color,
+            marker=marker
+        )
+
+    ax1.set_xlabel("Metric (ηg * ηv)")
+    ax1.set_ylabel("CO2 Emissions (kg)")
+    ax1.set_title("CO2 Emissions vs Metric")
+
+    ax2.set_xlabel("Metric (ηg * ηv)")
+    ax2.set_ylabel("Embodied Energy (MJ)")
+    ax2.set_title("Embodied Energy vs Metric")
+
+    ax2.legend(
+        loc='center left',
+        bbox_to_anchor=(1, 0.5),
+        title="Material Combinations",
+        frameon=False
+    )
+
+    plt.tight_layout()
+    plt.show()
+    
 
 if draw1:
     for i, (material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2, R_in,co2_kg) in enumerate(
