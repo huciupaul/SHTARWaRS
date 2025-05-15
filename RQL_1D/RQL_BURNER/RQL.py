@@ -340,7 +340,7 @@ summary = {
     "timestamp": datetime.utcnow().isoformat(timespec="seconds") + "Z"
 }
 
-summary_file = Path("run_summary.json")
+summary_file = Path("../run_summary.json")
 with summary_file.open("w") as fp:
     json.dump(summary, fp, indent=2)
 print(f"\n►► Summary written to {summary_file.resolve()}\n")
