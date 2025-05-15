@@ -16,7 +16,101 @@ class Design_point:
         p_diff = self.fuel_cell.P_C - self.fuel_cell.P_A
         self.fuel_cell.P_C = P_C
         self.fuel_cell.P_A = P_C - p_diff
+
+            
+    def O2_cooling_required(self):
+        # Calculate the heat removal required from the oxygen for the fuel cell
+        H_air_initial = PropsSI('H', 'T', self.flight_condition.T_tot, 'P', self.flight_condition.P_tot, 'Air')
+        gamma_air = PropsSI('CPMASS', 'T', self.flight_condition.T_tot, 'P', self.flight_condition.P_tot, 'Air') / PropsSI('CVMASS', 'T', self.flight_condition.T_tot, 'P', self.flight_condition.P_tot, 'Air')
+        P_air_comp = self.fuel_cell.P_A
+        T_air_comp = self.flight_condition.T_tot * (P_air_comp / self.flight_condition.P_tot)**((gamma_air - 1) / gamma_air) # Adiabatic compression
+        H_air_comp = PropsSI('H', 'T', T_air_comp, 'P', P_air_comp, 'Air')
+        H_air_fc = PropsSI('H', 'T', self.fuel_cell.T, 'P', self.fuel_cell.P_C, 'Air')
+        compressor_efficiency = 0.85 ### REVIEW THIS VALUE
+
+        # Calculate the energy required for air compression
+        self.fuel_cell.air_compression_energy = (H_air_comp - H_air_initial) / compressor_efficiency  # J/kg
         
+        # Calculate the heat removal required from the air
+        self.fuel_cell.heat_change_air = (H_air_fc - H_air_comp)  # J/kg
+
+        print(f"Power required for air compression: {self.fuel_cell.air_compression_energy * 10**(-6)} MJ/kg")
+        print(f"Heat added to from air after compression: {self.fuel_cell.heat_change_air * 10**(-6)} MJ/kg")
+
+
+    def mass_flow_calculation(self):
+
+        # Calculate air/hydrogen mass flow ratio
+        self.fuel_cell.air_hydrogen_ratio = 15.999 / 1.00784 * self.fuel_cell.stoic_ratio_A / 0.2314 # mass fraction of air per hydrogen
+        
+
+        # Calculate the required mass flow rate of gasses for the fuel cell
+        self.fuel_cell.power_required = self.flight_condition.power_required * self.flight_condition.power_split
+        self.fuel_cell.m_H2_tot = self.fuel_cell.power_required / ((self.fuel_cell.stack_efficiency  * LHV_H2 - self.fuel_cell.air_compression_energy * self.fuel_cell.air_hydrogen_ratio) * self.flight_condition.propulsive_efficiency)
+        self.fuel_cell.m_H2_used = self.fuel_cell.m_H2_tot / self.fuel_cell.stoic_ratio_A
+        self.fuel_cell.m_O2_used = self.fuel_cell.m_H2_used * 15.999/1.00784
+        self.fuel_cell.m_O2_tot = self.fuel_cell.m_O2_used * self.fuel_cell.stoic_ratio_C
+        self.fuel_cell.m_air = self.fuel_cell.m_O2_tot / 0.2314  # Divided by mass fraction of O2 in air
+
+        self.fuel_cell.m_tot = self.fuel_cell.m_air + self.fuel_cell.m_H2_tot
+        self.fuel_cell.m_H2O_out = self.fuel_cell.m_H2_used + self.fuel_cell.m_O2_used
+        self.fuel_cell.m_H2_out = self.fuel_cell.m_H2_tot - self.fuel_cell.m_H2_used
+        self.fuel_cell.m_O2_out = self.fuel_cell.m_O2_tot - self.fuel_cell.m_O2_used
+        self.fuel_cell.m_rest_out = self.fuel_cell.m_tot - self.fuel_cell.m_H2O_out - self.fuel_cell.m_H2_out - self.fuel_cell.m_O2_out
+
+
+        print(f"Mass flow rate of used oxygen for fuel cell: {self.fuel_cell.m_O2_used} kg/s")
+        print(f"Mass flow rate of air for fuel cell: {self.fuel_cell.m_air} kg/s")
+        
+        self.fuel_cell.reaction_efficiency = self.fuel_cell.stack_efficiency * self.fuel_cell.stoic_ratio_A # Efficiency of the reaction (to determine how much heat is generated)
+        self.fuel_cell.total_efficiency = self.fuel_cell.stack_efficiency - self.fuel_cell.air_compression_energy * self.fuel_cell.air_hydrogen_ratio / (LHV_H2) # Efficiency of the fuel cell
+        self.fuel_cell.heat_power = LHV_H2 * self.fuel_cell.m_H2_used * (1 - self.fuel_cell.reaction_efficiency)  # Heat power produced by the fuel cell
+
+
+        print(f"Mass flow rate of hydrogen used in fuel cell: {self.fuel_cell.m_H2_tot} kg/s")
+        print(f"Total efficiency of the fuel cell: {self.fuel_cell.total_efficiency * 100} %")
+        print(f"Electrical power produced by the fuel cell: {self.fuel_cell.power_required * 10**(-6)} MW")
+        print(f"Heat power produced by the fuel cell: {self.fuel_cell.heat_power * 10**(-6)} MW")
+
+        # Calculate the required mass flow rate of hydrogen for the combustion chamber
+        self.cc_power = self.flight_condition.power_required * (1 - self.flight_condition.power_split)
+        self.m_H2_cc = self.cc_power / (self.flight_condition.thermal_efficiency * self.flight_condition.propulsive_efficiency * LHV_H2)
+
+        # Calculate the total mass flow rate
+        self.m_H2_tot = self.m_H2_cc + self.fuel_cell.m_H2_tot
+
+        print(f"Mass flow rate of hydrogen used in fuel cell: {self.fuel_cell.m_H2_tot} kg/s")
+        print(f"Mass flow rate of hydrogen for combustion chamber: {self.m_H2_cc} kg/s")
+        print(f"Total mass flow rate of hydrogen: {self.m_H2_tot} kg/s")
+
+
+
+
+    def heat_removal_available(self):
+        # Calculate the heat removal available from the hydrogen for the fuel cell (combustion chamber treated separately)
+
+        H_fin_fc = PropsSI('H', 'T', self.fuel_cell.T, 'P', self.fuel_cell.P_A, 'Hydrogen')
+        self.HSP_fc_H2_sp = H_fin_fc - self.hydrogen_storage.H_init # J/kg
+        self.HSP_fc_H2 = self.HSP_fc_H2_sp * self.fuel_cell.m_H2_tot # W
+        print(f"Heat added to hydrogen for fuel cell: {self.HSP_fc_H2 * 10**(-6)} MW")
+
+        # Calculate the heat removal available from the hydrogen for the combustion chamber
+        H_fin_cc = PropsSI('H', 'T', self.flight_condition.T_cc, 'P', self.flight_condition.P_cc, 'Hydrogen')
+        self.HSP_cc_H2_sp = H_fin_cc - self.hydrogen_storage.H_init # J/kg
+        self.HSP_cc_H2 = self.HSP_cc_H2_sp * self.m_H2_cc
+        
+        # Calculate the heat removal available from the hydrogen for the combustion chamber until the fuel cell temp
+        H_fc_cc = PropsSI('H', 'T', self.fuel_cell.T, 'P', self.flight_condition.P_cc, 'Hydrogen')
+        self.HSP_cc_fc_H2_sp = H_fc_cc - self.hydrogen_storage.H_init # J/kg
+        self.HSP_cc_fc_H2 = self.HSP_cc_fc_H2_sp * self.m_H2_cc # W
+        print(f"Heat added to hydrogen for combustion chamber until fuel cell temperature: {self.HSP_cc_fc_H2 * 10**(-6)} MW")
+
+        print(f"Heat added to hydrogen for combustion chamber: {self.HSP_cc_H2 * 10**(-6)} MW")
+
+        # Calculate heat exchange required for the fuel cell
+        self.fuel_cell.heat_exchange_fc = self.fuel_cell.heat_power - (self.HSP_fc_H2 + self.HSP_cc_fc_H2) # W
+        print(f"Heat exchange required for the fuel cell: {self.fuel_cell.heat_exchange_fc * 10**(-6)} MW")
+
 
 
 # Create three fuel cell types
@@ -94,89 +188,6 @@ GCH2 = hydrogen_storage.HydrogenStorage(
 
 
 
-def O2_cooling_required(DP: Design_point):
-    # Calculate the heat removal required from the oxygen for the fuel cell
-    H_air_initial = PropsSI('H', 'T', DP.flight_condition.T_tot, 'P', DP.flight_condition.P_tot, 'Air')
-    gamma_air = PropsSI('CPMASS', 'T', DP.flight_condition.T_tot, 'P', DP.flight_condition.P_tot, 'Air') / PropsSI('CVMASS', 'T', DP.flight_condition.T_tot, 'P', DP.flight_condition.P_tot, 'Air')
-    P_air_comp = DP.fuel_cell.P_A
-    T_air_comp = DP.flight_condition.T_tot * (P_air_comp / DP.flight_condition.P_tot)**((gamma_air - 1) / gamma_air) # Adiabatic compression
-    H_air_comp = PropsSI('H', 'T', T_air_comp, 'P', P_air_comp, 'Air')
-    H_air_fc = PropsSI('H', 'T', DP.fuel_cell.T, 'P', DP.fuel_cell.P_C, 'Air')
-    compressor_efficiency = 0.85 ### REVIEW THIS VALUE
-
-    # Calculate the energy required for air compression
-    DP.fuel_cell.air_compression_energy = (H_air_comp - H_air_initial) / compressor_efficiency  # J/kg
-    
-    # Calculate the heat removal required from the air
-    DP.fuel_cell.heat_change_air = (H_air_fc - H_air_comp)  # J/kg
-
-    print(f"Power required for air compression: {DP.fuel_cell.air_compression_energy * 10**(-6)} MJ/kg")
-    print(f"Heat added to from air after compression: {DP.fuel_cell.heat_change_air * 10**(-6)} MJ/kg")
-
-
-def mass_flow_calculation(DP: Design_point):
-
-    # Calculate air/hydrogen mass flow ratio
-    DP.fuel_cell.air_hydrogen_ratio = 15.999 / 1.00784 * DP.fuel_cell.stoic_ratio_A / 0.2314 # mass fraction of air per hydrogen
-    
-
-    # Calculate the required mass flow rate of gasses for the fuel cell
-    DP.fuel_cell.power_required = DP.flight_condition.power_required * DP.flight_condition.power_split
-    DP.fuel_cell.m_H2_tot = DP.fuel_cell.power_required / ((DP.fuel_cell.stack_efficiency  * LHV_H2 - DP.fuel_cell.air_compression_energy * DP.fuel_cell.air_hydrogen_ratio) * DP.flight_condition.propulsive_efficiency)
-    DP.fuel_cell.m_H2_used = DP.fuel_cell.m_H2_tot / DP.fuel_cell.stoic_ratio_A
-    DP.fuel_cell.m_O2_used = DP.fuel_cell.m_H2_used * 15.999/1.00784
-    DP.fuel_cell.m_O2_tot = DP.fuel_cell.m_O2_used * DP.fuel_cell.stoic_ratio_C
-    DP.fuel_cell.m_air = DP.fuel_cell.m_O2_tot / 0.2314  # Divided by mass fraction of O2 in air
-
-    DP.fuel_cell.m_tot = DP.fuel_cell.m_air + DP.fuel_cell.m_H2_tot
-    DP.fuel_cell.m_H2O_out = DP.fuel_cell.m_H2_used + DP.fuel_cell.m_O2_used
-    DP.fuel_cell.m_H2_out = DP.fuel_cell.m_H2_tot - DP.fuel_cell.m_H2_used
-    DP.fuel_cell.m_O2_out = DP.fuel_cell.m_O2_tot - DP.fuel_cell.m_O2_used
-    DP.fuel_cell.m_rest_out = DP.fuel_cell.m_tot - DP.fuel_cell.m_H2O_out - DP.fuel_cell.m_H2_out - DP.fuel_cell.m_O2_out
-
-
-    print(f"Mass flow rate of used oxygen for fuel cell: {DP.fuel_cell.m_O2_used} kg/s")
-    print(f"Mass flow rate of air for fuel cell: {DP.fuel_cell.m_air} kg/s")
-    
-    DP.fuel_cell.reaction_efficiency = DP.fuel_cell.stack_efficiency * DP.fuel_cell.stoic_ratio_A # Efficiency of the reaction (to determine how much heat is generated)
-    DP.fuel_cell.total_efficiency = DP.fuel_cell.stack_efficiency - DP.fuel_cell.air_compression_energy * DP.fuel_cell.air_hydrogen_ratio / (LHV_H2) # Efficiency of the fuel cell
-    DP.fuel_cell.heat_power = LHV_H2 * DP.fuel_cell.m_H2_used * (1 - DP.fuel_cell.reaction_efficiency)  # Heat power produced by the fuel cell
-
-
-    print(f"Mass flow rate of hydrogen used in fuel cell: {DP.fuel_cell.m_H2_tot} kg/s")
-    print(f"Total efficiency of the fuel cell: {DP.fuel_cell.total_efficiency * 100} %")
-    print(f"Electrical power produced by the fuel cell: {DP.fuel_cell.power_required * 10**(-6)} MW")
-    print(f"Heat power produced by the fuel cell: {DP.fuel_cell.heat_power * 10**(-6)} MW")
-
-    # Calculate the required mass flow rate of hydrogen for the combustion chamber
-    DP.cc_power = DP.flight_condition.power_required * (1 - DP.flight_condition.power_split)
-    DP.m_H2_cc = DP.cc_power / (DP.flight_condition.thermal_efficiency * DP.flight_condition.propulsive_efficiency * LHV_H2)
-
-    # Calculate the total mass flow rate
-    DP.m_H2_tot = DP.m_H2_cc + DP.fuel_cell.m_H2_tot
-
-    print(f"Mass flow rate of hydrogen used in fuel cell: {DP.fuel_cell.m_H2_tot} kg/s")
-    print(f"Mass flow rate of hydrogen for combustion chamber: {DP.m_H2_cc} kg/s")
-    print(f"Total mass flow rate of hydrogen: {DP.m_H2_tot} kg/s")
-
-
-
-
-def heat_removal_available(DP: Design_point):
-    # Calculate the heat removal available from the hydrogen for the fuel cell (combustion chamber treated separately)
-
-    H_fin_fc = PropsSI('H', 'T', DP.fuel_cell.T, 'P', DP.fuel_cell.P_A, 'Hydrogen')
-    DP.HSP_fc_H2_sp = H_fin_fc - DP.hydrogen_storage.H_init # J/kg
-    DP.HSP_fc_H2 = DP.HSP_fc_H2_sp * DP.fuel_cell.m_H2_tot # W
-    print(f"Heat added to hydrogen for fuel cell: {DP.HSP_fc_H2 * 10**(-6)} MW")
-
-    # Calculate the heat removal available from the hydrogen for the combustion chamber
-    H_fin_cc = PropsSI('H', 'T', DP.flight_condition.T_cc, 'P', DP.flight_condition.P_cc, 'Hydrogen')
-    DP.HSP_cc_H2_sp = H_fin_cc - DP.hydrogen_storage.H_init # J/kg
-    DP.HSP_cc_H2 = DP.HSP_cc_H2_sp * DP.m_H2_cc
-    print(f"Heat added to hydrogen for combustion chamber: {DP.HSP_cc_H2 * 10**(-6)} MW")
-
-
 
     
 # Create an instance of the Output class
@@ -184,6 +195,6 @@ HTPEM_TO = Design_point(fuel_cell=HTPEM, flight_condition=takeoff, hydrogen_stor
 
 LHV_H2 = 120000000  # Lower heating value of hydrogen in J/kg
 
-O2_cooling_required(DP=HTPEM_TO)
-mass_flow_calculation(DP=HTPEM_TO)
-heat_removal_available(DP=HTPEM_TO)
+HTPEM_TO.O2_cooling_required()
+HTPEM_TO.mass_flow_calculation()
+HTPEM_TO.heat_removal_available()
