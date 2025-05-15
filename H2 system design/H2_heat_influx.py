@@ -3,9 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.optimize as opt
 from scipy.optimize import fsolve
+import csv
 
 class Tank:
-    def __init__(self, MAWP, material, mat_property,mass_h2):
+    def __init__(self, MAWP, material, mat_property,mass_h2,mat2_property):
         # ---------------------------------------------Database ------------------------------------------------------------------
         self.material = material
         self.mat_property = mat_property
@@ -13,6 +14,12 @@ class Tank:
         self.mat_yield_strength = mat_property[1]
         self.mat_thermal_conductivity = mat_property[2]
         self.mat_emissivity = mat_property[3]
+
+        self.mat2_property = mat2_property
+        self.mat2_density = mat2_property[0]
+        self.mat2_yield_strength = mat2_property[1]
+        self.mat2_thermal_conductivity = mat2_property[2]
+        self.mat2_emissivity = mat2_property[3]
 
         # ---------------------------------------------Constants ----------------------------------------------------------------
         self.dormancy = 24 #hours
@@ -43,8 +50,9 @@ class Tank:
         self.R_in = 0.8 #m
         self.Q_leak_min = 50 #W (determined from Nicolas's thesis)
         self.Q_leak_max = 600 #W (determined from Nicolas's thesis)
+        self.Q_leak_min = 50 #W (determined from Nicolas's thesis)
+        self.Q_leak_max = 600 #W (determined from Nicolas's thesis)
 
-    
     # ----------------------------------------------- Maximum Heat Load ---------------------------------------------------
     def maximum_Qin(self,Qleak):
         P = [self.P0]
@@ -115,7 +123,6 @@ class Tank:
         # Convert time to hours and pressure to bars for plotting
         time_hours = np.array(time)/3600
         P_bars = np.array(P)/100000 # Convert pressure from Pa to bars
-        print(0)
         return time_hours[-1] - self.dormancy
 
     # ----------------------------------------------- Inner tank Parameters ---------------------------------------------------
@@ -130,10 +137,7 @@ class Tank:
     def inner_tank_thickness(self):
         return MAWP * self.R_in / self.mat_property[1]
 
-
-
     # ------------------------------------------------ Vacuum and Outer tank  ---------------------------------------------------
-
 
     def heat_influx(self, L_in_max, Q_str,t1,emis_mli,k_vac,t_mli, k_mli):
         T_tank = self.T0
@@ -143,9 +147,8 @@ class Tank:
         t2 = t1
         Q_in_max = self.Q_leak_max
         k_1 = self.mat_property[2]
-        k_2 = self.mat_property[2]
-        eps1 = emis_mli
-        eps2 = self.mat_property[3]
+        k_2 = self.mat2_property[2]
+        eps2 = self.mat2_property[3]
 
         # Conduction...
         def Q_cond(dv):
@@ -188,11 +191,9 @@ class Tank:
 
         dv = dv_solution[0]  # Extract the solution from the array
 
-        t2 = max(t1, P_amb * (r_in+t1+dv) / self.mat_property[1])
+        t2 = P_amb * (r_in+t1+dv+t_mli) / self.mat2_property[1]
 
         return dv, t2
-
-
 
     # ------------------------------------------------ Tank Dimensions ---------------------------------------------------
     def total_volume(self, l,dv,t1,t2,t_mli):
@@ -206,27 +207,29 @@ class Tank:
         surface_inner = 2 * np.pi * self.R_in * L_cyl + 4 * np.pi * self.R_in**2
         surface_outer = 2 * np.pi * R_out * L_cyl + 4 * np.pi * R_out**2
         mass_inner = surface_inner * t1 * self.mat_density
-        mass_outer = surface_outer * t2 * self.mat_density
+        mass_outer = surface_outer * t2 * self.mat2_density
         mass_mli = surface_inner * t_mli * dens_mli
         return mass_inner + mass_outer + self.mass_h2 + mass_mli
 
 
-
 # -------------------------------------------------------------------------------------------------------------------
 # ------------------------------------------------- Tank Database ---------------------------------------------------
-materials = ['Al-7075-T6','G10']
+materials = ['Al-7075-T6','G10','SS-304','Carbon Fibre Woven Prepreg (QI)','SS-316'] #From Granta and Engineering Toolbox
 SF = 0.9
-mat_properties = [[2800,495*1e6*SF,134,0.05],[1900,298*1e6*SF,0.5,0.95]]  #density in kg/m^3, yield strength in Pa, thermal conductivity in W/mK, emissivity in [-]
-#MAWPS = [400000,650000,800000,1000000,1200000,1280000] #bar to Pa
-MAWPS = [600000,850000,1280000] #test
-
+mat_properties = [[2800,495*1e6*SF,134,0.048], #density in kg/m^3, yield strength in Pa, thermal conductivity in W/mK, emissivity in [-]
+                  [1900,298*1e6*SF,0.5,0.95],
+                  [7955,257.5*1e6*SF,15.5,0.075],
+                  [1575,549.5*1e6*SF,1.64,0.77],
+                  [7970,257.5*1e6*SF,15,0.075]]
+#MAWPS = [600000,650000,800000,1000000,1200000,1280000] #bar to Pa
+MAWPS = [1200000]
 
 # ------------------------------------------------- Structure ------------------------------------------------------
 # Thesis values
 Q_og_str = 0.4 #W
 k_kevlar = 1.9 #W/mK
 og_str_mass = 2.1 #kg
-og_lh2 = 6.2
+og_lh2 = 6.2 #kg
 grav_idx = 0.35 #from NASA report
 
 #Our values
@@ -234,15 +237,15 @@ mass_h2 = 250 #kg
 estimated_mass = mass_h2/grav_idx - mass_h2
 
 #Insulation
-t_mli = 5 *1e-3
-dens_mli = 20 #kg/m^3
-emis_mli = 0.03
-k_vac = 0.01 # W/mK
+t_mli = 10 *1e-3 #https://www.sciencedirect.com/science/article/pii/S135943112200391X
+dens_mli = 180 #kg/m^3 https://www.sciencedirect.com/science/article/pii/S135943112200391X
+emis_mli = 0.03 #https://www.thermalengineer.com/library/effective_emittance.htm
+k_vac = 10.44*1e-3 # W/mK (CEC Hawaii Presentation)
+k_mli = 0.035 # W/mK #https://www.sciencedirect.com/science/article/pii/S135943112200391X
 
 
-
-def compute_tank_volume(material, mat_property, MAWP,mass_h2, Q_str):
-    tankh2 = Tank(MAWP, material, mat_property,mass_h2)
+def compute_tank_volume(material, mat_property, MAWP,mass_h2, Q_str,mat2_property,str_mass):
+    tankh2 = Tank(MAWP, material, mat_property,mass_h2,mat2_property)
 
     # -----------------------------Maximum allowable heat load -----------------------------------
     Q_solution = opt.root_scalar(tankh2.maximum_Qin, bracket=[tankh2.Q_leak_min, tankh2.Q_leak_max], method='brentq')
@@ -263,94 +266,248 @@ def compute_tank_volume(material, mat_property, MAWP,mass_h2, Q_str):
         print("Failed to find an inner length. Adjust the bounds.")
 
     t1 = tankh2.inner_tank_thickness()
-    print(f"Inner tank thickness: {t1:.4f} m")
-    print(f"MAWP:",MAWP)
-    print(f"R_in:",tankh2.R_in)
-    print(f"Strength:",tankh2.mat_property[1])
 
-    dv, t2 = tankh2.heat_influx(L_in, Q_str,t1,emis_mli,k_vac,t_mli)
+    dv, t2 = tankh2.heat_influx(L_in, Q_str,t1,emis_mli,k_vac,t_mli,k_mli)
     
     Vt = tankh2.total_volume(L_in, dv,t1,t2,t_mli)
     Mt = tankh2.total_mass(L_in, dv, t1, t2,t_mli,dens_mli) 
     Mt += str_mass
     mass_error = Mt - estimated_mass - mass_h2
-
-    return Vt, Mt, mass_error
-
+    Vh2 = tankh2.V_in 
+    return Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in, Vh2,tankh2.R_in
 
 # ------------------------------------------------- Main ------------------------------------------------------
 
+RUN = False #Run new design
+OPEN = True #Open previous design
+
 plot_mats = []
+plot_mats2 = []
 plot_MAWPS = []
 plot_volumes = []
 plot_masses = []
 plot_mass_errors = []
 
+if RUN:
+    for MAWP in MAWPS:
+        for material, mat_property in zip(materials, mat_properties):
+            for material2, mat2_property in zip(materials, mat_properties):
+                if material == 'G10' or material == 'Carbon Fibre Non-crimp fabric (UD)' or material == 'Carbon Fibre Woven Prepreg (QI)': #Composites
+                    og_tank_mass = 4.8+3.15
+                else: #Metallic materials (compared to aluminium)
+                    og_tank_mass = 8.4+3.6
+                ratio = og_str_mass / (og_tank_mass+og_lh2)
+                str_mass = estimated_mass * ratio
+                Q_str = Q_og_str * np.sqrt(ratio/ratio) #Assuming Volume increase with the same ratio as the mass
+                Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in,Vh2,R_in = compute_tank_volume(material, mat_property, MAWP,mass_h2,Q_str,mat2_property,str_mass)
+                print(f"Material In: {material}, Material Out: {material2}, MAWP: {MAWP} Pa")
+                print(f"Tank Volume: {Vt:.4f} m^3")
+                print(f"Tank Mass: {Mt:.4f} kg")
 
-for MAWP in MAWPS:
-    for material, mat_property in zip(materials, mat_properties):
-        if material == 'G10': #Composite materials
-            og_tank_mass = 4.8+3.15
-        else: #Metallic materials
-            og_tank_mass = 8.4+3.6
-        ratio = og_str_mass / (og_tank_mass+og_lh2)
-        str_mass = estimated_mass * ratio 
-        Q_str = Q_og_str * np.sqrt(ratio/ratio) #Assuming Volume increase with the same ratio as the mass
-        Vt, Mt, mass_error = compute_tank_volume(material, mat_property, MAWP,mass_h2,Q_str)
-        print(f"Material: {material}, MAWP: {MAWP} Pa")
-        print(f"Tank Volume: {Vt:.4f} m^3")
-        print(f"Tank Mass: {Mt:.4f} kg")
-        print(f"Mass Error: {mass_error:.4f} kg\n")
+                plot_mats.append(material)
+                plot_mats2.append(material2)
+                plot_MAWPS.append(MAWP)
+                plot_volumes.append(Vt)
+                plot_masses.append(Mt)
+                plot_mass_errors.append(mass_error)
 
-        plot_mats.append(material)
-        plot_MAWPS.append(MAWP)
-        plot_volumes.append(Vt)
-        plot_masses.append(Mt)
-        plot_mass_errors.append(mass_error)
+                # CSV file
+                file_exists = False
+                try:
+                    with open('tank_results.csv', mode='r') as file:
+                        file_exists = True
+                except FileNotFoundError:
+                    pass
+
+                with open('tank_results.csv', mode='a', newline='') as file:
+                    writer = csv.writer(file)
+                    if not file_exists:
+                        writer.writerow(['Material Inner', 'Material Outer', 'MAWP (Pa)', 'Tank Volume (m^3)', 
+                                        'Tank Mass (kg)', 'Mass Error (kg)',
+                                        'Inner Tank Thickness (m)', 'Outer Tank Thickness (m)', 
+                                        'Vacuum Gap (m)', 'Inner Tank Length (m)', 'Vh2 (m^3)','R_in (m)'])
+                    # Write data
+                    writer.writerow([material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2,R_in])
 
 
+if OPEN:
+    with open('tank_results.csv', mode='r') as file:
+        reader = csv.reader(file)
+        next(reader)  # Skip the header row
+        for row in reader:
+            plot_mats.append(row[0])
+            plot_mats2.append(row[1])
+            plot_MAWPS.append(float(row[2]))
+            plot_volumes.append(float(row[3]))
+            plot_masses.append(float(row[4]))
+            plot_mass_errors.append(float(row[5]))
+            Vh2 = float(row[10])
 # ------------------------------------------------- Plotting ------------------------------------------------------
-fig, axs = plt.subplots(1, 3, figsize=(18, 6))
 
-# Plot 1: Volume vs MAWP
-for material in materials:
-    material_volumes = [plot_volumes[i] for i in range(len(plot_mats)) if plot_mats[i] == material]
-    material_MAWPS = [plot_MAWPS[i] for i in range(len(plot_mats)) if plot_mats[i] == material]
-    axs[0].plot(material_MAWPS, material_volumes, label=material, marker='o')
-
-axs[0].set_xlabel('MAWP (Pa)')
-axs[0].set_ylabel('Tank Volume (m^3)')
-axs[0].set_title('Tank Volume vs MAWP')
-axs[0].legend()
-axs[0].grid(True)
-
-# Plot 2: Mass vs MAWP
-for material in materials:
-    material_masses = [plot_masses[i] for i in range(len(plot_mats)) if plot_mats[i] == material]
-    material_MAWPS = [plot_MAWPS[i] for i in range(len(plot_mats)) if plot_mats[i] == material]
-    axs[1].plot(material_MAWPS, material_masses, label=material, marker='o')
-
-axs[1].set_xlabel('MAWP (Pa)')
-axs[1].set_ylabel('Tank Mass (kg)')
-axs[1].set_title('Tank Mass vs MAWP')
-axs[1].legend()
-axs[1].grid(True)
-
-# Plot 3: Mass Error vs MAWP
-for material in materials:
-    material_mass_errors = [plot_mass_errors[i] for i in range(len(plot_mats)) if plot_mats[i] == material]
-    material_MAWPS = [plot_MAWPS[i] for i in range(len(plot_mats)) if plot_mats[i] == material]
-    axs[2].plot(material_MAWPS, material_mass_errors, label=material, marker='o')
-
-axs[2].set_xlabel('MAWP (Pa)')
-axs[2].set_ylabel('Mass Error (kg)')
-axs[2].set_title('Mass Error vs MAWP')
-axs[2].legend()
-axs[2].grid(True)
-
-plt.tight_layout()
-plt.show()
+plot1 = True
+plot2=True
+draw1 = True
 
 
+if plot1:
+    plt.figure(figsize=(10, 6))
+    for i in range(len(materials)**2):
+        for j in range(len(MAWPS)):
+            plt.scatter(plot_MAWPS[i + j * len(materials)**2], plot_volumes[i + j * len(materials)**2], label=f"{plot_mats[i]}-{plot_mats2[i]}")
+    plt.xlabel("MAWP (Pa)")
+    plt.ylabel("Tank Volume (m^3)")
+    plt.title("Tank Volume vs MAWP")
+    plt.subplots_adjust(left=0.1, right=0.6, wspace=0.3)
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
+    plt.show()
+                
+        
+if plot2:
+    plt.figure(figsize=(10, 6))
+    unique_combinations = len(materials)**2 * len(MAWPS)
+    colors = plt.cm.tab20(np.linspace(0, 1, unique_combinations))
+    markers = ['o', 's', 'D', '^', 'v', '<', '>', 'p', '*', 'h', 'H', 'X', 'd']
+
+    for idx, (i, j) in enumerate([(i, j) for i in range(len(materials)**2) for j in range(len(MAWPS))]):
+        color = colors[idx % len(colors)]
+        marker = markers[idx % len(markers)]
+        plt.scatter(
+            mass_h2 / plot_masses[i + j * len(materials)**2],
+            Vh2 / plot_volumes[i + j * len(materials)**2],
+            label=f"{plot_mats[i]}-{plot_mats2[i]}",
+            color=color,
+            marker=marker
+        )
+
+    plt.xlabel(r"$\eta_g$")
+    plt.ylabel(r"$\eta_v$")
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
+    plt.title(r"$\eta_g$ vs $\eta_v$")
+    plt.subplots_adjust(left=0.1, right=0.6, wspace=0.3)
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
+    plt.show()
 
 
+if draw1:
+    for i, (material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2, R_in) in enumerate(
+        zip([(row[0]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'],
+            [(row[1]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'],
+            [float(row[2]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'],
+            [float(row[3]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'],
+            [float(row[4]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'],
+            [float(row[5]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'],
+            [float(row[6]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'],
+            [float(row[7]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'], 
+            [float(row[8]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'], 
+            [float(row[9]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'], 
+            [float(row[10]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'], 
+            [float(row[11]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'])):
+        
+        # Tank dimensions
+        r_inner = R_in
+        r_inner_wall = r_inner + t1
+        r_mli_outer = r_inner_wall + t_mli
+        r_vacuum_outer = r_mli_outer + dv
+        r_outer = r_vacuum_outer + t2
+
+        # Create the figure
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+        ax1.set_aspect('equal', adjustable='box')
+        ax2.set_aspect('auto', adjustable='box')
+
+        # ---------------- Top-down cross-section ----------------
+        
+        # Draw the vacuum gap
+        vacuum_circle = plt.Circle((0, 0), r_vacuum_outer, color='lightgray', label='Vacuum Gap', fill=True, linestyle='--', linewidth=1)
+        ax1.add_artist(vacuum_circle)
+
+        # Draw the inner volume
+        inner_volume_circle = plt.Circle((0, 0), r_inner, color='white', fill=True, edgecolor='black', linewidth=1)
+        ax1.add_artist(inner_volume_circle)
+
+        # Draw the inner tank wall
+        inner_wall_circle = plt.Circle((0, 0), r_inner_wall, color='green', label='Inner Tank Wall', fill=False, linewidth=2)
+        ax1.add_artist(inner_wall_circle)
+
+        # Draw the MLI insulation
+        mli_circle = plt.Circle((0, 0), r_mli_outer, color='orange', label='MLI Insulation', fill=False, linewidth=2)
+        ax1.add_artist(mli_circle)
+
+        # Draw the outer tank wall
+        outer_wall_circle = plt.Circle((0, 0), r_outer, color='red', label='Outer Tank Wall', fill=False, linewidth=2)
+        ax1.add_artist(outer_wall_circle)        
+
+        # Set limits for top-down view
+        padding = r_outer * 0.2
+        ax1.set_xlim(-r_outer - padding, r_outer + padding)
+        ax1.set_ylim(-r_outer - padding, r_outer + padding)
+
+        # ---------------- Side cross-section ----------------
+        # Draw the inner tank wall (side view)
+        L_cyl = L_in - 2 * r_inner
+        ax2.plot([-L_cyl / 2, L_cyl / 2], [r_inner_wall, r_inner_wall], color='green', label='Inner Tank Wall', linewidth=2)
+        ax2.plot([-L_cyl / 2, L_cyl / 2], [-r_inner_wall, -r_inner_wall], color='green', linewidth=2)
+
+        # Draw the hemispherical caps for the inner tank wall
+        theta = np.linspace(np.pi/2, 3*np.pi/2, 100)
+        ax2.plot(-L_cyl / 2 + r_inner * np.cos(theta), r_inner * np.sin(theta), color='green', linewidth=2)
+        ax2.plot(L_cyl / 2 - r_inner * np.cos(theta), r_inner * np.sin(theta), color='green', linewidth=2)
+
+        # Draw the MLI insulation (side view)
+        ax2.plot([-L_cyl / 2, L_cyl / 2], [r_mli_outer, r_mli_outer], color='orange', label='MLI Insulation', linewidth=2)
+        ax2.plot([-L_cyl / 2, L_cyl / 2], [-r_mli_outer, -r_mli_outer], color='orange', linewidth=2)
+
+        # Draw the hemispherical caps for the MLI insulation
+        ax2.plot(-L_cyl / 2 + r_mli_outer * np.cos(theta), r_mli_outer * np.sin(theta), color='orange', linewidth=2)
+        ax2.plot(L_cyl / 2 - r_mli_outer * np.cos(theta), r_mli_outer * np.sin(theta), color='orange', linewidth=2)
+
+        # Draw the vacuum gap (side view)
+        ax2.plot([-L_cyl / 2, L_cyl / 2], [r_vacuum_outer, r_vacuum_outer], color='gray', label='Vacuum Gap', linestyle='--', linewidth=1)
+        ax2.plot([-L_cyl / 2, L_cyl / 2], [-r_vacuum_outer, -r_vacuum_outer], color='gray', linestyle='--', linewidth=1)
+
+        # Draw the hemispherical caps for the vacuum gap
+        ax2.plot(-L_cyl / 2 + r_vacuum_outer * np.cos(theta), r_vacuum_outer * np.sin(theta), color='gray', linestyle='--', linewidth=1)
+        ax2.plot(L_cyl / 2 - r_vacuum_outer * np.cos(theta), r_vacuum_outer * np.sin(theta), color='gray', linestyle='--', linewidth=1)
+
+        # Draw the outer tank wall (side view)
+        ax2.plot([-L_cyl / 2, L_cyl / 2], [r_outer, r_outer], color='red', label='Outer Tank Wall', linewidth=2)
+        ax2.plot([-L_cyl / 2, L_cyl / 2], [-r_outer, -r_outer], color='red', linewidth=2)
+        ax2.plot([-L_cyl / 2, -L_cyl / 2], [-r_outer, r_outer], color='red', linewidth=1,linestyle='--')
+        ax2.plot([L_cyl / 2, L_cyl / 2], [-r_outer, r_outer], color='red', linewidth=1,linestyle='--')
+
+        # Draw the hemispherical caps for the outer tank wall
+        ax2.plot(-L_cyl / 2 + r_outer * np.cos(theta), r_outer * np.sin(theta), color='red', linewidth=2)
+        ax2.plot(L_cyl / 2 - r_outer * np.cos(theta), r_outer * np.sin(theta), color='red', linewidth=2)
+
+        # Set limits for side view
+        max_dim = max(L_in / 2 + padding, r_outer + padding)
+        ax2.set_xlim(-max_dim, max_dim)
+        ax2.set_ylim(-max_dim, max_dim)
+
+
+        # Add overall title
+        fig.suptitle(f"Tank Design Visualization", fontsize=16)
+
+        # Add subtitles for the cross-section plots
+        ax1.set_title("Top-down Cross-section", fontsize=14)
+        ax2.set_title("Side Cross-section", fontsize=14)
+
+        # Adjust the layout to move the graphs slightly to the right
+        fig.subplots_adjust(left=0.25, right=0.9, wspace=0.3)
+
+        # Add legend to the left of the plots for ax1
+        ax1.legend(
+            loc='center left', 
+            bbox_to_anchor=(-0.7, 0.5), 
+            title=(
+            f"Tank Details\n"
+            f"Total Volume: {Vt:.4f} m³\n"
+            f"Total Mass: {Mt:.4f} kg\n"
+            f"Inner Material: {material}\n"
+            f"Outer Material: {material2}"
+            )
+        )
+
+        # Show the figure
+        plt.show()
