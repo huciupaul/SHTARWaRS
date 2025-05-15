@@ -147,7 +147,7 @@ class Tank:
             P_test = (MAWP + 0.2*100000) * 1.3 #Safety factor
             N_theta_p = P_test * self.R_in
             N_phi_p = P_test * self.R_in / 2
-            self.mat_property[1] = self.mat_property[1] * 0.38 * 0.57 * 0.75 #may add safety factors
+            self.mat_property[1] = self.mat_property[1] #may add safety factors
             angle = [0,90,0.1] #helical winding angle in degrees
             t_min = 1000
             for ang in angle:
