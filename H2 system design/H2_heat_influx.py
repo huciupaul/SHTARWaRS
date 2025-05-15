@@ -141,6 +141,7 @@ class Tank:
 
     
     def inner_tank_thickness(self):
+        alpha = 0
         if self.material == 'G10' or self.material == 'Carbon Fibre Woven Prepreg (QI)':
             #Calc membrane loads
             P_test = (MAWP + 0.2*100000) * 1.3 #Safety factor
@@ -157,9 +158,10 @@ class Tank:
                 t = (t_heli + t_hoop) / self.mat_property[6]
                 if t < t_min:
                     t_min = t
-            return t_min
+                    alpha = ang
+            return t_min, alpha
         else:
-            return P_test * self.R_in / self.mat_property[1]
+            return P_test * self.R_in / self.mat_property[1], alpha
 
     # ------------------------------------------------ Vacuum and Outer tank  ---------------------------------------------------
 
@@ -216,6 +218,7 @@ class Tank:
         dv = dv_solution[0]  # Extract the solution from the array
 
         t2_min = 1000
+        alpha = 0
         if self.material == 'G10' or self.material == 'Carbon Fibre Woven Prepreg (QI)':
             #Calc membrane loads
             P_test = P_amb #Safety factor
@@ -232,10 +235,11 @@ class Tank:
                 t = (t_heli + t_hoop) / self.mat2_property[6]
                 if t < t2_min:
                     t2_min = t
+                    alpha = ang
         else:
             t2_min = P_amb * (r_in+t1+dv+t_mli) / self.mat2_property[1]
 
-        return dv, t2_min
+        return dv, t2_min, alpha
 
     # ------------------------------------------------ Tank Dimensions ---------------------------------------------------
     def total_volume(self, l,dv,t1,t2,t_mli):
@@ -332,9 +336,11 @@ def compute_tank_volume(material, mat_property, MAWP,mass_h2, Q_str,mat2_propert
     else:
         print("Failed to find an inner length. Adjust the bounds.")
 
-    t1 = max(tankh2.inner_tank_thickness(),t_limit)
+    t1, ang1_w = tankh2.inner_tank_thickness()
+    if t1 < t_limit:
+        t1 = t_limit
 
-    dv, t2 = tankh2.heat_influx(L_in, Q_str,t1,emis_mli,k_vac,t_mli,k_mli)
+    dv, t2, ang2_w = tankh2.heat_influx(L_in, Q_str,t1,emis_mli,k_vac,t_mli,k_mli)
     t2 = max(t2,t_limit)
     
     Vt = tankh2.total_volume(L_in, dv,t1,t2,t_mli)
@@ -347,7 +353,7 @@ def compute_tank_volume(material, mat_property, MAWP,mass_h2, Q_str,mat2_propert
     co2_kg = tankh2.kg_co2(mass_inner,mass_outer,mass_mli,str_mass,mli_co2,co2_kevlar)
     embodied_energy = tankh2.embodied_energy(mass_inner,mass_outer,mass_mli,str_mass,kevlar_ee,mli_ee)
 
-    return Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in, Vh2,tankh2.R_in, co2_kg, embodied_energy
+    return Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in, Vh2,tankh2.R_in, co2_kg, embodied_energy, ang1_w, ang2_w
 
 # ------------------------------------------------- Main ------------------------------------------------------
 
@@ -374,7 +380,7 @@ if RUN:
                 ratio = og_str_mass / (og_tank_mass+og_lh2)
                 str_mass = estimated_mass * ratio
                 Q_str = Q_og_str * np.sqrt(ratio/ratio) #Assuming Volume increase with the same ratio as the mass
-                Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in,Vh2,R_in,co2_kg,emb_energy = compute_tank_volume(material, mat_property, MAWP,mass_h2,Q_str,mat2_property,str_mass)
+                Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in,Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w = compute_tank_volume(material, mat_property, MAWP,mass_h2,Q_str,mat2_property,str_mass)
                 print(f"Material In: {material}, Material Out: {material2}, MAWP: {MAWP} Pa")
                 print(f"Tank Volume: {Vt:.4f} m^3")
                 print(f"Tank Mass: {Mt:.4f} kg")
@@ -404,9 +410,9 @@ if RUN:
                         writer.writerow(['Material Inner', 'Material Outer', 'MAWP (Pa)', 'Tank Volume (m^3)', 
                                         'Tank Mass (kg)', 'Mass Error (kg)',
                                         'Inner Tank Thickness (m)', 'Outer Tank Thickness (m)', 
-                                        'Vacuum Gap (m)', 'Inner Tank Length (m)', 'Vh2 (m^3)','R_in (m)','CO2 (kg)','Embodied Energy (MJ)'])
+                                        'Vacuum Gap (m)', 'Inner Tank Length (m)', 'Vh2 (m^3)','R_in (m)','CO2 (kg)','Embodied Energy (MJ)','Angle of winding inner','Angle of winding outer'])
                     # Write data
-                    writer.writerow([material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2,R_in,co2_kg,emb_energy])
+                    writer.writerow([material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w])
 
 
 if OPEN:
