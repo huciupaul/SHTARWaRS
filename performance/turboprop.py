@@ -148,7 +148,7 @@ class Turboprop:
         
         # Atmospheric conditions
         M0 = V0/np.sqrt(self.k_air*R_AIR*T0)
-        mdot_air = mdot_air = rho0 * V0 * A_inlet/eta_prop
+        mdot_air = rho0 * V0 * A_inlet/eta_prop
         
         # Station 2 (compressor inlet)
         T02, P02 = self.__02(T0, P0, M0, self.eta_in, self.k_air)
