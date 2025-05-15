@@ -14,12 +14,18 @@ class Tank:
         self.mat_yield_strength = mat_property[1]
         self.mat_thermal_conductivity = mat_property[2]
         self.mat_emissivity = mat_property[3]
+        self.mat_co2 = mat_property[4]
+        self.mat_ee = mat_property[5]
+        self.mat_fibre_ratio = mat_property[6]
 
         self.mat2_property = mat2_property
         self.mat2_density = mat2_property[0]
         self.mat2_yield_strength = mat2_property[1]
         self.mat2_thermal_conductivity = mat2_property[2]
         self.mat2_emissivity = mat2_property[3]
+        self.mat2_co2 = mat2_property[4]
+        self.mat2_ee = mat2_property[5]
+        self.mat2_fibre_ratio = mat2_property[6]
 
         # ---------------------------------------------Constants ----------------------------------------------------------------
         self.dormancy = 24 #hours
@@ -209,20 +215,40 @@ class Tank:
         mass_inner = surface_inner * t1 * self.mat_density
         mass_outer = surface_outer * t2 * self.mat2_density
         mass_mli = surface_inner * t_mli * dens_mli
-        return mass_inner + mass_outer + self.mass_h2 + mass_mli
+        return mass_inner,mass_outer,mass_mli
 
+    def kg_co2(self,mass_inner,mass_outer,mass_mli,mass_str,mli_co2,co2_kevlar):
+        lca_inner = mass_inner * self.mat_property[4]
+        lca_outer = mass_outer * self.mat2_property[4]
+        lca_mli = mass_mli * mli_co2
+        lca_str = mass_str * co2_kevlar
+        lca_total = lca_inner + lca_outer + lca_mli + lca_str
+        return lca_total
+    
+    def embodied_energy(self,mass_inner,mass_outer,mass_mli,mass_str,kevlar_ee,mli_ee):
+        ee_inner = mass_inner * self.mat_ee
+        ee_outer = mass_outer * self.mat2_ee
+        ee_mli = mass_mli * mli_ee
+        ee_str = mass_str * kevlar_ee
+        ee_total = ee_inner + ee_outer + ee_mli + ee_str
+        return ee_total
 
 # -------------------------------------------------------------------------------------------------------------------
 # ------------------------------------------------- Tank Database ---------------------------------------------------
 materials = ['Al-7075-T6','G10','SS-304','Carbon Fibre Woven Prepreg (QI)','SS-316'] #From Granta and Engineering Toolbox
 SF = 0.9
-mat_properties = [[2800,495*1e6*SF,134,0.048], #density in kg/m^3, yield strength in Pa, thermal conductivity in W/mK, emissivity in [-]
-                  [1900,298*1e6*SF,0.5,0.95],
-                  [7955,257.5*1e6*SF,15.5,0.075],
-                  [1575,549.5*1e6*SF,1.64,0.77],
-                  [7970,257.5*1e6*SF,15,0.075]]
+#density in kg/m^3, yield strength in Pa, thermal conductivity in W/mK, emissivity in [-], CO2 [kg/kg], Embodied Energy in MJ/kg, Fibre Ratio
+mat_properties = [[2800,495*1e6*SF,134,0.048,7.795,106,0], 
+                  [1900,298*1e6*SF,0.5,0.95,15.25,369,0.4],
+                  [7955,257.5*1e6*SF,15.5,0.075,3,42.75,0],
+                  [1575,549.5*1e6*SF,1.64,0.77,47.8,686.5,0.625],
+                  [7970,257.5*1e6*SF,15,0.075,4.265,49.75,0]]
 #MAWPS = [600000,650000,800000,1000000,1200000,1280000] #bar to Pa
 MAWPS = [1200000]
+
+n_mats = 2
+materials = materials[:n_mats]
+mat_properties = mat_properties[:n_mats]
 
 # ------------------------------------------------- Structure ------------------------------------------------------
 # Thesis values
@@ -231,9 +257,11 @@ k_kevlar = 1.9 #W/mK
 og_str_mass = 2.1 #kg
 og_lh2 = 6.2 #kg
 grav_idx = 0.35 #from NASA report
+co2_kevlar = 13.1 #kg/kg (Kevlar 149)
+kevlar_ee = 257 #MJ/kg (Embodied Energy for Kevlar 149)
 
 #Our values
-mass_h2 = 250 #kg
+mass_h2 = 532.65 #kg
 estimated_mass = mass_h2/grav_idx - mass_h2
 
 #Insulation
@@ -242,6 +270,8 @@ dens_mli = 180 #kg/m^3 https://www.sciencedirect.com/science/article/pii/S135943
 emis_mli = 0.03 #https://www.thermalengineer.com/library/effective_emittance.htm
 k_vac = 10.44*1e-3 # W/mK (CEC Hawaii Presentation)
 k_mli = 0.035 # W/mK #https://www.sciencedirect.com/science/article/pii/S135943112200391X
+mli_co2 = 8.03 #kg/kg (for Aluminium 6463 T6)
+mli_ee = 108.4 #MJ/kg (Embodied Energy for Aluminium 6463 T6)
 
 
 def compute_tank_volume(material, mat_property, MAWP,mass_h2, Q_str,mat2_property,str_mass):
@@ -270,11 +300,16 @@ def compute_tank_volume(material, mat_property, MAWP,mass_h2, Q_str,mat2_propert
     dv, t2 = tankh2.heat_influx(L_in, Q_str,t1,emis_mli,k_vac,t_mli,k_mli)
     
     Vt = tankh2.total_volume(L_in, dv,t1,t2,t_mli)
-    Mt = tankh2.total_mass(L_in, dv, t1, t2,t_mli,dens_mli) 
+    mass_inner,mass_outer,mass_mli = tankh2.total_mass(L_in, dv, t1, t2,t_mli,dens_mli) 
+    Mt = mass_inner + mass_outer + mass_mli + mass_h2
     Mt += str_mass
     mass_error = Mt - estimated_mass - mass_h2
-    Vh2 = tankh2.V_in 
-    return Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in, Vh2,tankh2.R_in
+    Vh2 = tankh2.V_in
+
+    co2_kg = tankh2.kg_co2(mass_inner,mass_outer,mass_mli,str_mass,mli_co2,co2_kevlar)
+    embodied_energy = tankh2.embodied_energy(mass_inner,mass_outer,mass_mli,str_mass,kevlar_ee,mli_ee)
+
+    return Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in, Vh2,tankh2.R_in, co2_kg, embodied_energy
 
 # ------------------------------------------------- Main ------------------------------------------------------
 
@@ -287,22 +322,26 @@ plot_MAWPS = []
 plot_volumes = []
 plot_masses = []
 plot_mass_errors = []
+plot_co2 = []
+plot_embodied_energy = []
 
 if RUN:
     for MAWP in MAWPS:
         for material, mat_property in zip(materials, mat_properties):
             for material2, mat2_property in zip(materials, mat_properties):
-                if material == 'G10' or material == 'Carbon Fibre Non-crimp fabric (UD)' or material == 'Carbon Fibre Woven Prepreg (QI)': #Composites
+                if material == 'G10' or  material == 'Carbon Fibre Woven Prepreg (QI)': #Composites
                     og_tank_mass = 4.8+3.15
                 else: #Metallic materials (compared to aluminium)
                     og_tank_mass = 8.4+3.6
                 ratio = og_str_mass / (og_tank_mass+og_lh2)
                 str_mass = estimated_mass * ratio
                 Q_str = Q_og_str * np.sqrt(ratio/ratio) #Assuming Volume increase with the same ratio as the mass
-                Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in,Vh2,R_in = compute_tank_volume(material, mat_property, MAWP,mass_h2,Q_str,mat2_property,str_mass)
+                Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in,Vh2,R_in,co2_kg,emb_energy = compute_tank_volume(material, mat_property, MAWP,mass_h2,Q_str,mat2_property,str_mass)
                 print(f"Material In: {material}, Material Out: {material2}, MAWP: {MAWP} Pa")
                 print(f"Tank Volume: {Vt:.4f} m^3")
                 print(f"Tank Mass: {Mt:.4f} kg")
+                print(f"CO2 emissions: {co2_kg:.4f} kg")
+                print(f"Embodied Energy: {emb_energy:.4f} MJ")
 
                 plot_mats.append(material)
                 plot_mats2.append(material2)
@@ -310,6 +349,8 @@ if RUN:
                 plot_volumes.append(Vt)
                 plot_masses.append(Mt)
                 plot_mass_errors.append(mass_error)
+                plot_co2.append(co2_kg)
+                plot_embodied_energy.append(emb_energy)
 
                 # CSV file
                 file_exists = False
@@ -325,9 +366,9 @@ if RUN:
                         writer.writerow(['Material Inner', 'Material Outer', 'MAWP (Pa)', 'Tank Volume (m^3)', 
                                         'Tank Mass (kg)', 'Mass Error (kg)',
                                         'Inner Tank Thickness (m)', 'Outer Tank Thickness (m)', 
-                                        'Vacuum Gap (m)', 'Inner Tank Length (m)', 'Vh2 (m^3)','R_in (m)'])
+                                        'Vacuum Gap (m)', 'Inner Tank Length (m)', 'Vh2 (m^3)','R_in (m)','CO2 (kg)','Embodied Energy (MJ)'])
                     # Write data
-                    writer.writerow([material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2,R_in])
+                    writer.writerow([material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2,R_in,co2_kg,emb_energy])
 
 
 if OPEN:
@@ -342,11 +383,14 @@ if OPEN:
             plot_masses.append(float(row[4]))
             plot_mass_errors.append(float(row[5]))
             Vh2 = float(row[10])
+            plot_co2.append(float(row[12]))
+            plot_embodied_energy.append(float(row[13]))
 # ------------------------------------------------- Plotting ------------------------------------------------------
 
-plot1 = True
-plot2=True
-draw1 = True
+plot1 = False
+plot2=False
+plot3 = True
+draw1 = False
 
 
 if plot1:
@@ -389,8 +433,9 @@ if plot2:
     plt.show()
 
 
+
 if draw1:
-    for i, (material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2, R_in) in enumerate(
+    for i, (material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2, R_in,co2_kg) in enumerate(
         zip([(row[0]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'],
             [(row[1]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'],
             [float(row[2]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'],
@@ -402,7 +447,8 @@ if draw1:
             [float(row[8]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'], 
             [float(row[9]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'], 
             [float(row[10]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'], 
-            [float(row[11]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'])):
+            [float(row[11]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'],
+            [float(row[12]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'])):
         
         # Tank dimensions
         r_inner = R_in
@@ -482,8 +528,8 @@ if draw1:
 
         # Set limits for side view
         max_dim = max(L_in / 2 + padding, r_outer + padding)
-        ax2.set_xlim(-max_dim, max_dim)
-        ax2.set_ylim(-max_dim, max_dim)
+        ax2.set_xlim(-max_dim*1.5, max_dim*1.5)
+        ax2.set_ylim(-max_dim*1.5, max_dim*1.5)
 
 
         # Add overall title
