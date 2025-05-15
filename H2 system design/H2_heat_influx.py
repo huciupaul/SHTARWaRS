@@ -215,9 +215,27 @@ class Tank:
 
         dv = dv_solution[0]  # Extract the solution from the array
 
-        t2 = P_amb * (r_in+t1+dv+t_mli) / self.mat2_property[1]
+        t2_min = 1000
+        if self.material == 'G10' or self.material == 'Carbon Fibre Woven Prepreg (QI)':
+            #Calc membrane loads
+            P_test = P_amb #Safety factor
+            N_theta_p = P_test * (r_in+t1+dv+t_mli)
+            N_phi_p = P_test * (r_in+t1+dv+t_mli) / 2
+            self.mat2_property[1] = self.mat2_property[1] #may add safety factors
+            angle = [0,90,0.1] #helical winding angle in degrees
+            
+            for ang in angle:
+                #Calc netting thickness in hoop and helical direction
+                t_heli = N_phi_p / (self.mat2_property[1] * np.cos(ang)**2)
+                t_hoop = (N_theta_p - N_phi_p * np.tan(ang)**2) / (self.mat2_property[1])
+                #Calc minimum thickness based on FVF
+                t = (t_heli + t_hoop) / self.mat2_property[6]
+                if t < t2_min:
+                    t2_min = t
+        else:
+            t2_min = P_amb * (r_in+t1+dv+t_mli) / self.mat2_property[1]
 
-        return dv, t2
+        return dv, t2_min
 
     # ------------------------------------------------ Tank Dimensions ---------------------------------------------------
     def total_volume(self, l,dv,t1,t2,t_mli):
