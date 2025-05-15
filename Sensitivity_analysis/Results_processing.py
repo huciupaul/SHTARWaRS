@@ -43,7 +43,7 @@ win_matrix = []
 for j in range(len(sens_input.design_option_names)):
     d = []
     for i in range(len(sens_input.tradeoff_criteria_names)):
-        x = main.output['Tradeoff Wins for ' + sens_input.design_option_names[j] + ' and ' + sens_input.tradeoff_criteria_names[i]][Which_to_check]
+        x = 100/(np.shape(main.output['Tradeoff Values for ' + sens_input.tradeoff_criteria_names[0]])[0] - 1) * main.output['Tradeoff Wins for ' + sens_input.design_option_names[j] + ' and ' + sens_input.tradeoff_criteria_names[i]][Which_to_check]
         d.append(x)
     win_matrix.append(d)
 win_matrix = np.array(win_matrix)
@@ -58,7 +58,7 @@ plt.show()
 
 
 #compares the wins of one design to the total amount it could have won
-win_frac_sus = 100 * main.output['Tradeoff Wins for Sustainability'][1] /  sum(main.output['Tradeoff Wins for Sustainability'])
+
 percent = []
 for i in range(len(sens_input.tradeoff_criteria_names)):
     percent.append(100 * main.output['Tradeoff Wins for ' + sens_input.tradeoff_criteria_names[i]][Which_to_check] /  sum(main.output['Tradeoff Wins for ' + sens_input.tradeoff_criteria_names[i]]))
@@ -70,15 +70,38 @@ plt.ylabel("Values")
 plt.show()
 
 
-def visualize_redness(data, row_labels, col_labels):
+def visualize_red_yellow_green_above_half(data, row_labels, col_labels):
     data = np.array(data)
 
     if data.shape != (len(row_labels), len(col_labels)):
         raise ValueError("Shape of data does not match number of row and column labels")
 
-    # Normalize values for color (lower values = more red)
-    norm = (data - np.min(data)) / (np.max(data) - np.min(data) + 1e-5)
-    cell_colors = [[(1, norm[i, j], norm[i, j]) for j in range(data.shape[1])] for i in range(data.shape[0])]
+    max_val = np.max(data)
+    half_max = max_val / 2
+    three_quarter_max = 0.75 * max_val
+
+    if max_val == 0:
+        raise ValueError("All data values are zero — can't compute color gradient.")
+
+    def value_to_color(val):
+        if val <= half_max:
+            return (1, 0, 0)  # Solid red
+        elif val <= three_quarter_max:
+            # red → yellow (1,0,0) → (1,1,0)
+            norm = (val - half_max) / (three_quarter_max - half_max + 1e-5)
+            r = 1
+            g = norm
+            b = 0
+            return (r, g, b)
+        else:
+            # yellow → green (1,1,0) → (0,1,0)
+            norm = (val - three_quarter_max) / (max_val - three_quarter_max + 1e-5)
+            r = 1 - norm
+            g = 1
+            b = 0
+            return (r, g, b)
+
+    cell_colors = [[value_to_color(data[i, j]) for j in range(data.shape[1])] for i in range(data.shape[0])]
 
     fig, ax = plt.subplots()
     ax.set_axis_off()
@@ -89,11 +112,11 @@ def visualize_redness(data, row_labels, col_labels):
         rowLabels=row_labels,
         colLabels=col_labels,
         loc='center',
-        cellLoc='center'
+        cellLoc='right',
     )
 
-    table.scale(1, 2)  # Adjust for better visibility
-    plt.title("Redder = Lower Value", fontsize=14)
+    table.scale(1, 2)
+    plt.title("Color: ≤50% Max = Red, >50% = Red → Yellow → Green", fontsize=14)
     plt.show()
 
 data = win_matrix
@@ -103,7 +126,7 @@ sens_input.design_option_names[j]
 row_labels = names
 col_labels = criteria
 
-visualize_redness(data, row_labels, col_labels)
+visualize_red_yellow_green_above_half(data, row_labels, col_labels)
 
 
 
