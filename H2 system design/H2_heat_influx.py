@@ -141,7 +141,25 @@ class Tank:
 
     
     def inner_tank_thickness(self):
-        return MAWP * self.R_in / self.mat_property[1]
+        if self.material == 'G10' or self.material == 'Carbon Fibre Woven Prepreg (QI)':
+            #Calc membrane loads
+            N_theta_p = MAWP * self.R_in
+            N_phi_p = MAWP * self.R_in / 2
+            self.mat_property[1] = self.mat_property[1] * 0.38 * 0.57 * 0.75 #may add safety factors
+            angle = [0,90,0.1] #helical winding angle in degrees
+            t_min = 1000
+            for ang in angle:
+                #Calc netting thickness in hoop and helical direction
+                t_heli = N_phi_p / (self.mat_property[1] * np.cos(ang)**2)
+                t_hoop = (N_theta_p - N_phi_p * np.tan(ang)**2) / (self.mat_property[1])
+                #Calc minimum thickness based on FVF
+                t = (t_heli + t_hoop) / self.mat_property[6]
+                if t < t_min:
+                    t_min = t
+            return t_min
+        else:
+            return MAWP * self.R_in / self.mat_property[1]
+        return None
 
     # ------------------------------------------------ Vacuum and Outer tank  ---------------------------------------------------
 
