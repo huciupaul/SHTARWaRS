@@ -22,7 +22,7 @@ reactants = 'H2:1.5, O2:1, AR:7'  # premixed gas composition
 width = 0.5  # m
 loglevel = 1  # amount of diagnostic output (0 to 5)
 
-gas = ct.Solution('SanDiego.yaml')
+gas = ct.Solution('SanDiegoBIG.yaml')
 gas.TPX = tburner, p, reactants
 
 f = ct.BurnerFlame(gas, width=width)

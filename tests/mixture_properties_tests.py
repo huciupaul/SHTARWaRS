@@ -40,14 +40,14 @@ def test_mixture_air_h2_mean_molar_mass_and_flow(mdot_air: float, mdot_h2: float
     X_H2 = "H2:1"
 
     X_mix_str, mdot_tot, M_mix = mixture_properties(
-        mdot_air, X_air, mdot_h2, X_H2, mech="SanDiego.yaml"
+        mdot_air, X_air, mdot_h2, X_H2, mech="SanDiegoBIG.yaml"
     )
 
     # ---------------- Expected total mass-flow -----------------
     assert mdot_tot == pytest.approx(mdot_air + mdot_h2)
 
     # ---------------- Expected mean molar mass -----------------
-    gas = ct.Solution("SanDiego.yaml")
+    gas = ct.Solution("SanDiegoBIG.yaml")
 
     # Stream 1 – air
     gas.TPX = 298.15, 101_325.0, X_air
