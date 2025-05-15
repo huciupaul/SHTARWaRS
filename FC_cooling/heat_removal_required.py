@@ -159,7 +159,7 @@ takeoff = flight_condition.FlightCondition(
     RH_amb=0,  # Relative humidity of the ambient air
     V=0,  # m/s
     power_required = 1908000, # Power required in W
-    power_split = 0.5,  # proportion of power outputted from the fuel cell
+    power_split = 1,  # proportion of power outputted from the fuel cell
     thermal_efficiency = 0.4,  # thermal efficiency of the combustion chamber
     propulsive_efficiency = 0.85, # propulsive efficiency of the propeller
     P_cc = 12.1 * 101325,  # Pa
@@ -191,10 +191,11 @@ GCH2 = hydrogen_storage.HydrogenStorage(
 
     
 # Create an instance of the Output class
-HTPEM_TO = Design_point(fuel_cell=HTPEM, flight_condition=takeoff, hydrogen_storage=LH2, P_C = 1.85 * 101325)
+HTPEM_TO = Design_point(fuel_cell=LTPEM, flight_condition=takeoff, hydrogen_storage=LH2, P_C = 1.85 * 101325)
 
 LHV_H2 = 120000000  # Lower heating value of hydrogen in J/kg
-
+print(HTPEM_TO.fuel_cell.name)
+print(HTPEM_TO.flight_condition.name)
 HTPEM_TO.O2_cooling_required()
 HTPEM_TO.mass_flow_calculation()
 HTPEM_TO.heat_removal_available()
