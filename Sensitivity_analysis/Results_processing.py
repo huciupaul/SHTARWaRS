@@ -116,7 +116,7 @@ def visualize_red_yellow_green_above_half(data, row_labels, col_labels):
     )
 
     table.scale(1, 2)
-    plt.title("Color: ≤50% Max = Red, >50% = Red → Yellow → Green", fontsize=14)
+    plt.title("Color: ≤50% = Red → Yellow → Green", fontsize=14)
     plt.show()
 
 data = win_matrix
