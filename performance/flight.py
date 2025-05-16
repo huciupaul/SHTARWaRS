@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 
 # Local imports
-from common.constants import TOGA, G_0, A_inlet
+from common.constants import MAXC, G_0, A_inlet
 from common.atmosphere import isa_atmosphere
 from turboprop import Turboprop
 
@@ -18,7 +18,7 @@ class Aircraft:
     prop_diameter: float
     eng: Turboprop
     MTOW: float
-    TOGA: float = TOGA
+    MAXC: float = MAXC
     n_prop: int = 2  # Added n_prop for number of propellers
     
     @property
@@ -364,7 +364,7 @@ class FlightMission:
         for pp, sl in self.__pp_slices(phase_arr, time_arr):
             if pp.power is not None:
                 # Powerpoint with power
-                Pr_arr[sl] = pp.power*self.ac.TOGA
+                Pr_arr[sl] = pp.power*self.ac.MAXC
                 # Propulsive efficiency
                 T = Pr_arr[sl]/V_arr[sl]
                 eta_prop_arr[sl] = self.__eta_prop_thrust(T, V_arr[sl], rho_arr[sl])
@@ -443,7 +443,7 @@ class FlightMission:
         axs[0, 2].plot(p["time"], p["ROC"])
         axs[0, 2].set_ylabel("ROC [m/s]")
         axs[0, 3].plot(p["time"], p["Pa"])
-        axs[0, 3].set_ylabel("Power [-] (TOGA frac)")
+        axs[0, 3].set_ylabel("Shaft power [W]")
         axs[1, 0].plot(p["time"], p["Pr"])
         axs[1, 0].set_ylabel("Power [W]")
         axs[1, 1].plot(p["time"], p["mdot_fuel"])
@@ -480,12 +480,12 @@ if __name__ == "__main__":
 
     pws = [
         Powerpoint("taxi\\TO", 0.1415, until_phase="takeoff"),
-        Powerpoint("takeoff", 1.0, time=5 * 60),
-        Powerpoint("climb", 0.95, until_phase="cruise"),
+        Powerpoint("takeoff", 1.04, time=5 * 60),
+        Powerpoint("climb", 0.85, until_phase="cruise"),
         Powerpoint("cruise", until_phase="descent1"),  # power filled by placeholder
-        Powerpoint("descent1", 0.19, until_phase="hold"),
+        Powerpoint("descent1", 0.50, until_phase="hold"),
         Powerpoint("hold", until_phase="descent2"),    # power filled by placeholder
-        Powerpoint("final", 0.19, until_phase="taxi\\landing"),
+        Powerpoint("final", 0.50, until_phase="taxi\\landing"),
         Powerpoint("taxi\\landing", 0.1415, time=10 * 60),
     ]
     
