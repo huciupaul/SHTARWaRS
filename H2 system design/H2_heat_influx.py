@@ -6,9 +6,10 @@ from scipy.optimize import fsolve
 import csv
 
 class Tank:
-    def __init__(self, MAWP, material, mat_property,mass_h2,mat2_property):
+    def __init__(self, MAWP, material, material2, mat_property,mass_h2,mat2_property,fill,V_in,p_vent):
         # ---------------------------------------------Database ------------------------------------------------------------------
         self.material = material
+        self.material2 = material2
         self.mat_property = mat_property
         self.mat_density = mat_property[0] 
         self.mat_yield_strength = mat_property[1]
@@ -29,7 +30,7 @@ class Tank:
 
         # ---------------------------------------------Constants ----------------------------------------------------------------
         self.dormancy = 24 #hours
-        self.fill_ratio = 0.8 #percentage of LH2 at the start
+        self.fill_ratio = fill #percentage of LH2 at the start
         self.mass_h2 = mass_h2 #kg
         self.stratification_factor = 2
         self.k_str = 1.9 #[W/mK]
@@ -38,14 +39,14 @@ class Tank:
         # --------------------------------------------- Inputs ------------------------------------------------------------------
 
         self.MAWP = MAWP # Convert from Bar to Pa for the venting pressure
-        self.Pvent = MAWP #Assumption
+        self.Pvent = p_vent #Assumption
 
         # Hydrogen properties
         self.P0 = 101000 # Initial pressure in Pa
         self.T0 = CP.PropsSI('T', 'P', self.P0, 'Q', 0.1, 'ParaHydrogen') # Initial temperature in K
         self.rhol0 = CP.PropsSI('D', 'T', self.T0, 'Q', 0, 'ParaHydrogen') # density of liquid hydrogen
         self.rhog0 = CP.PropsSI('D', 'T', self.T0, 'Q', 1, 'ParaHydrogen') # density of gas hydrogen
-        self.V_in = self.mass_h2 / (self.fill_ratio * self.rhol0) # Volume in m^3
+        self.V_in = V_in
         self.mg0 = CP.PropsSI('D', 'T', self.T0, 'Q', 1, 'ParaHydrogen')*self.V_in*(1-self.fill_ratio) # kg
         self.ml0 = CP.PropsSI('D', 'T', self.T0, 'Q', 0, 'ParaHydrogen')*self.V_in*(self.fill_ratio) # kg
         self.hg0 = CP.PropsSI('H', 'T', self.T0, 'Q', 1, 'ParaHydrogen')#kJ/kg
@@ -54,10 +55,9 @@ class Tank:
 
         # ---------------------------------------------- Constraint ---------------------------------------------------
         self.R_in = 0.8 #m
-        self.Q_leak_min = 50 #W (determined from Nicolas's thesis)
-        self.Q_leak_max = 600 #W (determined from Nicolas's thesis)
-        self.Q_leak_min = 50 #W (determined from Nicolas's thesis)
-        self.Q_leak_max = 600 #W (determined from Nicolas's thesis)
+        self.Q_leak_min = 10 #W (determined from Nicolas's thesis)
+        self.Q_leak_max = 1000 #W (determined from Nicolas's thesis)
+        
 
     # ----------------------------------------------- Maximum Heat Load ---------------------------------------------------
     def maximum_Qin(self,Qleak):
@@ -141,10 +141,10 @@ class Tank:
 
     
     def inner_tank_thickness(self):
+        P_test = (self.MAWP + 0.2*100000) * 1.3 #Safety factor
         alpha = 0
         if self.material == 'G10' or self.material == 'Carbon Fibre Woven Prepreg (QI)':
             #Calc membrane loads
-            P_test = (MAWP + 0.2*100000) * 1.3 #Safety factor
             N_theta_p = P_test * self.R_in
             N_phi_p = P_test * self.R_in / 2
             self.mat_property[1] = self.mat_property[1] #may add safety factors
@@ -165,13 +165,14 @@ class Tank:
 
     # ------------------------------------------------ Vacuum and Outer tank  ---------------------------------------------------
 
-    def heat_influx(self, L_in_max, Q_str,t1,emis_mli,k_vac,t_mli, k_mli):
+    def heat_influx(self, L_in_max, Q_str,t1,emis_mli,k_vac,t_mli, k_mli,Qmax):
         T_tank = self.T0
+        print(f"Initial tank temperature: {T_tank} K")
         T_amb = 300 # K
         P_amb = 101325 # Pa
         r_in = self.R_in
         t2 = t1
-        Q_in_max = self.Q_leak_max
+        Q_in_max = Qmax
         k_1 = self.mat_property[2]
         k_2 = self.mat2_property[2]
         eps2 = self.mat2_property[3]
@@ -192,12 +193,16 @@ class Tank:
             r2 = r1 + dv          # Inner surface of outer tank
 
             # Surface areas (cylinder + two hemispherical caps)
-            A1 = 2 * np.pi * r1 * (L_in_max + 4 * r1 / 3)
-            A2 = 2 * np.pi * r2 * (L_in_max + 4 * r2 / 3)
+            A1 = 2 * np.pi * r1 * (L_in_max + 2 * r1)
+            A2 = 2 * np.pi * r2 * (L_in_max + 2 * r2)
 
             # Radiation heat transfer
-            denom = (1 / emis_mli) + (A1 / A2) * (1 / eps2 - 1)
-            return 5.670374419e-8 * A1 * (T_amb**4 - T_tank**4) / denom
+            
+            #denom = (1 / (eps2)) + (A2 / A1) * (1 / emis_mli - 1)
+            #return 5.670374419e-8 * A2 * (T_amb**4 - T_tank**4) / denom
+            num = 5.670374419e-8 * (T_amb**4 - T_tank**4)
+            denom = 1/emis_mli + (1/eps2) - 1
+            return num * A2 / denom
 
         # Total heat influx...
         def total_heat_influx(dv):
@@ -218,10 +223,10 @@ class Tank:
         dv = dv_solution[0]  # Extract the solution from the array
 
         t2_min = 1000
+        P_test = P_amb #Safety factor
         alpha = 0
-        if self.material == 'G10' or self.material == 'Carbon Fibre Woven Prepreg (QI)':
+        if self.material2 == 'G10' or self.material2 == 'Carbon Fibre Woven Prepreg (QI)':
             #Calc membrane loads
-            P_test = P_amb #Safety factor
             N_theta_p = P_test * (r_in+t1+dv+t_mli)
             N_phi_p = P_test * (r_in+t1+dv+t_mli) / 2
             self.mat2_property[1] = self.mat2_property[1] #may add safety factors
@@ -239,7 +244,7 @@ class Tank:
         else:
             t2_min = P_amb * (r_in+t1+dv+t_mli) / self.mat2_property[1]
 
-        return dv, t2_min, alpha
+        return dv, t2_min, alpha, Q_in_max, Q_cond(dv),  Q_rad(dv)
 
     # ------------------------------------------------ Tank Dimensions ---------------------------------------------------
     def total_volume(self, l,dv,t1,t2,t_mli):
@@ -278,13 +283,14 @@ class Tank:
 materials = ['Al-7075-T6','G10','SS-304','Carbon Fibre Woven Prepreg (QI)','SS-316'] #From Granta and Engineering Toolbox
 SF = 0.9
 #density in kg/m^3, yield strength in Pa, thermal conductivity in W/mK, emissivity in [-], CO2 [kg/kg], Embodied Energy in MJ/kg, Fibre Ratio
-mat_properties = [[2800,495*1e6*SF,134,0.048,7.795,106,0], 
+mat_properties = [[2800,495*1e6*SF,134,0.11,7.795,106,0], 
                   [1900,298*1e6*SF,0.5,0.95,15.25,369,0.4],
-                  [7955,257.5*1e6*SF,15.5,0.075,3,42.75,0],
+                  [7955,257.5*1e6*SF,15.5,0.35,3,42.75,0],
                   [1575,549.5*1e6*SF,1.64,0.77,47.8,686.5,0.625],
-                  [7970,257.5*1e6*SF,15,0.075,4.265,49.75,0]]
+                  [7970,257.5*1e6*SF,15,0.35,4.265,49.75,0]]
 #MAWPS = [600000,650000,800000,1000000,1200000,1280000] #bar to Pa
-MAWPS = [1200000]
+MAWP = 1200000
+P_vents = [600000,800000,1000000]
 
 n_mats = 2
 materials = materials[:n_mats]
@@ -308,16 +314,30 @@ t_limit = 0.001 #m (minimum thickness of the tank wall)
 #Insulation
 t_mli = 10 *1e-3 #https://www.sciencedirect.com/science/article/pii/S135943112200391X
 dens_mli = 180 #kg/m^3 https://www.sciencedirect.com/science/article/pii/S135943112200391X
-emis_mli = 0.03 #https://www.thermalengineer.com/library/effective_emittance.htm
-k_vac = 10.44*1e-3 # W/mK (CEC Hawaii Presentation)
-k_mli = 0.035 # W/mK #https://www.sciencedirect.com/science/article/pii/S135943112200391X
+emis_mli = 0.23  #https://www.thermalengineer.com/library/effective_emittance.htm
+k_vac = 0.015*1e-1#3 # W/mK https://www.researchgate.net/publication/321219004_Cylindrical_Cryogenic_Calorimeter_Testing_of_Six_Types_of_Multilayer_Insulation_Systems
+k_mli = 0.035 # W/mK  https://www.sciencedirect.com/science/article/pii/S135943112200391X
 mli_co2 = 8.03 #kg/kg (for Aluminium 6463 T6)
 mli_ee = 108.4 #MJ/kg (Embodied Energy for Aluminium 6463 T6)
 
+def fA(mh2, P_vent, fl_final = 0.98):
 
-def compute_tank_volume(material, mat_property, MAWP,mass_h2, Q_str,mat2_property,str_mass):
-    tankh2 = Tank(MAWP, material, mat_property,mass_h2,mat2_property)
+    # From the heat influx get the maximum initial fill fraction
+    rho_l_f = CP.PropsSI('D', 'P', P_vent, 'Q', 0, 'ParaHydrogen')  # Final liquid density
+    print(f"Final liquid density: {rho_l_f} kg/m^3")
+    V_l_fin = mh2 / rho_l_f  # Final liquid volume
+    V_tot   = V_l_fin / fl_final
 
+    # Calculate the initial fill fraction
+    rho_l_0 = CP.PropsSI('D', 'P', 101325, 'Q', 0, 'ParaHydrogen')  # Initial liquid density
+    print(f"Initial liquid density: {rho_l_0} kg/m^3")
+    V_l_0   = mh2 / rho_l_0  # Initial liquid volume
+    fl_init = V_l_0 / V_tot  # Initial fill fraction
+
+    return V_tot, fl_init
+
+def compute_Qleak(material, material2, mat_property, MAWP,mass_h2, Q_str,mat2_property,str_mass,fill_ratio,V_in,P_vent):
+    tankh2 = Tank(MAWP, material, material2, mat_property,mass_h2,mat2_property,fill_ratio,V_in,P_vent)
     # -----------------------------Maximum allowable heat load -----------------------------------
     Q_solution = opt.root_scalar(tankh2.maximum_Qin, bracket=[tankh2.Q_leak_min, tankh2.Q_leak_max], method='brentq')
 
@@ -326,6 +346,10 @@ def compute_tank_volume(material, mat_property, MAWP,mass_h2, Q_str,mat2_propert
         print(f"Calculated Qin: {Qmax:.4f} W")
     else:
         print("Failed to find an Qin_max. Adjust the bounds.")
+    return Qmax
+
+def compute_tank_volume(material, material2, mat_property, MAWP,mass_h2, Q_str,mat2_property,str_mass,fill_ratio,V_in,P_vent,Qmax):
+    tankh2 = Tank(MAWP, material, material2, mat_property,mass_h2,mat2_property,fill_ratio,V_in,P_vent)
 
     # -----------------------------Inner tank sizing -----------------------------------
     L_solution = opt.root_scalar(tankh2.volume_equation, bracket=[2*tankh2.R_in, 10], method='brentq')
@@ -340,7 +364,7 @@ def compute_tank_volume(material, mat_property, MAWP,mass_h2, Q_str,mat2_propert
     if t1 < t_limit:
         t1 = t_limit
 
-    dv, t2, ang2_w = tankh2.heat_influx(L_in, Q_str,t1,emis_mli,k_vac,t_mli,k_mli)
+    dv, t2, ang2_w, Qleak, Qcond, Qrad = tankh2.heat_influx(L_in, Q_str,t1,emis_mli,k_vac,t_mli,k_mli,Qmax)
     t2 = max(t2,t_limit)
     
     Vt = tankh2.total_volume(L_in, dv,t1,t2,t_mli)
@@ -353,12 +377,12 @@ def compute_tank_volume(material, mat_property, MAWP,mass_h2, Q_str,mat2_propert
     co2_kg = tankh2.kg_co2(mass_inner,mass_outer,mass_mli,str_mass,mli_co2,co2_kevlar)
     embodied_energy = tankh2.embodied_energy(mass_inner,mass_outer,mass_mli,str_mass,kevlar_ee,mli_ee)
 
-    return Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in, Vh2,tankh2.R_in, co2_kg, embodied_energy, ang1_w, ang2_w
+    return Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in, Vh2,tankh2.R_in, co2_kg, embodied_energy, ang1_w, ang2_w, P_vent,Qleak, Qcond, Qrad
 
 # ------------------------------------------------- Main ------------------------------------------------------
 
-RUN = True #Run new design
-OPEN = False #Open previous design
+RUN = False #Run new design
+OPEN = True #Open previous design
 
 plot_mats = []
 plot_mats2 = []
@@ -368,9 +392,13 @@ plot_masses = []
 plot_mass_errors = []
 plot_co2 = []
 plot_embodied_energy = []
+plot_P_vents = []
+plot_vh2 = []
 
 if RUN:
-    for MAWP in MAWPS:
+    for P_vent in P_vents:
+        V_in, fill_ratio = fA(mass_h2, P_vent)
+        Qmax = compute_Qleak(materials[0], materials[0], mat_properties[0], MAWP,mass_h2,0,mat_properties[0],0,fill_ratio,V_in, P_vent)
         for material, mat_property in zip(materials, mat_properties):
             for material2, mat2_property in zip(materials, mat_properties):
                 if material == 'G10' or  material == 'Carbon Fibre Woven Prepreg (QI)': #Composites
@@ -380,8 +408,8 @@ if RUN:
                 ratio = og_str_mass / (og_tank_mass+og_lh2)
                 str_mass = estimated_mass * ratio
                 Q_str = Q_og_str * np.sqrt(ratio/ratio) #Assuming Volume increase with the same ratio as the mass
-                Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in,Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w = compute_tank_volume(material, mat_property, MAWP,mass_h2,Q_str,mat2_property,str_mass)
-                print(f"Material In: {material}, Material Out: {material2}, MAWP: {MAWP} Pa")
+                Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in,Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w, p_vent, Qleak, Qcond, Qrad = compute_tank_volume(material, material2, mat_property, MAWP,mass_h2,Q_str,mat2_property,str_mass,fill_ratio,V_in, P_vent,Qmax)
+                print(f"Material In: {material}, Material Out: {material2}, MAWP: {MAWP} Pa, P_vent:{P_vent}")
                 print(f"Tank Volume: {Vt:.4f} m^3")
                 print(f"Tank Mass: {Mt:.4f} kg")
                 print(f"CO2 emissions: {co2_kg:.4f} kg")
@@ -395,6 +423,8 @@ if RUN:
                 plot_mass_errors.append(mass_error)
                 plot_co2.append(co2_kg)
                 plot_embodied_energy.append(emb_energy)
+                plot_P_vents.append(P_vent)
+                plot_vh2.append(Vh2)
 
                 # CSV file
                 file_exists = False
@@ -410,9 +440,9 @@ if RUN:
                         writer.writerow(['Material Inner', 'Material Outer', 'MAWP (Pa)', 'Tank Volume (m^3)', 
                                         'Tank Mass (kg)', 'Mass Error (kg)',
                                         'Inner Tank Thickness (m)', 'Outer Tank Thickness (m)', 
-                                        'Vacuum Gap (m)', 'Inner Tank Length (m)', 'Vh2 (m^3)','R_in (m)','CO2 (kg)','Embodied Energy (MJ)','Angle of winding inner','Angle of winding outer'])
+                                        'Vacuum Gap (m)', 'Inner Tank Length (m)', 'Vh2 (m^3)','R_in (m)','CO2 (kg)','Embodied Energy (MJ)','Angle of winding inner','Angle of winding outer', 'P_vent','Qleak', 'Q_cond', 'Q_rad'])
                     # Write data
-                    writer.writerow([material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w])
+                    writer.writerow([material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w,p_vent,Qleak, Qcond, Qrad])
 
 
 if OPEN:
@@ -426,25 +456,34 @@ if OPEN:
             plot_volumes.append(float(row[3]))
             plot_masses.append(float(row[4]))
             plot_mass_errors.append(float(row[5]))
-            Vh2 = float(row[10])
+            plot_vh2.append(float(row[10]))
             plot_co2.append(float(row[12]))
             plot_embodied_energy.append(float(row[13]))
+            plot_P_vents.append(float(row[16]))
 # ------------------------------------------------- Plotting ------------------------------------------------------
 
-plot1 = False
-plot2=False
+plot1 = True
+plot2=True
 plot3 = True
-draw1 = False
-
 
 if plot1:
     plt.figure(figsize=(10, 6))
-    for i in range(len(materials)**2):
-        for j in range(len(MAWPS)):
-            plt.scatter(plot_MAWPS[i + j * len(materials)**2], plot_volumes[i + j * len(materials)**2], label=f"{plot_mats[i]}-{plot_mats2[i]}")
-    plt.xlabel("MAWP (Pa)")
+    unique_combinations = len(materials)**2
+    colors = plt.cm.tab20(np.linspace(0, 1, unique_combinations))
+    markers = ['o', 's', 'D', '^', 'v', '<', '>', 'p', '*', 'h', 'H', 'X', 'd']
+
+    for idx, (material, material2) in enumerate([(m1, m2) for m1 in materials for m2 in materials]):
+        color = colors[idx % len(colors)]
+        marker = markers[idx % len(markers)]
+        label = f"{material}-{material2}"
+        x_values = [plot_P_vents[k] for k in range(len(plot_P_vents)) if plot_mats[k] == material and plot_mats2[k] == material2]
+        y_values = [plot_volumes[k] for k in range(len(plot_volumes)) if plot_mats[k] == material and plot_mats2[k] == material2]
+        if x_values and y_values:
+            plt.plot(x_values, y_values, label=label, color=color, marker=marker, linestyle='-')
+
+    plt.xlabel("P_vent (Pa)")
     plt.ylabel("Tank Volume (m^3)")
-    plt.title("Tank Volume vs MAWP")
+    plt.title("Tank Volume vs P_vent")
     plt.subplots_adjust(left=0.1, right=0.6, wspace=0.3)
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
     plt.show()
@@ -452,17 +491,17 @@ if plot1:
         
 if plot2:
     plt.figure(figsize=(10, 6))
-    unique_combinations = len(materials)**2 * len(MAWPS)
+    unique_combinations = len(materials)**2 * len(P_vents)
     colors = plt.cm.tab20(np.linspace(0, 1, unique_combinations))
     markers = ['o', 's', 'D', '^', 'v', '<', '>', 'p', '*', 'h', 'H', 'X', 'd']
 
-    for idx, (i, j) in enumerate([(i, j) for i in range(len(materials)**2) for j in range(len(MAWPS))]):
+    for idx, (i, j) in enumerate([(i, j) for i in range(len(materials)**2) for j in range(len(P_vents))]):
         color = colors[idx % len(colors)]
         marker = markers[idx % len(markers)]
         plt.scatter(
             mass_h2 / plot_masses[i + j * len(materials)**2],
-            Vh2 / plot_volumes[i + j * len(materials)**2],
-            label=f"{plot_mats[i]}-{plot_mats2[i]}",
+            plot_vh2[i + j * len(materials)**2] / plot_volumes[i + j * len(materials)**2],
+            label=f"{plot_mats[i]}-{plot_mats2[i]}-PVENT={plot_P_vents[i + j * len(materials)**2]/100000} Bar",
             color=color,
             marker=marker
         )
@@ -478,14 +517,14 @@ if plot2:
 
 if plot3:
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
-    unique_combinations = len(materials)**2 * len(MAWPS)
+    unique_combinations = len(materials)**2 * len(P_vents)
     colors = plt.cm.tab20(np.linspace(0, 1, unique_combinations))
     markers = ['o', 's', 'D', '^', 'v', '<', '>', 'p', '*', 'h', 'H', 'X', 'd']
 
-    for idx, (i, j) in enumerate([(i, j) for i in range(len(materials)**2) for j in range(len(MAWPS))]):
+    for idx, (i, j) in enumerate([(i, j) for i in range(len(materials)**2) for j in range(len(P_vents))]):
         color = colors[idx % len(colors)]
         marker = markers[idx % len(markers)]
-        eta_v = Vh2 / plot_volumes[i + j * len(materials)**2]
+        eta_v = plot_vh2[i + j * len(materials)**2] / plot_volumes[i + j * len(materials)**2]
         eta_g = mass_h2 / plot_masses[i + j * len(materials)**2]
         metric = eta_g * eta_v
 
@@ -501,7 +540,7 @@ if plot3:
         ax2.scatter(
             metric,
             plot_embodied_energy[i + j * len(materials)**2],
-            label=f"{plot_mats[i]}-{plot_mats2[i]}",
+            label=f"{plot_mats[i]}-{plot_mats2[i]}-PVENT={plot_P_vents[i + j * len(materials)**2]/100000} Bar",
             color=color,
             marker=marker
         )
@@ -524,6 +563,8 @@ if plot3:
     plt.tight_layout()
     plt.show()
     
+#-------------------------------------------------- Draw Tank ---------------------------------------------------
+draw1 = True
 
 if draw1:
     for i, (material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2, R_in,co2_kg) in enumerate(
