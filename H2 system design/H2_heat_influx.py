@@ -42,7 +42,7 @@ class Tank:
         self.Pvent = p_vent #Assumption
 
         # Hydrogen properties
-        self.P0 = 101000 # Initial pressure in Pa
+        self.P0 = 101325 # Initial pressure in Pa
         self.T0 = CP.PropsSI('T', 'P', self.P0, 'Q', 0.1, 'ParaHydrogen') # Initial temperature in K
         self.rhol0 = CP.PropsSI('D', 'T', self.T0, 'Q', 0, 'ParaHydrogen') # density of liquid hydrogen
         self.rhog0 = CP.PropsSI('D', 'T', self.T0, 'Q', 1, 'ParaHydrogen') # density of gas hydrogen
@@ -161,22 +161,20 @@ class Tank:
                     alpha = ang
             return t_min, alpha
         else:
-            return P_test * self.R_in / self.mat_property[1], alpha
+            t = (P_test * self.R_in / self.mat_property[1]) * np.sqrt(3)/2
+            return t, alpha
 
     # ------------------------------------------------ Vacuum and Outer tank  ---------------------------------------------------
 
-    def heat_influx(self, L_in_max, Q_str,t1,emis_mli,k_vac,t_mli, k_mli,Qmax):
+    def heat_influx(self, L_in_max, Q_str,t1,emis_mli,k_vac,t_mli, k_mli,Qmax,n_mli,t2):
         T_tank = self.T0
-        print(f"Initial tank temperature: {T_tank} K")
         T_amb = 300 # K
         P_amb = 101325 # Pa
         r_in = self.R_in
-        t2 = t1
         Q_in_max = Qmax
         k_1 = self.mat_property[2]
         k_2 = self.mat2_property[2]
         eps2 = self.mat2_property[3]
-
         # Conduction...
         def Q_cond(dv):
             # Conduction resistance
@@ -200,9 +198,14 @@ class Tank:
             
             #denom = (1 / (eps2)) + (A2 / A1) * (1 / emis_mli - 1)
             #return 5.670374419e-8 * A2 * (T_amb**4 - T_tank**4) / denom
-            num = 5.670374419e-8 * (T_amb**4 - T_tank**4)
-            denom = 1/emis_mli + (1/eps2) - 1
-            return num * A2 / denom
+            #return num * A2 / denom
+            #
+            if n_mli == 0:
+                return (5.670374419e-8 * (T_amb**4 - T_tank**4))/((1/self.mat_emissivity) + (1/eps2) - 1) * A1
+            else:
+                return (5.670374419e-8 * (T_amb**4 - T_tank**4))/((n_mli+1)/emis_mli) * A1
+
+
 
         # Total heat influx...
         def total_heat_influx(dv):
@@ -215,15 +218,14 @@ class Tank:
             return total_heat_influx(dv) - Q_in_max
 
         # Initial guess for dv
-        dv_initial_guess = 0.01  # Initial guess for the vacuum gap thickness (m)
+        dv_initial_guess = 0.1  # Initial guess for the vacuum gap thickness (m)
 
         # Solve for dv...
         dv_solution = fsolve(equation, dv_initial_guess)
 
         dv = dv_solution[0]  # Extract the solution from the array
-
         t2_min = 1000
-        P_test = P_amb #Safety factor
+        P_test = (P_amb+20000)*1.3 #Safety factor
         alpha = 0
         if self.material2 == 'G10' or self.material2 == 'Carbon Fibre Woven Prepreg (QI)':
             #Calc membrane loads
@@ -241,10 +243,13 @@ class Tank:
                 if t < t2_min:
                     t2_min = t
                     alpha = ang
+            t2_final = t2_min
         else:
-            t2_min = P_amb * (r_in+t1+dv+t_mli) / self.mat2_property[1]
+            t2_final = P_amb * (r_in+t1+dv+t_mli) / self.mat2_property[1] * np.sqrt(3)/2
+        
+        t2 = max(t2_final, t2)
 
-        return dv, t2_min, alpha, Q_in_max, Q_cond(dv),  Q_rad(dv)
+        return dv, t2, alpha, Q_in_max, Q_cond(dv),  Q_rad(dv)
 
     # ------------------------------------------------ Tank Dimensions ---------------------------------------------------
     def total_volume(self, l,dv,t1,t2,t_mli):
@@ -307,18 +312,19 @@ co2_kevlar = 13.1 #kg/kg (Kevlar 149)
 kevlar_ee = 257 #MJ/kg (Embodied Energy for Kevlar 149)
 
 #Our values
-mass_h2 = 532.65 #kg
+mass_h2 = 480 #kg
 estimated_mass = mass_h2/grav_idx - mass_h2
 t_limit = 0.001 #m (minimum thickness of the tank wall)
 
 #Insulation
-t_mli = 10 *1e-3 #https://www.sciencedirect.com/science/article/pii/S135943112200391X
-dens_mli = 180 #kg/m^3 https://www.sciencedirect.com/science/article/pii/S135943112200391X
-emis_mli = 0.23  #https://www.thermalengineer.com/library/effective_emittance.htm
+t_mli = 0.03 *1e-3 #https://www.sciencedirect.com/science/article/pii/S135943112200391X
+dens_mli = 7900 #kg/m^3 https://www.sciencedirect.com/science/article/pii/S135943112200391X
+emis_mli = 0.21  #https://www.thermalengineer.com/library/effective_emittance.htm
 k_vac = 0.015*1e-1#3 # W/mK https://www.researchgate.net/publication/321219004_Cylindrical_Cryogenic_Calorimeter_Testing_of_Six_Types_of_Multilayer_Insulation_Systems
-k_mli = 0.035 # W/mK  https://www.sciencedirect.com/science/article/pii/S135943112200391X
-mli_co2 = 8.03 #kg/kg (for Aluminium 6463 T6)
-mli_ee = 108.4 #MJ/kg (Embodied Energy for Aluminium 6463 T6)
+k_mli = 17.4 # W/mK  https://www.sciencedirect.com/science/article/pii/S135943112200391X
+mli_co2 = 3 #kg/kg (for SS)
+mli_ee = 42.74 #MJ/kg (Embodied Energy for SS)
+N_MLI = 40
 
 def fA(mh2, P_vent, fl_final = 0.98):
 
@@ -350,7 +356,7 @@ def compute_Qleak(material, material2, mat_property, MAWP,mass_h2, Q_str,mat2_pr
 
 def compute_tank_volume(material, material2, mat_property, MAWP,mass_h2, Q_str,mat2_property,str_mass,fill_ratio,V_in,P_vent,Qmax):
     tankh2 = Tank(MAWP, material, material2, mat_property,mass_h2,mat2_property,fill_ratio,V_in,P_vent)
-
+    dv_list = []
     # -----------------------------Inner tank sizing -----------------------------------
     L_solution = opt.root_scalar(tankh2.volume_equation, bracket=[2*tankh2.R_in, 10], method='brentq')
 
@@ -364,9 +370,16 @@ def compute_tank_volume(material, material2, mat_property, MAWP,mass_h2, Q_str,m
     if t1 < t_limit:
         t1 = t_limit
 
-    dv, t2, ang2_w, Qleak, Qcond, Qrad = tankh2.heat_influx(L_in, Q_str,t1,emis_mli,k_vac,t_mli,k_mli,Qmax)
+    dv, t2, ang2_w, Qleak, Qcond, Qrad = tankh2.heat_influx(L_in, Q_str,t1,emis_mli,k_vac,t_mli,k_mli,Qmax, N_MLI,t1)
+    dv_list.append(dv)
     t2 = max(t2,t_limit)
-    
+    t20 = t2 + 1
+    while abs(t2-t20) > 1e-15:
+        t20 = t2
+        dv,t2,ang2_w,Qleak,Qcond,Qrad = tankh2.heat_influx(L_in, Q_str,t1,emis_mli,k_vac,t_mli,k_mli,Qmax, N_MLI,t20)
+        dv_list.append(dv)
+        t2 = max(t2,t_limit)
+
     Vt = tankh2.total_volume(L_in, dv,t1,t2,t_mli)
     mass_inner,mass_outer,mass_mli = tankh2.total_mass(L_in, dv, t1, t2,t_mli,dens_mli) 
     Mt = mass_inner + mass_outer + mass_mli + mass_h2
@@ -377,12 +390,12 @@ def compute_tank_volume(material, material2, mat_property, MAWP,mass_h2, Q_str,m
     co2_kg = tankh2.kg_co2(mass_inner,mass_outer,mass_mli,str_mass,mli_co2,co2_kevlar)
     embodied_energy = tankh2.embodied_energy(mass_inner,mass_outer,mass_mli,str_mass,kevlar_ee,mli_ee)
 
-    return Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in, Vh2,tankh2.R_in, co2_kg, embodied_energy, ang1_w, ang2_w, P_vent,Qleak, Qcond, Qrad
+    return Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in, Vh2,tankh2.R_in, co2_kg, embodied_energy, ang1_w, ang2_w, P_vent,Qleak, Qcond, Qrad, dv_list
 
 # ------------------------------------------------- Main ------------------------------------------------------
 
-RUN = False #Run new design
-OPEN = True #Open previous design
+RUN = True #Run new design
+OPEN = False #Open previous design
 
 plot_mats = []
 plot_mats2 = []
@@ -394,6 +407,7 @@ plot_co2 = []
 plot_embodied_energy = []
 plot_P_vents = []
 plot_vh2 = []
+plot_dv = []
 
 if RUN:
     for P_vent in P_vents:
@@ -408,7 +422,7 @@ if RUN:
                 ratio = og_str_mass / (og_tank_mass+og_lh2)
                 str_mass = estimated_mass * ratio
                 Q_str = Q_og_str * np.sqrt(ratio/ratio) #Assuming Volume increase with the same ratio as the mass
-                Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in,Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w, p_vent, Qleak, Qcond, Qrad = compute_tank_volume(material, material2, mat_property, MAWP,mass_h2,Q_str,mat2_property,str_mass,fill_ratio,V_in, P_vent,Qmax)
+                Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in,Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w, p_vent, Qleak, Qcond, Qrad, dv_list = compute_tank_volume(material, material2, mat_property, MAWP,mass_h2,Q_str,mat2_property,str_mass,fill_ratio,V_in, P_vent,Qmax)
                 print(f"Material In: {material}, Material Out: {material2}, MAWP: {MAWP} Pa, P_vent:{P_vent}")
                 print(f"Tank Volume: {Vt:.4f} m^3")
                 print(f"Tank Mass: {Mt:.4f} kg")
@@ -425,6 +439,7 @@ if RUN:
                 plot_embodied_energy.append(emb_energy)
                 plot_P_vents.append(P_vent)
                 plot_vh2.append(Vh2)
+                plot_dv.append(dv_list)
 
                 # CSV file
                 file_exists = False
@@ -440,9 +455,9 @@ if RUN:
                         writer.writerow(['Material Inner', 'Material Outer', 'MAWP (Pa)', 'Tank Volume (m^3)', 
                                         'Tank Mass (kg)', 'Mass Error (kg)',
                                         'Inner Tank Thickness (m)', 'Outer Tank Thickness (m)', 
-                                        'Vacuum Gap (m)', 'Inner Tank Length (m)', 'Vh2 (m^3)','R_in (m)','CO2 (kg)','Embodied Energy (MJ)','Angle of winding inner','Angle of winding outer', 'P_vent','Qleak', 'Q_cond', 'Q_rad'])
+                                        'Vacuum Gap (m)', 'Inner Tank Length (m)', 'Vh2 (m^3)','R_in (m)','CO2 (kg)','Embodied Energy (MJ)','Angle of winding inner','Angle of winding outer', 'P_vent','Qleak', 'Q_cond', 'Q_rad', 'dv_list'])
                     # Write data
-                    writer.writerow([material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w,p_vent,Qleak, Qcond, Qrad])
+                    writer.writerow([material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w,p_vent,Qleak, Qcond, Qrad, dv_list])
 
 
 if OPEN:
@@ -460,8 +475,10 @@ if OPEN:
             plot_co2.append(float(row[12]))
             plot_embodied_energy.append(float(row[13]))
             plot_P_vents.append(float(row[16]))
-# ------------------------------------------------- Plotting ------------------------------------------------------
+            plot_dv.append(row[20])
 
+# ------------------------------------------------- Plotting ------------------------------------------------------
+print(plot_dv)
 plot1 = True
 plot2=True
 plot3 = True
@@ -511,8 +528,15 @@ if plot2:
     plt.xlim(0, 1)
     plt.ylim(0, 1)
     plt.title(r"$\eta_g$ vs $\eta_v$")
-    plt.subplots_adjust(left=0.1, right=0.6, wspace=0.3)
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
+
+    # Split legend into two columns to reduce its height
+    handles, labels = plt.gca().get_legend_handles_labels()
+    n = len(labels)
+    if n > 0:
+        # Show legend in two columns
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False, fontsize='small', markerscale=0.7, handlelength=1.5, ncol=2)
+    plt.subplots_adjust(left=0.1, right=0.4, wspace=0.3, top=0.85, bottom=0.15)
+    plt.gcf().set_size_inches(8, 5)
     plt.show()
 
 if plot3:
@@ -553,14 +577,23 @@ if plot3:
     ax2.set_ylabel("Embodied Energy (MJ)")
     ax2.set_title("Embodied Energy vs Metric")
 
-    ax2.legend(
-        loc='center left',
-        bbox_to_anchor=(1, 0.5),
-        title="Material Combinations",
-        frameon=False
-    )
+    # Split legend into two columns for better fit
+    handles, labels = ax2.get_legend_handles_labels()
+    n = len(labels)
+    if n > 0:
+        # Show legend in two columns, smaller font, outside the plot
+        ax2.legend(
+            loc='center left',
+            bbox_to_anchor=(1, 0.5),
+            title="Material Combinations",
+            frameon=False,
+            fontsize='x-small',  # Make font smaller
+            ncol=2,
+            title_fontsize='x-small'  # Make title font smaller
+        )
 
-    plt.tight_layout()
+    # Make the two diagrams larger horizontally and shift them slightly to the left
+    plt.tight_layout(rect=[0, 0, 1, 1])  # increase width, leave space on right for legend
     plt.show()
     
 #-------------------------------------------------- Draw Tank ---------------------------------------------------
@@ -663,7 +696,8 @@ if draw1:
         ax2.set_xlim(-max_dim*1.5, max_dim*1.5)
         ax2.set_ylim(-max_dim*1.5, max_dim*1.5)
 
-
+        # Ensure ax2 plot is square (equal aspect ratio)
+        ax2.set_aspect('equal', adjustable='box')
         # Add overall title
         fig.suptitle(f"Tank Design Visualization", fontsize=16)
 
