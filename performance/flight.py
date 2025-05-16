@@ -27,6 +27,7 @@ class Aircraft:
 
     @property
     def oswald(self) -> float:
+        # From Mohammad Sadraey, "Wing Design"
         return 1.78 * (1 - 0.045 * self.aspect_ratio ** 0.68) - 0.64
 
     @property
@@ -118,6 +119,8 @@ class FlightMission:
         # Constant velocity: Thrust = Drag
         T = 0.5*rho_inf*V_inf**2*S*C_D
         P = T*V_inf
+        
+        print(f"L/D: {C_L/C_D:.6f}")
         return P
     
     # ---------------------------------------------------------------------
@@ -582,3 +585,4 @@ if __name__ == "__main__":
     print(f"Fuel burn (FC only): {burn_fc:.1f} kg")
     
     mission_JA1.quicklook()
+    # mission_H2.quicklook()
