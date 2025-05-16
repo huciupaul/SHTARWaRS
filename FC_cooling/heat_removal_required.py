@@ -44,7 +44,7 @@ class Design_point:
     def mass_flow_calculation(self):
 
         # Calculate air/hydrogen mass flow ratio
-        self.fuel_cell.air_hydrogen_ratio = 15.999 / 1.00784 * self.fuel_cell.stoic_ratio_A / 0.2314 # mass fraction of air per hydrogen
+        self.fuel_cell.air_hydrogen_ratio = 15.999 / 1.00784 * self.fuel_cell.stoic_ratio_C / self.fuel_cell.stoic_ratio_A / 0.2314 # mass fraction of total air per total hydrogen
         
 
         # Calculate the required mass flow rate of gasses for the fuel cell
@@ -61,16 +61,17 @@ class Design_point:
         self.fuel_cell.m_O2_out = self.fuel_cell.m_O2_tot - self.fuel_cell.m_O2_used
         self.fuel_cell.m_rest_out = self.fuel_cell.m_tot - self.fuel_cell.m_H2O_out - self.fuel_cell.m_H2_out - self.fuel_cell.m_O2_out
 
-
+        print(f"Mass flow rate of hydrogen used in fuel cell: {self.fuel_cell.m_H2_tot} kg/s")
         print(f"Mass flow rate of used oxygen for fuel cell: {self.fuel_cell.m_O2_used} kg/s")
         print(f"Mass flow rate of air for fuel cell: {self.fuel_cell.m_air} kg/s")
+        print(f"Mass flow rate of hydrogen for fuel cell: {self.fuel_cell.m_H2_tot} kg/s")
+        print(f"Mass flow rate of water produced by fuel cell: {self.fuel_cell.m_H2O_out} kg/s")
         
         self.fuel_cell.reaction_efficiency = self.fuel_cell.stack_efficiency * self.fuel_cell.stoic_ratio_A # Efficiency of the reaction (to determine how much heat is generated)
         self.fuel_cell.total_efficiency = self.fuel_cell.stack_efficiency - self.fuel_cell.air_compression_energy * self.fuel_cell.air_hydrogen_ratio / (LHV_H2) # Efficiency of the fuel cell
         self.fuel_cell.heat_power = LHV_H2 * self.fuel_cell.m_H2_used * (1 - self.fuel_cell.reaction_efficiency)  # Heat power produced by the fuel cell
 
 
-        print(f"Mass flow rate of hydrogen used in fuel cell: {self.fuel_cell.m_H2_tot} kg/s")
         print(f"Total efficiency of the fuel cell: {self.fuel_cell.total_efficiency * 100} %")
         print(f"Electrical power produced by the fuel cell: {self.fuel_cell.power_required * 10**(-6)} MW")
         print(f"Heat power produced by the fuel cell: {self.fuel_cell.heat_power * 10**(-6)} MW")

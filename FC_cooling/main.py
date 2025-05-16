@@ -9,7 +9,7 @@ import heat_removal_required
 # Create three fuel cell types
 LTPEM = fuel_cell_info.FuelCell(
     name = "LTPEM",
-    stack_efficiency=0.6,
+    stack_efficiency=0.7,
     T=273.15 + 80,  # K
     P_A=1.8 * 101325 + 0.06 * 10**5,  # Pa https://pdf.sciencedirectassets.com/271472/1-s2.0-S0360319921X00614/1-s2.0-S0360319921027634/main.pdf?X-Amz-Security-Token=IQoJb3JpZ2luX2VjEFwaCXVzLWVhc3QtMSJIMEYCIQDn6w4UOTzRqoEPtaJbiJTNcGIZB9kDUYb2ecZ%2BmBXN9wIhAMOwbI4XLuHoL5%2Bsp27d4gD7Tv66lv%2Bm2yXTJiurmwktKrMFCBUQBRoMMDU5MDAzNTQ2ODY1IgzoT0L%2Boa5nr7Qm%2BbQqkAViGsDYeaEzBi%2BfWU4I%2BGGl1oz5YeF1BhCa3EI%2BsdekiMWno3GyGuSawP6UhKhrMmxI2IiRRuMFNbQODhnC9aXp%2BNApcCE6YnLxInhezcfKHTenH67lBh2Caol23dSWqQ7g6xNDYQSvWmt2o1GO%2B9thieoAoMwWWsIbcYh7JzjS9%2BWZossrFcPvxYWLhx978ah9UStWo3wfqn5VRnbAcGqwB29JmIoGWdeOxH99kXZLH8ErtK7rtZeXsovb27UXBkYUTtaVE0%2BTxzWsTiHUJUcknbgkdDvdZ0Tc5CTdMeepnDQSx2ad1teq43xKqIaaHEJ%2BZsFjcPt%2FaTn4AqvGYoAAEyYtrgBPJjD8nrFwpN%2B1VGYDNWUwBrL0N%2F67aoI29n%2BeeIj%2F48FjeRoINWoCtcMRFFJAFHJIqjvthQqxgicN%2F%2FwwlgbZplrrVJN2rq2%2Bj7bCV8IJKxu%2Bhm%2FjEWjBaU5%2FDLcf9gOjTE9Rcf1WBwemFImvlAMduz%2B%2BZnOnKRrNX95GoEJdkIBWHWOXcEA7uEhArudTaVqldwCVjs0VBRo95bUWgpkm78YoOF9%2BK5ETevqXTvceQWtAmVoWZzL5O1SxFYV9CeG1i2uX4y9%2B3%2BxqZlgbIo755dSJJD0w%2B9Oc8MPhSTYbUnXdF%2FiHJfIMDODertE8sKXKbKrFfB1c7ajcO7ptzCP56TxzF9qa8cyAshzlLj%2F%2Brz7FxxyPmV4toDhBSPS3gtg%2F9OPjk6AcCoHRuLjXXi6YKk323Rwpz%2Fy%2F7onraITAqwXvzFfb9GedKAeSuPz%2Bk4etVDmQS87AAMAMBN4v7MehJ4YnI5MCm%2BSaKKWfa0grEMX8z2YFexgk69lVJts0TfbnWKwt9bpgvZL0nDDa%2F5HBBjqwAaSfaaYmRRuwBONTr8vEiVqhE2xjVkEBLlVgXw3XtSO5cUHiAEh1a1f9IVwrIZSepVSyNyboY3yZ5%2B8dhkkkALCSJlGbudhItI4Z0Zc5rFIBIUBiTIbnkiknIz5PJRMRWBdBwKmzxWacUGvSJRD7SP%2BR8csCcd4nyTFeBPrx9J%2Fr%2Fsbsc2KbpghupePp7nREX5kxCbpIAxjlhUc%2FhpRqae4kQqzMcqNbL5NgGmnxwjr2&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20250514T123737Z&X-Amz-SignedHeaders=host&X-Amz-Expires=300&X-Amz-Credential=ASIAQ3PHCVTYTNM6Z4RK%2F20250514%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Signature=218bd5bcc7fa27dde6283d4177a9db49807cbe6645b3470448d3e7297e4fa515&hash=23dba463727fe3e5de483bc687ec6fd5a87197a2d15fb33588c30bd19bbd42a8&host=68042c943591013ac2b2430a89b270f6af2c76d8dfd086a07176afe7c76c2c61&pii=S0360319921027634&tid=spdf-b7d767c9-1df7-4ff6-9758-ed1bc6e98c49&sid=8b7897ae44a1344a266b0d809b3b3978ce3agxrqb&type=client&tsoh=d3d3LnNjaWVuY2VkaXJlY3QuY29t&rh=d3d3LnNjaWVuY2VkaXJlY3QuY29t&ua=140a5b5604065551020d01&rr=93fa72abae34312a&cc=nl
     P_C=1.8 * 101325,  # Pa
@@ -21,7 +21,7 @@ LTPEM = fuel_cell_info.FuelCell(
 
 HTPEM = fuel_cell_info.FuelCell(
     name = "HTPEM",
-    stack_efficiency=0.6,
+    stack_efficiency=0.7,
     T=273.15 + 160,  # K
     P_A=1.85 * 101325 + 0.06 * 10**5,  # Pa
     P_C=1.85 * 101325,  # Pa
@@ -51,10 +51,10 @@ takeoff = flight_condition.FlightCondition(
     P_amb=101325,  # Pa
     RH_amb=0,  # Relative humidity of the ambient air
     V=0,  # m/s
-    power_required = 1908000, # Power required in W
+    actual_power_required = 1908000, # Power required in W
     power_split = 1,  # proportion of power outputted from the fuel cell
     thermal_efficiency = 0.4,  # thermal efficiency of the combustion chamber
-    propulsive_efficiency = 0.85, # propulsive efficiency of the propeller
+    propulsive_efficiency = 0.8, # propulsive efficiency of the propeller
     P_cc = 12.1 * 101325,  # Pa
     T_cc = 300 + 273.15 #K
 )
@@ -84,7 +84,7 @@ GCH2 = hydrogen_storage.HydrogenStorage(
 
     
 # Create an instance of the Output class
-HTPEM_TO = heat_removal_required.Design_point(fuel_cell=LTPEM, flight_condition=takeoff, hydrogen_storage=LH2, P_C = 1.85 * 101325)
+HTPEM_TO = heat_removal_required.Design_point(fuel_cell=HTPEM, flight_condition=takeoff, hydrogen_storage=LH2, P_C = 1.85 * 101325)
 
 LHV_H2 = 120000000  # Lower heating value of hydrogen in J/kg
 print(HTPEM_TO.fuel_cell.name)
