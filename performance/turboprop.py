@@ -124,6 +124,93 @@ class Turboprop:
         return T05, P05
     
     @staticmethod
+    def __mu(
+        M0: np.ndarray,
+        k_air: float
+    ):
+        """Mach number correction factor."""
+        mu = 1 + (k_air-1)/2*M0**2
+        return mu
+    
+    @staticmethod
+    def __kappa(
+        mu: np.ndarray,
+        PI_comp: float,
+        k_air: float
+    ):
+        """Kappa factor taken from Torenbeek.
+        Note: Assumes epsilon_c = PI_comp"""
+        kappa = mu*(PI_comp**((k_air-1)/k_air)-1)
+        return kappa
+    
+    @staticmethod
+    def __phi(
+        T0: np.ndarray,
+        T04: np.ndarray
+    ):
+        """Non-dimensional TET taken from Torenbeek."""
+        phi = T04/T0
+        return phi
+    
+    @staticmethod
+    def __G(
+        mu: np.ndarray,
+        phi: np.ndarray,
+        kappa: np.ndarray,
+        eta_comp: float,
+        eta_in: float,
+        eta_turb: float,
+        k_air: float
+    ):
+        """Gas generator function taken from Torenbeek."""
+        G = (phi-kappa/eta_comp)*(1-1.01/(eta_in**((k_air-1)/k_air)*(kappa+mu)*(1-kappa/(phi*eta_comp*eta_turb))))
+        return G
+    
+    def __PSFC(
+        self,
+        M0: np.ndarray,
+        T0: np.ndarray
+        
+    ):
+        """Power-specific fuel consumption estimation taken from Torenbeek.
+        Torenbeek, S. (1986). Synthesis of Subsonic Airplane Design."""
+        mu = self.__mu(M0, self.k_air)
+        kappa = self.__kappa(mu, self.PI_comp, self.k_air)
+        phi = self.__phi(self.T04, T0)
+        
+        G = self.__G(mu, phi, kappa, self.eta_comp, self.eta_in, self.eta_turb, self.k_air)
+        
+        # Eqn. H-40, Torenbeek, pp. 569, constant adjusted for SI units
+        C_p = 2.41011428486284326e-8*((phi-mu-kappa/self.eta_comp)/(self.eta_turb*G-0.28*M0**2/self.eta_turb))
+        C_p = np.clip(C_p, 0, None) # Avoid negative values
+        
+        return C_p
+    
+    @staticmethod
+    def __eta_prop(
+        M0: np.ndarray,
+        eta_prop_max: float = 0.85
+    ):
+        """Empirical propeller/propulsion efficiency.
+        Taken from: Mattingly, Aircraft Engine Design, 2nd ed.
+        """
+        eta_prop = np.zeros_like(M0)
+        
+        # M0 < 0.1
+        mask = M0 <= 0.1
+        eta_prop[mask] = 10*M0[mask]*eta_prop_max
+        
+        # 0.1 < M0 <= 0.7
+        mask = (M0 > 0.1) & (M0 <= 0.7)
+        eta_prop[mask] = eta_prop_max
+        
+        # 0.7 < M0 <= 1.0
+        mask = (M0 > 0.7) & (M0 <= 0.85)
+        eta_prop[mask] = (1-((M0[mask]-0.7)/3))*eta_prop_max
+        
+        return eta_prop
+    
+    @staticmethod
     def __eta_th(
         mdot_air: np.ndarray,
         mdot_fuel: np.ndarray,
@@ -143,11 +230,16 @@ class Turboprop:
         return eta_th
     
     #  COMPUTE
-    def compute(self, T0: np.ndarray, P0: np.ndarray, rho0:np.ndarray, V0: np.ndarray, eta_prop: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def compute(self, T0: np.ndarray, P0: np.ndarray, rho0:np.ndarray, V0: np.ndarray, R_LHV: float=1.0, Pr: np.ndarray=None) -> Tuple[np.ndarray, np.ndarray]:
         """Compute the turboprop engine performance."""
         
         # Atmospheric conditions
         M0 = V0/np.sqrt(self.k_air*R_AIR*T0)
+        
+        # Propeller efficiency
+        eta_prop = self.__eta_prop(M0)
+        
+        # Inlet mass flow rate
         mdot_air = rho0 * V0 * A_inlet/eta_prop
         
         # Station 2 (compressor inlet)
@@ -158,9 +250,16 @@ class Turboprop:
 
         # Station 4 (combustion chamber exit)
         T04, P04 = self.__04(self.T04, P03, self.PI_cc)
-
-        # Mass flow rate of fuel
-        mdot_fuel = self.__mdot_fuel(mdot_air, self.c_pg, T03, T04, self.LHV_fuel, self.eta_cc)
+        
+        if Pr is None:
+            # Mass flow rate of fuel
+            mdot_fuel = self.__mdot_fuel(mdot_air, self.c_pg, T03, T04, self.LHV_fuel, self.eta_cc)
+            
+        else:
+            # Power-specific fuel consumption
+            C_p = self.__PSFC(M0, T0)
+            # Fuel flow rate
+            mdot_fuel = C_p*R_LHV*Pr/eta_prop
 
         # Station 5 (turbine exit)
         T05, P05 = self.__05(mdot_air, mdot_fuel, self.c_pa, self.c_pg, T02, T03, T04, P04,
@@ -172,4 +271,4 @@ class Turboprop:
                                self.c_pg,
                                self.k_gas)
         
-        return mdot_fuel, eta_th
+        return mdot_fuel, eta_th, eta_prop
