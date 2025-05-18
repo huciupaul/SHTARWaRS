@@ -35,26 +35,15 @@ T_h2o = 750.0  # K
 
 #----------Calculations----------
 
-X_mix1, mdot_tot1, _ = mixture_properties(
+X_mix1, mdot_mix1, _ = mixture_properties(
     mdot1=mdot_rich_ex, X1=X_rich_ex,
     mdot2=mdot_air, X2=X_air
 )
+T_mix1 = (T_rich_ex*mdot_rich_ex  + T_air*mdot_air) / mdot_mix1
 
 # Compute enthalpy-weighted temperature for the mixture
 gas = ct.Solution(MECH)
-
-h_tot = 0.0
-for mdot, X, T in [
-    (mdot_rich_ex, X_rich_ex, T_rich_ex),
-    (mdot_air, X_air, T_air)
-]:
-    if mdot > 0:
-        gas.TPX = T, P_rich_ex, X
-        h_tot += mdot * gas.enthalpy_mass
-
-h_mix = h_tot / mdot_tot1
-gas.HP = h_mix, P_rich_ex
-gas.equilibrate('HP')
+gas.TPX = T_mix1, P_rich_ex, X_mix1
 
 # Set up 0D reactor
 reactor = ct.IdealGasConstPressureReactor(gas)
@@ -66,40 +55,30 @@ temps = []
 
 time = 0.0
 t_end = 0.05  # seconds
-dt = 1e-3
+dt = 1e-6
 num_steps = int(t_end / dt)
 
-for step in tqdm(range(num_steps), desc="Simulation time"):
-    time = (step + 1) * dt
-    times.append(time)
+for mdot_h2o_i in mdot_h2o:
     NOx_row = []
     temps_row = []
-    for mdot_h2o_i in mdot_h2o:
-        # Mix rich+air with current h2o
-        X_mix, mdot_mix, _ = mixture_properties(
-            mdot1=mdot_tot1, X1=X_mix1,
-            mdot2=mdot_h2o_i, X2=X_h2o
-        )
+    time = 0.0
+    # Recompute mixture for this mdot_h2o_i
+    X_mix, mdot_mix, _ = mixture_properties(
+        mdot1=mdot_mix1, X1=X_mix1,
+        mdot2=mdot_h2o_i, X2=X_h2o
+    )
+    T_mix = (T_mix1*mdot_mix1  + T_h2o*mdot_h2o_i) / mdot_mix
+    gas.TPX = T_mix, P_rich_ex, X_mix
 
-        # Compute enthalpy-weighted temperature for the new mixture
-        h_tot = 0.0
-        for mdot, X, T in [
-            (mdot_tot1, X_mix1, gas.T),  # Use last gas.T as approx
-            (mdot_h2o_i, X_h2o, T_h2o)
-        ]:
-            if mdot > 0:
-                gas.TPX = T, P_rich_ex, X
-                h_tot += mdot * gas.enthalpy_mass
+    # Set up 0D reactor
+    reactor = ct.IdealGasConstPressureReactor(gas)
+    sim = ct.ReactorNet([reactor])
 
-        h_mix = h_tot / (mdot_tot1 + mdot_h2o_i)
-        gas.HP = h_mix, P_rich_ex
-        gas.equilibrate('HP', solver='vcs')
-        
-        # Set up 0D reactor
-        reactor = ct.IdealGasConstPressureReactor(gas)
-        sim = ct.ReactorNet([reactor])
+    for step in range(num_steps):
+        time += dt
+        if len(times) < num_steps:
+            times.append(time)
         sim.advance(time)
-
         temps_row.append(reactor.T)
         NOx_row.append(reactor.thermo['NO'].X[0] + reactor.thermo['NO2'].X[0])
 
@@ -112,25 +91,41 @@ NOx = np.array(NOx)
 temps = np.array(temps)
 mdot_h2o = np.array(mdot_h2o)
 
-# Create meshgrid for time and mdot_h2o
-T, M = np.meshgrid(times, mdot_h2o, indexing='ij')
-
-# Plot NOx surface
-fig = plt.figure(figsize=(12, 5))
-ax1 = fig.add_subplot(121, projection='3d')
-ax1.plot_surface(T, M, NOx, cmap='viridis')
+# Plot NOx heatmap
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+  
+im1 = ax1.imshow(
+    NOx, 
+    aspect='auto', 
+    origin='lower', 
+    extent=[times[0], times[-1], mdot_h2o[0], mdot_h2o[-1]],
+    cmap='viridis'
+)
 ax1.set_xlabel('Time [s]')
 ax1.set_ylabel('mdot_h2o [kg/s]')
-ax1.set_zlabel('NOx mole fraction')
-ax1.set_title('NOx vs Time and mdot_h2o')
+ax1.set_title('NOx mole fraction')
+fig.colorbar(im1, ax=ax1, label='NOx mole fraction')
 
-# Plot temperature surface
-ax2 = fig.add_subplot(122, projection='3d')
-ax2.plot_surface(T, M, temps, cmap='plasma')
+# Add contour for 1 ppm NOx (1e-6 mole fraction)
+T, M = np.meshgrid(times, mdot_h2o)
+contour = ax1.contour(
+    times, mdot_h2o, NOx, levels=[1e-38], colors='red', linewidths=2, origin='lower'
+)
+ax1.clabel(contour, fmt={1e-38: '1e-38'}, colors='red')
+
+
+# Plot temperature heatmap
+im2 = ax2.imshow(
+    temps, 
+    aspect='auto', 
+    origin='lower', 
+    extent=[times[0], times[-1], mdot_h2o[0], mdot_h2o[-1]],
+    cmap='plasma'
+)
 ax2.set_xlabel('Time [s]')
 ax2.set_ylabel('mdot_h2o [kg/s]')
-ax2.set_zlabel('Temperature [K]')
-ax2.set_title('Temperature vs Time and mdot_h2o')
+ax2.set_title('Temperature [K]')
+fig.colorbar(im2, ax=ax2, label='Temperature [K]')
 
 plt.tight_layout()
 plt.show()
