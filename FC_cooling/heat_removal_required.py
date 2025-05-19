@@ -38,7 +38,7 @@ class Design_point:
         self.fuel_cell.heat_change_air = (H_air_fc - H_air_comp)  # J/kg
 
         print(f"Power required for air compression: {self.fuel_cell.air_compression_energy * 10**(-6)} MJ/kg")
-        print(f"Heat added to from air after compression: {self.fuel_cell.heat_change_air * 10**(-6)} MJ/kg")
+        print(f"Heat added to air after compression: {self.fuel_cell.heat_change_air * 10**(-6)} MJ/kg")
 
 
     def mass_flow_calculation(self):
@@ -48,12 +48,16 @@ class Design_point:
         
 
         # Calculate the required mass flow rate of gasses for the fuel cell
-        self.fuel_cell.power_required = self.flight_condition.power_required * self.flight_condition.power_split
-        self.fuel_cell.m_H2_tot = self.fuel_cell.power_required / ((self.fuel_cell.stack_efficiency  * LHV_H2 - self.fuel_cell.air_compression_energy * self.fuel_cell.air_hydrogen_ratio) * self.flight_condition.propulsive_efficiency)
+        self.fuel_cell.shaft_power_required = self.flight_condition.power_required * self.flight_condition.power_split # W
+        self.fuel_cell.m_H2_tot = self.fuel_cell.shaft_power_required / (self.fuel_cell.stack_efficiency  * LHV_H2 - self.fuel_cell.air_compression_energy * self.fuel_cell.air_hydrogen_ratio)
         self.fuel_cell.m_H2_used = self.fuel_cell.m_H2_tot / self.fuel_cell.stoic_ratio_A
         self.fuel_cell.m_O2_used = self.fuel_cell.m_H2_used * 15.999/1.00784
         self.fuel_cell.m_O2_tot = self.fuel_cell.m_O2_used * self.fuel_cell.stoic_ratio_C
         self.fuel_cell.m_air = self.fuel_cell.m_O2_tot / 0.2314  # Divided by mass fraction of O2 in air
+
+        
+        self.fuel_cell.total_power_O2_comp = self.fuel_cell.air_compression_energy * self.fuel_cell.m_air # W
+        print(f"Power required for air compression (total): {self.fuel_cell.total_power_O2_comp * 10**(-6)} MW")
 
         self.fuel_cell.m_tot = self.fuel_cell.m_air + self.fuel_cell.m_H2_tot
         self.fuel_cell.m_H2O_out = self.fuel_cell.m_H2_used + self.fuel_cell.m_O2_used
@@ -70,10 +74,12 @@ class Design_point:
         self.fuel_cell.reaction_efficiency = self.fuel_cell.stack_efficiency * self.fuel_cell.stoic_ratio_A # Efficiency of the reaction (to determine how much heat is generated)
         self.fuel_cell.total_efficiency = self.fuel_cell.stack_efficiency - self.fuel_cell.air_compression_energy * self.fuel_cell.air_hydrogen_ratio / (LHV_H2) # Efficiency of the fuel cell
         self.fuel_cell.heat_power = LHV_H2 * self.fuel_cell.m_H2_used * (1 - self.fuel_cell.reaction_efficiency)  # Heat power produced by the fuel cell
+        self.fuel_cell.total_electrical_power = LHV_H2 * self.fuel_cell.m_H2_tot * self.fuel_cell.stack_efficiency  # Total electrical power produced by the fuel cell
 
 
         print(f"Total efficiency of the fuel cell: {self.fuel_cell.total_efficiency * 100} %")
-        print(f"Electrical power produced by the fuel cell: {self.fuel_cell.power_required * 10**(-6)} MW")
+        print(f"Shaft power produced by the fuel cell: {self.fuel_cell.shaft_power_required * 10**(-6)} MW")
+        print(f"Total power produced by the fuel cell (+BOP): {self.fuel_cell.total_electrical_power * 10**(-6)} MW")
         print(f"Heat power produced by the fuel cell: {self.fuel_cell.heat_power * 10**(-6)} MW")
 
         # Calculate the required mass flow rate of hydrogen for the combustion chamber
@@ -114,5 +120,11 @@ class Design_point:
         # Calculate heat exchange required for the fuel cell
         self.fuel_cell.heat_exchange_fc = self.fuel_cell.heat_power - (self.HSP_fc_H2 + self.HSP_cc_fc_H2) # W
         print(f"Heat exchange required for the fuel cell: {self.fuel_cell.heat_exchange_fc * 10**(-6)} MW")
+
+        self.fuel_cell.mass =  self.fuel_cell.shaft_power_required / self.fuel_cell.spec_power # kg
+        self.fuel_cell.volume = self.fuel_cell.total_electrical_power / self.fuel_cell.spec_vol_power # m^3
+
+        print(f"Mass of the fuel cell: {self.fuel_cell.mass} kg")
+        print(f"Volume of the fuel cell: {self.fuel_cell.volume} m^3")
 
 
