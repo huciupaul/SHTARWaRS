@@ -1,86 +1,136 @@
-from ADRpy import constraintanalysis as ca
-import matplotlib.pyplot as plt
-
+from ADRpy import constraintanalysis as ca       # you kept this for later use
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Example: Constraint Analysis for a Small Turboprop Aircraft (based on G-OUAV ADRpy notebook)
+# ------------------------------------------------------------------
+# 1. Constants and aircraft data
+# ------------------------------------------------------------------
+g        = 9.8056          # [m/s²]
+rho_SL   = 1.225           # sea-level density [kg/m³]
 
-# Constants and Parameters
-g = 9.8056                              # gravity [m/s^2]
-rho_SL = 1.225                        # sea level air density [kg/m^3]
+# ---- Beechcraft 1900D parameters ---------------------------------
+C_d_0    = 0.024
+AR       = 10.808
+e        = 0.735809
+k        = 1 / (np.pi * AR * e)
 
-S = 28.79                             # wing surface area [m^2]
-MTOW = 7765*g                         # MTOW [N]
-W_fuel = 2022*g
-LW_max = 7604*g                           # max landing weight [N]  
-LW = MTOW-W_fuel
-V_TO = 54.0167                        # take-off speed [m/s]
-V_L =  60.2                           # landing speed  [m/s]
+TOGA     = 1_908_000       # total take-off power available [W]
+S        = 28.79           # wing area [m²]
 
-rho_cruise = 0.550798                 # assumed cruise altitude density [kg/m^3]
-V_stall = 46.3                    # stall speed [m/s]  -->  clean, max T-O weight
-V_cruise = 144.044                    # cruise speed [m/s]
-LD_cruise = 15.07                     # Lift-to-Drag ratio at cruise
-ROC = 6.35                            # rate of climb [m/s]
+MTOW     = 7_765 * g       # [N]
+W_fuel   = 2_022 * g
+LW_max   = 7_604 * g       # max landing weight [N]
+LW       = MTOW - W_fuel
 
-mu_TO = 0.03                          # ground friction coeff  --> source??????
-S_g = 1163                            # ground run length [m]  -->  T-O flap setting
-S_land = 851                          # required landing distance [m]  -->  at max landing W
+V_TO     = 54.0167         # take-off speed [m/s]
+V_L      = 54.0167         # approach / landing speed [m/s]
 
-CL_max_TO = 1.8
-CL_max_L = 2.4
+rho_cruise = 0.550798
+V_stall_L  = 46.3          # stall speed (TO flaps, LW_max) [m/s]
+V_stall_c  = 51.9589       # clean stall speed at MTOW [m/s]
+V_cruise   = 144.044       # cruise TAS [m/s]
+LD_cruise  = 15.07         # L/D at cruise (unused here)
+ROC        = 6.35          # required climb rate [m/s]
 
-# why CL max TO > CL max L ?
-#CL_max_TO = MTOW/(0.5*rho_SL*V_TO**2*S)                 # max lift coefficient in takeoff 
-#CL_max_L = LW_max/(0.5*rho_SL*V_L**2*S)                 # max lift coefficient in landing    
-#print("CL max for take off is:", CL_max_TO)
-#print("CL max for landing is:", CL_max_L)
+V_climb   = 73.43
+rho_climb = rho_SL
+q_climb   = 0.5 * rho_climb * V_climb**2
 
-# Wing loading range [N/m^2]
-# --> S = cte, W decreases
-# MAX = MTOW*g/S = 2645.87183
-# MIN = (MTOW-MAXF)/S = (7765-2022)*g/S = 1956.8888
-#WS = np.linspace(1950, 2646, 5) 
-WS = np.linspace(500, 5000, 50)  
+sigma      = rho_cruise / rho_SL
+q_c        = 0.5 * rho_cruise * V_cruise**2
+eff_prop   = 0.80
 
-# Constraint 1: Takeoff field length
-TW_takeoff = (WS / (rho_SL * CL_max_TO)) / (S_g * g) 
+mu_TO      = 0.04
+S_g        = 1163          # take-off ground run [m]
+S_land     = 851           # landing distance [m]
 
-# Constraint 2: Stall speed (converted to max WS)
-WS_stall = 0.5 * rho_SL * V_stall**2 * CL_max_L
+# ------------------------------------------------------------------
+# 2. Aerodynamic coefficients
+# ------------------------------------------------------------------
+CL_max_TO = MTOW / (0.5*rho_SL*V_stall_L**2*S)
+CL_TO     = MTOW / (0.5*rho_SL*V_TO**2       *S)
 
-# Constraint 3: Cruise condition
-TW_cruise = WS / (rho_cruise * V_cruise**2 * LD_cruise)
+CL_max_L  = LW_max / (0.5*rho_SL*V_stall_L**2*S)
+CL_max    = max(CL_max_TO, CL_max_L)
 
-# Constraint 4: Climb performance (using simplified excess power method)
-TW_climb = ROC / V_cruise + 1 / LD_cruise
+print(f"CL_max (take-off): {CL_max_TO:.3f}")
+print(f"CL_max (landing): {CL_max_L :.3f}")
 
-# From Roskam: WS < K * S_land * rho * CL_max_L
-K_land = 0.3 * g  
-WS_land_limit = rho_SL * CL_max_L * K_land * S_land  # Max allowed wing loading for landing
+# ------------------------------------------------------------------
+# 3. Wing-loading grid
+# ------------------------------------------------------------------
+WS = np.linspace(500, 6000, 200)        # [N/m²]
 
+# ------------------------------------------------------------------
+# 4. Constraint equations
+# ------------------------------------------------------------------
+# 4.1 Take-off field length
+C_D_TO    = C_d_0 + k * CL_TO**2
+TW_TO     = (1.21 / (g * rho_SL * CL_max_TO * S_g)) * WS \
+          + (0.605 / CL_TO) * (C_D_TO - mu_TO * CL_TO) + mu_TO
+PW_TO     = TW_TO * V_TO / eff_prop
 
-# Feasible region
-TW_envelope = np.maximum(TW_takeoff, TW_cruise)
-TW_envelope = np.maximum(TW_envelope, TW_climb)
-WS_feasible = WS[WS <= WS_stall]
-TW_feasible = TW_envelope[WS <= WS_stall]
+# 4.2 Stall limit  (gives a *vertical* WS limit)
+WS_stall  = 0.5 * rho_SL * V_stall_L**2 * CL_max_TO
 
-# Plot
-plt.figure(figsize=(10, 6))
-plt.fill_between(WS_feasible, TW_feasible, y2=1.0, color='lightgreen', alpha=0.4, label="Feasible region")
+# 4.3 Cruise
+TW_cruise = (q_c * C_d_0) / WS + (k / q_c) * WS
+PW_cruise = TW_cruise * V_cruise / eff_prop
 
-plt.plot(WS, TW_takeoff, label="Takeoff")
-plt.axvline(WS_stall, color='r', linestyle='--', label="Stall limit")
-plt.plot(WS, TW_cruise, label="Cruise")
-plt.axvline(WS_land_limit, color='purple', linestyle='--', label="Landing limit")
-plt.axhline(TW_climb, color='g', linestyle='--', label="Climb requirement")
+# 4.4 Climb
+TW_climb  = ROC / V_climb + (q_climb * C_d_0) / WS + k * WS / q_climb
+PW_climb  = TW_climb * V_climb / eff_prop
 
-plt.xlabel("Wing Loading W/S [N/m²]")
-plt.ylabel("Thrust-to-Weight T/W")
-plt.title("Constraint Diagram for Small Turboprop Aircraft")
-plt.grid(True)
-plt.legend()
+# 4.5 Landing distance (vertical line)
+WS_land_limit = 0.5 * rho_SL * V_L**2 * CL_max_L
+
+# ------------------------------------------------------------------
+# 5. Actual aircraft point (optional reference)
+# ------------------------------------------------------------------
+PW_beechcraft = TOGA / MTOW           # “available” P/W at MTOW
+WS_beechcraft = MTOW / S
+print(f"Beech 1900D  P/W: {PW_beechcraft:.3f}  W/S: {WS_beechcraft:.1f}")
+
+# ------------------------------------------------------------------
+# 6. DESIGN point (intersection of stall-WS with climb curve)
+# ------------------------------------------------------------------
+PW_design = np.interp(WS_stall, WS, PW_climb)
+
+# ------------------------------------------------------------------
+# 7. PLOT
+# ------------------------------------------------------------------
+fig, ax = plt.subplots(figsize=(10, 6))
+
+# 7.1 Constraint curves
+ax.plot(WS, PW_TO,      label='Take-off')
+ax.plot(WS, PW_cruise,  label='Cruise')
+ax.plot(WS, PW_climb,   label='Climb requirement', ls='--', c='green')
+
+# 7.2 Vertical limits
+ax.axvline(WS_stall,      ls='--', c='red',    label='Stall limit')
+ax.axvline(WS_land_limit, ls='--', c='purple', label='Landing limit')
+
+# 7.3 Feasible region shading  (only up to WS_stall)
+mask        = WS <= WS_stall
+P_required  = np.maximum.reduce([PW_TO[mask],
+                                 PW_cruise[mask],
+                                 PW_climb[mask]])
+_, y_top = ax.get_ylim()        # current y-axis upper bound
+ax.fill_between(WS[mask], P_required, y_top,
+                color='lightgreen', alpha=0.35,
+                zorder=0, label='Feasible region')
+
+# 7.4 Design point
+ax.scatter(WS_stall, PW_design, marker='x', s=100, c='k', lw=2,
+           label='Design point')
+
+# 7.5 Cosmetics
+ax.set_xlim(WS.min(), WS.max())
+ax.set_ylim(0)                      # y-axis starts at zero
+ax.set_xlabel('Wing loading  W/S  [N/m²]')
+ax.set_ylabel('Power-to-weight  P/W  [W/N]')
+ax.set_title('Constraint diagram – Beechcraft 1900D')
+ax.grid(True, which='both', ls=':')
+ax.legend(loc='upper right')
 plt.tight_layout()
 plt.show()
