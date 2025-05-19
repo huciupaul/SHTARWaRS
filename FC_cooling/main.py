@@ -9,7 +9,7 @@ class MainSimulation:
         # Define fuel cells
         self.LTPEM = fuel_cell_info.FuelCell(
             name="LTPEM",
-            stack_efficiency=0.7,
+            stack_efficiency=0.6,
             T=273.15 + 160,
             P_A=1.8 * 101325 + 0.06 * 1e5,
             P_C=1.8 * 101325,
@@ -17,7 +17,8 @@ class MainSimulation:
             RH_C=0.38,
             stoic_ratio_C=1.8,
             stoic_ratio_A=1.05,
-            spec_power = 2750
+            spec_power = 2750,
+            spec_vol_power = 3100000
         )
 
         # Define flight condition
@@ -27,7 +28,7 @@ class MainSimulation:
             P_amb=101325,
             RH_amb=0,
             V=0,
-            actual_power_required=1_908_000,
+            actual_power_required=1_908_000 / 0.85,
             power_split=1,
             thermal_efficiency=0.4,
             propulsive_efficiency=0.85,
@@ -41,7 +42,7 @@ class MainSimulation:
             P_amb=37594.02446,
             RH_amb=0,
             V=0,
-            actual_power_required=650_740,
+            actual_power_required= 650_740,
             power_split=1,
             thermal_efficiency=0.4,
             propulsive_efficiency=0.85,

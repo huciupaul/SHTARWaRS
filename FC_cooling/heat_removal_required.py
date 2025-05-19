@@ -38,7 +38,7 @@ class Design_point:
         self.fuel_cell.heat_change_air = (H_air_fc - H_air_comp)  # J/kg
 
         print(f"Power required for air compression: {self.fuel_cell.air_compression_energy * 10**(-6)} MJ/kg")
-        print(f"Heat added to from air after compression: {self.fuel_cell.heat_change_air * 10**(-6)} MJ/kg")
+        print(f"Heat added to air after compression: {self.fuel_cell.heat_change_air * 10**(-6)} MJ/kg")
 
 
     def mass_flow_calculation(self):
@@ -121,8 +121,10 @@ class Design_point:
         self.fuel_cell.heat_exchange_fc = self.fuel_cell.heat_power - (self.HSP_fc_H2 + self.HSP_cc_fc_H2) # W
         print(f"Heat exchange required for the fuel cell: {self.fuel_cell.heat_exchange_fc * 10**(-6)} MW")
 
-        self.fuel_cell_mass =  self.fuel_cell.total_electrical_power / self.fuel_cell.spec_power # kg
+        self.fuel_cell.mass =  self.fuel_cell.shaft_power_required / self.fuel_cell.spec_power # kg
+        self.fuel_cell.volume = self.fuel_cell.total_electrical_power / self.fuel_cell.spec_vol_power # m^3
 
-        print(f"Mass of the fuel cell: {self.fuel_cell_mass} kg")
+        print(f"Mass of the fuel cell: {self.fuel_cell.mass} kg")
+        print(f"Volume of the fuel cell: {self.fuel_cell.volume} m^3")
 
 
