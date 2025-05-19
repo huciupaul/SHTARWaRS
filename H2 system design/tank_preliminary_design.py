@@ -333,7 +333,7 @@ co2_kevlar = 13.1 #kg/kg (Kevlar 149)
 kevlar_ee = 257 #MJ/kg (Embodied Energy for Kevlar 149)
 
 #Our values
-mass_h2 = 292.5 #kg
+mass_h2 = 339.1 #kg
 estimated_mass = mass_h2/grav_idx - mass_h2
 t_limit = 0.001 #m (minimum thickness of the tank wall)
 
