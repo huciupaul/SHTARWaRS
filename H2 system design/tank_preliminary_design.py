@@ -152,7 +152,7 @@ class Tank:
             N_theta_p = P_test * self.R_in
             N_phi_p = P_test * self.R_in / 2
             self.mat_property[1] = self.mat_property[1] #may add safety factors
-            angle = np.arange(1, 89, 0.1) #helical winding angle in degrees
+            angle = np.arange(1, 54, 0.1) #helical winding angle in degrees
             t_min = 1000
             #thicknesses = []
             #angles_deg = []
@@ -251,12 +251,12 @@ class Tank:
             N_theta_p = P_test * (r_in+t1+dv+t_mli)
             N_phi_p = P_test * (r_in+t1+dv+t_mli) / 2
             #self.mat2_property[1] = self.mat2_property[1] #may add safety factors
-            angle = np.arange(0, np.pi/2 - 0.1, 0.001) # helical winding angle in radians
+            angle = np.arange(0, 54, 0.1) # helical winding angle in radians
             
             for ang in angle:
                 #Calc netting thickness in hoop and helical direction
-                t_heli = N_phi_p / (self.mat2_property[1] * np.cos(ang)**2)
-                t_hoop = (N_theta_p - N_phi_p * np.tan(ang)**2) / (self.mat2_property[1])
+                t_heli = N_phi_p / (self.mat2_property[1] * np.cos(ang*np.pi/180)**2)
+                t_hoop = (N_theta_p - N_phi_p * np.tan(ang*np.pi/180)**2) / (self.mat2_property[1])
                 #Calc minimum thickness based on FVF
                 t = (t_heli + t_hoop) / self.mat2_property[6]
                 if t < t2_min:
@@ -268,7 +268,7 @@ class Tank:
         
         t2 = t2_final
 
-        return dv, t2, np.rad2deg(alpha), Q_in_max, Q_cond(dv),  Q_rad(dv)
+        return dv, t2, alpha, Q_in_max, Q_cond(dv),  Q_rad(dv)
 
     # ------------------------------------------------ Tank Dimensions ---------------------------------------------------
     def total_volume(self, l,dv,t1,t2,t_mli):
@@ -415,8 +415,8 @@ def compute_tank(material, material2, mat_property, MAWP,mass_h2, Q_str,mat2_pro
 
 # ------------------------------------------------- Main ------------------------------------------------------
 
-RUN = False #Run new design
-OPEN = True #Open previous design
+RUN = True #Run new design
+OPEN = False #Open previous design
 
 plot_mats = []
 plot_mats2 = []
