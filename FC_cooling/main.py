@@ -51,6 +51,8 @@ class MainSimulation:
 
         # Define hydrogen storage
         self.LH2 = hydrogen_storage.HydrogenStorage(name="LH2", T=20, P=6 * 101325)
+        self.CcH2 = hydrogen_storage.HydrogenStorage(name="CcH2", T=273.15-207, P=350*101325)
+        self.GCH2 = hydrogen_storage.HydrogenStorage(name="GCH2", T=273.15+20, P=700*101325)
 
         # Set design point
         self.design_point = heat_removal_required.Design_point(
@@ -71,11 +73,13 @@ class MainSimulation:
         self.design_point.mass_flow_calculation()
         self.design_point.heat_removal_available()
 
-        # Coolant constants: Ethylene Glycol solution 60% (lowest freezing point)
+        # Coolant constants: 
+        # Therminol D-12 (high temperature range, lower cp)
+        # Ethylene Glycol solution 60% (lowest freezing point, lower T_boil = 111.1 deg + high cp = 3424 J/kg*deg  )
+        # Pressurized water (high boiling point, high freezing point = -2deg, high cp) --> This allows the coolant to absorb more heat without phase change, enabling higher operating temperatures and smaller heat exchangers
         # https://www.engineeringtoolbox.com/ethylene-glycol-d_146.html
-        cp_coolant =  3424                  # J/kg*deg 
-        rho_coolant = 1068                  # at 60deg
-        boiling_coolant = 111.1 + 273.15    # K
+        cp_coolant =  4180                  # J/kg*deg 
+        boiling_coolant = 160 + 273.15      # K
 
         self.heat_exchanger.mass_flow(cp_coolant)
         print(f"Mass flow rate of coolant: {self.heat_exchanger.m_dot_cool:.4f} kg/s")
