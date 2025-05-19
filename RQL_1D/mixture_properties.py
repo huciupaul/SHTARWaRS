@@ -150,3 +150,34 @@ def air_mass_flow_for_phi(
         raise ValueError("phi must be positive.")
 
     return mdot_H2/(phi*0.0292)
+
+
+def mix_streams_const_HP(stream1, stream2, stream3, P):
+    """
+    Mix two Cantera Quantity streams at constant enthalpy and pressure.
+    Returns the mixture composition (X), temperature (T), and mass flow rate (mdot).
+    """
+    # Total mass flow
+    mdot_mix = stream1.mass + stream2.mass + stream3.mass
+
+    # Total enthalpy (J)
+    H_total = stream1.enthalpy + stream2.enthalpy + stream3.enthalpy
+
+    # Mixture composition (mass-weighted)
+    X1 = stream1.X
+    X2 = stream2.X
+    X3 = stream3.X
+    X_mix = (stream1.mass * X1 + stream2.mass * X2 + stream3.mass * X3) / mdot_mix
+
+    # Create a new gas object for the mixture
+    gas = ct.Solution(stream1.phase.source)
+    # Guess initial temperature (mass-weighted average)
+    T_guess = (stream1.T * stream1.mass + stream2.T * stream2.mass + stream3.T * stream3.mass) / mdot_mix
+
+    # Set initial guess
+    gas.TPX = T_guess, P, X_mix
+
+    # Use Cantera's HP solver to find the correct temperature at constant H, P, X
+    gas.HP = H_total / mdot_mix, P
+
+    return gas.X, gas.T, mdot_mix
