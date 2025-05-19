@@ -308,7 +308,7 @@ materials = ['Al-7075-T6','G10','SS-304','Carbon Fibre UD (Prepreg)','SS-316'] #
 SF = 0.9
 #density in kg/m^3, yield strength in Pa, thermal conductivity in W/mK, emissivity in [-], CO2 [kg/kg], Embodied Energy in MJ/kg, Fibre Ratio
 mat_properties = [[2800,495*1e6*SF,134,0.11,7.795,106,0], 
-                  [1900,298*1e6*SF,0.5,0.95,15.25,369,0.4],
+                  [1905,1730*1e6*SF,0.745,0.95,7.22,116.5,0.675],
                   [7955,257.5*1e6*SF,15.5,0.35,3,42.75,0],
                   [1565,1955*1e6*SF,5.25,0.77,50.9,728.5,0.675],
                   [7970,257.5*1e6*SF,15,0.35,4.265,49.75,0]]
@@ -415,8 +415,8 @@ def compute_tank(material, material2, mat_property, MAWP,mass_h2, Q_str,mat2_pro
 
 # ------------------------------------------------- Main ------------------------------------------------------
 
-RUN = True #Run new design
-OPEN = False #Open previous design
+RUN = False #Run new design
+OPEN = True #Open previous design
 
 plot_mats = []
 plot_mats2 = []
@@ -500,7 +500,7 @@ if OPEN:
 
 # ------------------------------------------------- Plotting ------------------------------------------------------
 plot1 = False
-plot2 = False
+plot2 = True
 plot3 = False
 plot4 = False
 
