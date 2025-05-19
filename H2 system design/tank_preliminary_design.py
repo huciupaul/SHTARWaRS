@@ -152,14 +152,14 @@ class Tank:
             N_theta_p = P_test * self.R_in
             N_phi_p = P_test * self.R_in / 2
             self.mat_property[1] = self.mat_property[1] #may add safety factors
-            angle = np.arange(0, np.pi/2 - 0.1, 0.001) #helical winding angle in degrees
+            angle = np.arange(1, 89, 0.1) #helical winding angle in degrees
             t_min = 1000
             #thicknesses = []
             #angles_deg = []
             for ang in angle:
                 # Calc netting thickness in hoop and helical direction
-                t_heli = N_phi_p / (self.mat_property[1] * np.cos(ang)**2)
-                t_hoop = (N_theta_p - N_phi_p * np.tan(ang)**2) / (self.mat_property[1])
+                t_heli = N_phi_p / (self.mat_property[1] * np.cos(ang*np.pi/180)**2)
+                t_hoop = (N_theta_p - N_phi_p * np.tan(ang*np.pi/180)**2) / (self.mat_property[1])
                 # Calc minimum thickness based on FVF
                 t = (t_heli + t_hoop) / self.mat_property[6]
                 #thicknesses.append(t)
@@ -178,10 +178,10 @@ class Tank:
             plt.legend()
             plt.show()
             '''
-            return t_min, np.rad2deg(alpha)
+            return t_min, alpha
         else:
             t = (P_test * self.R_in / self.mat_property[1]) * np.sqrt(3)/2
-            return t, np.rad2deg(alpha)
+            return t, alpha
 
     # ------------------------------------------------ Vacuum and Outer tank  ---------------------------------------------------
 
