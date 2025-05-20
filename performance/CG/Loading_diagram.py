@@ -3,183 +3,91 @@ import matplotlib.pyplot as plt
 import os
 
 '''Reference Data'''
-OEW = 13600             # kg
-X_OEW = 12.25           # m
-X_LEMAC = 11.242        # m
-MAC = 2.303             # m
+OEW =              # kg
+X_OEW =            # m
 
-# Front cargo
-XCG_fc = 4.29           # m
-XCG_rc = 21.49          # m
-
-# Rear cargo
-W_fc = 560 * (4.6/9.4)
-W_rc = 560 * (4.8/9.4)
+# Cargo
+X_c =             # m
+W_c =               # kg
 
 # Passengers
-W_seat_value = 95       # kg
-num_seats = 72          # seats
-X_most_forward_seat = 6.71 # m
-X_most_aft_seat = 18.71 # m
+W_s = 84            # kg
+num_seats = 19               # seats
+X_most_forward_seat = 4.8375 # m
+seat_spacing = 0.7525  # m
 
 # Fuel
-W_fuel = 2000           # kg
-XCG_fuel = 12.068       # m
-
-'''Modified Aircraft Data'''
-OEW_with_Batt_new = 14219.1       # kg
-X_OEW_with_Batt_new = 12.71 # 13.56       # m
-X_LEMAC_new = 11.242 # 12.580    # m
-MAC_new = 2.303        # m
-
-# Front cargo
-XCG_fc_new = 4.29       # m
-W_fc_new = 436 * (4.6/9.4) # kg
-
-# Rear cargo
-XCG_rc_new = 21.49      # m
-W_rc_new = 436 * (4.8/9.4) # kg
-
-# Passengers
-W_seat_value_new = 95   # kg
-num_seats_new = 56      # seats
-# seats spread evenly (change if needed)
-X_most_forward_seat_new = 6.71 # m
-X_most_aft_seat_new = 16.71 # m
-
-# Fuel
-W_fuel_new = 3025       # kg
-XCG_fuel_new = 12.068      # m
+W_f = 368.3           # kg
+X_f =        # m
 
 
 '''Function Definitions'''
-def convert_to_MAC_reference(def_X, def_X_LEMAC, def_MAC):
-    return (def_X - def_X_LEMAC)/def_MAC
+def cargo(def_X_c, def_W_c, def_X_OEW, def_OEW):
+
+    W_cargo = def_OEW + def_W_c
+    X_cargo = ((def_X_OEW * def_OEW) + (def_X_c * def_W_c)) / W_cargo
+
+    return X_cargo, W_cargo
 
 
-def convert_to_MAC_reference_inverse(def_X, def_X_LEMAC, def_MAC):
-    return def_X_LEMAC + (def_X * def_MAC)
+def passengers(def_X_cargo, def_W_cargo, def_W_seat, def_num_seats, def_X_most_forward_seat, def_seat_spacing):
 
+    X_start = def_X_cargo
+    W_start = def_W_cargo
+    num_rows = (def_num_seats - 1) // 2
 
-def cargo(def_XCG_fc, def_W_fc, def_XCG_rc, def_W_rc, def_X_OEW, def_OEW, def_X_LEMAC, def_MAC):
+    # Front to back
+    X_seat_front = np.zeros(num_rows)
+    W_seat_front = np.zeros(num_rows)
+    X_seat_front[0] = X_start
+    W_seat_front[0] = W_start
 
-    # Only front
-    XCG_FW = ((def_X_OEW * def_OEW) + (def_XCG_fc * def_W_fc)) / (def_OEW + def_W_fc)
-    W_OEW_fc = def_OEW + def_W_fc
+    for i in range(1, num_rows + 1):
+        W_seat_front[i] = W_seat_front[i - 1] + (2 * def_W_seat)
+        X_seat_front[i] = (((def_X_most_forward_seat + (i * def_seat_spacing)) * 2 * def_W_seat) + 
+                    (X_seat_front[i - 1] * W_seat_front[i - 1])) / W_seat_front[i]
 
-    # Only rear
-    XCG_RW = ((def_X_OEW * def_OEW) + (def_XCG_rc * def_W_rc)) / (def_OEW + def_W_rc)
-    W_OEW_rc = def_OEW + def_W_rc
-
-    # Combined
-    XCG_CW = ((def_X_OEW * def_OEW) + (def_XCG_fc * def_W_fc) + (def_XCG_rc * def_W_rc)) / (def_OEW + def_W_fc + def_W_rc)
-    W_OEW_c = def_OEW + def_W_fc + def_W_rc
-
-    X_cargo = [def_X_OEW, XCG_FW, XCG_RW, XCG_CW]
-    for i in range(len(X_cargo)):
-        X_cargo[i] = convert_to_MAC_reference(X_cargo[i], def_X_LEMAC, def_MAC)
-    W_cargo = [def_OEW, W_OEW_fc, W_OEW_rc, W_OEW_c]
-    
-    return X_cargo, W_cargo, XCG_CW
-
-
-def passengers(def_XCG_CW, def_W_OEW_c, def_W_seat_value, def_num_seats, def_X_most_forward_seat, def_X_most_aft_seat, def_X_LEMAC, def_MAC):
-
-    # Window seats
-    X_start = def_XCG_CW 
-    W_start = def_W_OEW_c
-    num_rows = (def_num_seats // 4) + 1
-    seat_spacing = (def_X_most_aft_seat - def_X_most_forward_seat) / (num_rows) # m
-
-    # Front to back window seats
-    X_seat = np.zeros(num_rows)
-    W_seat = np.zeros(num_rows)
-    X_seat[0] = X_start
-    W_seat[0] = W_start
-    for i in range(1, num_rows):
-        W_seat[i] = W_seat[i - 1] + (2 * def_W_seat_value)
-        X_seat[i] = (((X_most_forward_seat + (i * seat_spacing)) * 2 * def_W_seat_value) + 
-                    (X_seat[i - 1] * W_seat[i - 1])) / (2 * def_W_seat_value + W_seat[i - 1])
-
-    for i in range(len(X_seat)):
-        X_seat[i] = convert_to_MAC_reference(X_seat[i], def_X_LEMAC, def_MAC)
-
-    # Back to front window seats
+    # Back to front
     X_seat_back = np.zeros(num_rows)
     W_seat_back = np.zeros(num_rows)
     X_seat_back[0] = X_start
     W_seat_back[0] = W_start
-    for i in range(1, num_rows):
-        W_seat_back[i] = W_seat_back[i - 1] + (2 * def_W_seat_value)
-        X_seat_back[i] = (((def_X_most_aft_seat - (i * seat_spacing)) * 2 * def_W_seat_value) + 
-                        (X_seat_back[i - 1] * W_seat_back[i - 1])) / (2 * def_W_seat_value + W_seat_back[i - 1])
 
-    for i in range(len(X_seat_back)):
-        X_seat_back[i] = convert_to_MAC_reference(X_seat_back[i], def_X_LEMAC, def_MAC)
+    for i in range(1, num_rows + 1):
+        W_seat_back[i] = W_seat_back[i - 1] + (2 * def_W_seat)
+        X_seat_back[i] = (((def_X_most_forward_seat - (i * seat_spacing)) * 2 * def_W_seat) + 
+                        (X_seat_back[i - 1] * W_seat_back[i - 1])) / W_seat_back[i]
 
-    # Aisle seats
-    X_start = convert_to_MAC_reference_inverse(X_seat[-1], def_X_LEMAC, def_MAC)
-    W_start = W_seat[-1]
-
-    # Front to back aisle seats
-    X_seat_aisle = np.zeros(num_rows)
-    W_seat_aisle = np.zeros(num_rows)
-    X_seat_aisle[0] = X_start
-    W_seat_aisle[0] = W_start
-    for i in range(1, num_rows):
-        W_seat_aisle[i] = W_seat_aisle[i - 1] + (2 * def_W_seat_value)
-        X_seat_aisle[i] = (((def_X_most_forward_seat + (i * seat_spacing)) * 2 * def_W_seat_value) + 
-                        (X_seat_aisle[i - 1] * W_seat_aisle[i - 1])) / (2 * def_W_seat_value + W_seat_aisle[i - 1])
-
-    for i in range(len(X_seat_aisle)):
-        X_seat_aisle[i] = convert_to_MAC_reference(X_seat_aisle[i], def_X_LEMAC, def_MAC)
-
-    X_start = convert_to_MAC_reference_inverse(X_seat_back[-1], def_X_LEMAC, def_MAC)
-
-    # Back to front aisle seats
-    X_seat_back_aisle = np.zeros(num_rows)
-    W_seat_back_aisle = np.zeros(num_rows)
-    X_seat_back_aisle[0] = X_start
-    W_seat_back_aisle[0] = W_start
-    for i in range(1, num_rows):
-        W_seat_back_aisle[i] = W_seat_back_aisle[i - 1] + (2 * def_W_seat_value)
-        X_seat_back_aisle[i] = (((def_X_most_aft_seat - (i * seat_spacing)) * 2 * def_W_seat_value) + 
-                                (X_seat_back_aisle[i - 1] * W_seat_back_aisle[i - 1])) / (2 * def_W_seat_value + W_seat_back_aisle[i - 1])
-
-    for i in range(len(X_seat_back)):
-        X_seat_back_aisle[i] = convert_to_MAC_reference(X_seat_back_aisle[i], def_X_LEMAC, def_MAC)
-
-    # returning: front to back window, back to front window, front to back aisle, back to front aisle
-    return X_seat, W_seat, X_seat_back, W_seat_back, X_seat_aisle, W_seat_aisle, X_seat_back_aisle, W_seat_back_aisle
+    # returning: front to back, back to front
+    return X_seat_front, W_seat_front, X_seat_back, W_seat_back
 
 
-def fuel(def_X_seat_aisle, def_W_seat_aisle, def_XCG_fuel, def_W_fuel, def_X_LEMAC, def_MAC):
-    X_start = convert_to_MAC_reference_inverse(def_X_seat_aisle[-1], def_X_LEMAC, def_MAC)
-    W_start = def_W_seat_aisle[-1]
+def fuel(def_X_seat_back, def_W_seat_back, def_X_fuel, def_W_fuel):
+    
+    X_start = def_X_seat_back[-1]
+    W_start = def_W_seat_back[-1]
 
     X_fuel = np.zeros(2)
-    W_fuel_value = np.zeros(2)
+    W_fuel = np.zeros(2)
     X_fuel[0] = X_start
-    W_fuel_value[0] = W_start
+    W_fuel[0] = W_start
 
-    W_fuel_value[1] = W_fuel_value[0] + def_W_fuel
-    X_fuel[1] = (((def_XCG_fuel * def_W_fuel) + (X_start * W_start)) / (def_W_fuel + W_start))
-    for i in range(len(X_fuel)):
-        X_fuel[i] = convert_to_MAC_reference(X_fuel[i], def_X_LEMAC, def_MAC)
+    W_fuel[1] = W_start + def_W_fuel
+    X_fuel[1] = ((def_X_fuel * def_W_fuel) + (X_start * W_start)) / W_fuel[1]
 
-    return X_fuel, W_fuel_value
+    return X_fuel, W_fuel
 
 
-def min_max_X_cg_positions(def_X_cargo, def_X_seat, def_X_seat_back, def_X_seat_aisle, def_X_seat_back_aisle, def_X_fuel):
+def min_max_X_cg_positions(def_X_cargo, def_X_seat_front, def_X_seat_back, def_X_fuel):
     # Combine all x_cg positions
-    arrays = [def_X_cargo, def_X_seat, def_X_seat_back, def_X_seat_aisle, def_X_seat_back_aisle, def_X_fuel]
-    array_names = ["X_cargo", "X_seat", "X_seat_back", "X_seat_aisle", "X_seat_back_aisle", "X_fuel"]
+    arrays = [def_X_cargo, def_X_seat_front, def_X_seat_back, def_X_fuel]
+    array_names = ["X_cargo", "X_seat_front", "X_seat_back", "X_fuel"]
 
-    min_cg = np.min(np.hstack([def_X_cargo, def_X_seat, def_X_seat_back, def_X_seat_aisle, def_X_seat_back_aisle, def_X_fuel]))
-    max_cg = np.max(np.hstack([def_X_cargo, def_X_seat, def_X_seat_back, def_X_seat_aisle, def_X_seat_back_aisle, def_X_fuel]))
+    min_cg = np.min(np.hstack([def_X_cargo, def_X_seat_front, def_X_seat_back, def_X_fuel]))
+    max_cg = np.max(np.hstack([def_X_cargo, def_X_seat_front, def_X_seat_back, def_X_fuel]))
 
-    min_index = np.argmin(np.hstack([def_X_cargo, def_X_seat, def_X_seat_back, def_X_seat_aisle, def_X_seat_back_aisle, def_X_fuel]))
-    max_index = np.argmax(np.hstack([def_X_cargo, def_X_seat, def_X_seat_back, def_X_seat_aisle, def_X_seat_back_aisle, def_X_fuel]))
+    min_index = np.argmin(np.hstack([def_X_cargo, def_X_seat_front, def_X_seat_back, def_X_fuel]))
+    max_index = np.argmax(np.hstack([def_X_cargo, def_X_seat_front, def_X_seat_back, def_X_fuel]))
 
     cumulative_lengths = np.cumsum([len(arr) for arr in arrays])
 
@@ -195,33 +103,26 @@ def min_max_X_cg_positions(def_X_cargo, def_X_seat, def_X_seat_back, def_X_seat_
     min_source, min_array_index = find_source_array_and_index(min_index)
     max_source, max_array_index = find_source_array_and_index(max_index)
 
-    print(f"Min value: {min_cg*0.98}, found in {min_source} at index {min_array_index}")
-    print(f"Max value: {max_cg*1.02}, found in {max_source} at index {max_array_index}")
-
-    min_cg_conv = convert_to_MAC_reference_inverse(min_cg*0.98, 11.242, 2.303)
-    max_cg_conv = convert_to_MAC_reference_inverse(max_cg*1.02, 11.242, 2.303)
-    print(f'min val: ', min_cg_conv)
-    print(f'max val: ', max_cg_conv)
+    print(f"Min value with 2% margin: {min_cg*0.98}, found in {min_source} at index {min_array_index}")
+    print(f"Max value with 2% margin: {max_cg*1.02}, found in {max_source} at index {max_array_index}")
 
     return min_cg, max_cg
 
 
 '''Plotting'''
 # Loading diagram of the reference aircraft
-X_cargo, W_cargo, XCG_CW = cargo(XCG_fc, W_fc, XCG_rc, W_rc, X_OEW, OEW, X_LEMAC, MAC)
-W_OEW_c, W_OEW_fc, W_OEW_rc = W_cargo[3], W_cargo[1], W_cargo[2]
-X_seat, W_seat, X_seat_back, W_seat_back, X_seat_aisle, W_seat_aisle, X_seat_back_aisle, W_seat_back_aisle = passengers(XCG_CW, W_OEW_c, W_seat_value, num_seats, X_most_forward_seat, X_most_aft_seat, X_LEMAC, MAC)
-X_fuel, W_fuel_value = fuel(X_seat_aisle, W_seat_aisle, XCG_fuel, W_fuel, X_LEMAC, MAC)
-min_cg, max_cg = min_max_X_cg_positions(X_cargo, X_seat, X_seat_back, X_seat_aisle, X_seat_back_aisle, X_fuel)
+X_cargo, W_cargo = cargo(X_c, W_c, X_OEW, OEW)
+X_seat_front, W_seat_front, X_seat_back, W_seat_back = passengers(X_cargo, W_cargo, W_s, num_seats, X_most_forward_seat, seat_spacing)
+X_fuel, W_fuel = fuel(X_seat_back, W_seat_back, X_f, W_f)
+min_cg, max_cg = min_max_X_cg_positions(X_cargo, X_seat_front, X_seat_back, X_fuel)
 
-print(f'OEW CG: ', X_OEW, convert_to_MAC_reference_inverse(X_OEW, X_LEMAC, MAC))
-print(f'Front cargo CG: ', X_cargo[1], convert_to_MAC_reference_inverse(X_cargo[1], X_LEMAC, MAC))
-print(f'Rear cargo CG: ', X_cargo[2], convert_to_MAC_reference_inverse(X_cargo[2], X_LEMAC, MAC))
-print(f'Fuel CG: ', X_fuel[-1], convert_to_MAC_reference_inverse(X_fuel[-1], X_LEMAC, MAC))
+print(f'OEW CG: ', X_OEW)
+print(f'Cargo CG: ', X_cargo)
+print(f'Fuel CG: ', X_fuel[-1])
 
 plt.figure(figsize=(8, 6))
 plt.scatter(X_cargo, W_cargo, color='blue', label="Cargo")
-plt.scatter(X_seat, W_seat, color='red', label="Window Passengers Front to Back")
+plt.scatter(X_seat_front, W_seat_front, color='red', label="Window Passengers Front to Back")
 plt.scatter(X_seat_back, W_seat_back, color='green', label="Window Passengers Back to Front")
 plt.scatter(X_seat_aisle, W_seat_aisle, color='orange', label="Aisle Passengers Front to Back")
 plt.scatter(X_seat_back_aisle, W_seat_back_aisle, color='purple', label="Aisle Passengers Back to Front")
