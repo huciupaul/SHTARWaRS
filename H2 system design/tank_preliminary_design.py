@@ -58,7 +58,7 @@ class Tank:
         self.x0 = self.mg0/(self.mg0+self.ml0) #unitless (vapor quality)
 
         # ---------------------------------------------- Constraint ---------------------------------------------------
-        self.R_in = 0.7 #m
+        self.R_in = 0.75 #m
         self.Q_leak_min = 10 #W (determined from Nicolas's thesis)
         self.Q_leak_max = 1000 #W (determined from Nicolas's thesis)
         
@@ -273,8 +273,9 @@ class Tank:
     # ------------------------------------------------ Tank Dimensions ---------------------------------------------------
     def total_volume(self, l,dv,t1,t2,t_mli):
         R_out = self.R_in + dv +t1 +t2 +t_mli
-        V = np.pi * R_out**2 * (l-2*self.R_in) + (4/3) * np.pi * R_out**3
-        return V
+        L_out = 2*R_out + l
+        V = np.pi * R_out**2 * (l) + (4/3) * np.pi * R_out**3
+        return V, L_out,R_out
     
     def total_mass(self, l, dv, t1, t2,t_mli,dens_mli):
         R_out = self.R_in + dv +t1 +t2 +t_mli
@@ -315,6 +316,7 @@ mat_properties = [[2800,495*1e6*SF,134,0.11,7.795,106,0],
 #MAWPS = [600000,650000,800000,1000000,1200000,1280000] #bar to Pa
 MAWP = 1200000
 P_vents = [300000, 400000, 500000, 600000,700000,800000,900000,1000000]
+P_vents = [500000,600000]
 
 n_mats = 5
 n_vent = len(P_vents)
@@ -333,7 +335,7 @@ co2_kevlar = 13.1 #kg/kg (Kevlar 149)
 kevlar_ee = 257 #MJ/kg (Embodied Energy for Kevlar 149)
 
 #Our values
-mass_h2 = 368.3 #kg
+mass_h2 = 309.2288 #kg
 estimated_mass = mass_h2/grav_idx - mass_h2
 t_limit = 0.001 #m (minimum thickness of the tank wall)
 
@@ -390,18 +392,18 @@ def compute_tank(material, material2, mat_property, MAWP,mass_h2, Q_str,mat2_pro
     t1, ang1_w = tankh2.inner_tank_thickness()
     if t1 < t_limit:
         t1 = t_limit
-
-    dv, t2, ang2_w, Qleak, Qcond, Qrad = tankh2.heat_influx(L_in, Q_str,t1,emis_mli,k_vac,t_mli,k_mli,Qmax, N_MLI,t1)
+    L_cyl = L_in - 2 * tankh2.R_in
+    dv, t2, ang2_w, Qleak, Qcond, Qrad = tankh2.heat_influx(L_cyl, Q_str,t1,emis_mli,k_vac,t_mli,k_mli,Qmax, N_MLI,t1)
     dv_list.append(dv)
     t2 = max(t2,t_limit)
     t20 = t2 + 1
     while abs(t2-t20) > 1e-20:
         t20 = t2
-        dv,t2,ang2_w,Qleak,Qcond,Qrad = tankh2.heat_influx(L_in, Q_str,t1,emis_mli,k_vac,t_mli,k_mli,Qmax, N_MLI,t20)
+        dv,t2,ang2_w,Qleak,Qcond,Qrad = tankh2.heat_influx(L_cyl, Q_str,t1,emis_mli,k_vac,t_mli,k_mli,Qmax, N_MLI,t20)
         dv_list.append(dv)
         t2 = max(t2,t_limit)
 
-    Vt = tankh2.total_volume(L_in, dv,t1,t2,t_mli)
+    Vt,L_out,R_out = tankh2.total_volume(L_cyl, dv,t1,t2,t_mli)
     mass_inner,mass_outer,mass_mli = tankh2.total_mass(L_in, dv, t1, t2,t_mli,dens_mli) 
     Mt = mass_inner + mass_outer + mass_mli + mass_h2
     Mt += str_mass
@@ -411,12 +413,12 @@ def compute_tank(material, material2, mat_property, MAWP,mass_h2, Q_str,mat2_pro
     co2_kg = tankh2.kg_co2(mass_inner,mass_outer,mass_mli,str_mass,mli_co2,co2_kevlar)
     embodied_energy = tankh2.embodied_energy(mass_inner,mass_outer,mass_mli,str_mass,kevlar_ee,mli_ee)
 
-    return Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in, Vh2,tankh2.R_in, co2_kg, embodied_energy, ang1_w, ang2_w, P_vent,Qleak, Qcond, Qrad, dv_list
+    return Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in, Vh2,tankh2.R_in, co2_kg, embodied_energy, ang1_w, ang2_w, P_vent,Qleak, Qcond, Qrad, dv_list, L_out, R_out
 
 # ------------------------------------------------- Main ------------------------------------------------------
 
-RUN = False #Run new design
-OPEN = True #Open previous design
+RUN = True #Run new design
+OPEN = False #Open previous design
 
 plot_mats = []
 plot_mats2 = []
@@ -433,6 +435,7 @@ plot_dv = []
 if RUN:
     for P_vent in P_vents:
         V_in, fill_ratio = fA(mass_h2, P_vent)
+        V_in = V_in
         Qmax = compute_Qleak(materials[0], materials[0], mat_properties[0], MAWP,mass_h2,0,mat_properties[0],0,fill_ratio,V_in, P_vent)
         for material, mat_property in zip(materials, mat_properties):
             for material2, mat2_property in zip(materials, mat_properties):
@@ -443,7 +446,7 @@ if RUN:
                 ratio = og_str_mass / (og_tank_mass+og_lh2)
                 str_mass = estimated_mass * ratio
                 Q_str = Q_og_str * np.sqrt(ratio/ratio) #Assuming Volume increase with the same ratio as the mass
-                Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in,Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w, p_vent, Qleak, Qcond, Qrad, dv_list = compute_tank(material, material2, mat_property, MAWP,mass_h2,Q_str,mat2_property,str_mass,fill_ratio,V_in, P_vent,Qmax)
+                Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in,Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w, p_vent, Qleak, Qcond, Qrad, dv_list, L_out, R_out = compute_tank(material, material2, mat_property, MAWP,mass_h2,Q_str,mat2_property,str_mass,fill_ratio,V_in, P_vent,Qmax)
                 print(f"Material In: {material}, Material Out: {material2}, MAWP: {MAWP} Pa, P_vent:{P_vent}")
                 print(f"Tank Volume: {Vt:.4f} m^3")
                 print(f"Tank Mass: {Mt:.4f} kg")
@@ -476,9 +479,9 @@ if RUN:
                         writer.writerow(['Material Inner', 'Material Outer', 'MAWP (Pa)', 'Tank Volume (m^3)', 
                                         'Tank Mass (kg)', 'Mass Error (kg)',
                                         'Inner Tank Thickness (m)', 'Outer Tank Thickness (m)', 
-                                        'Vacuum Gap (m)', 'Inner Tank Length (m)', 'Vh2 (m^3)','R_in (m)','CO2 (kg)','Embodied Energy (MJ)','Angle of winding inner','Angle of winding outer', 'P_vent','Qleak', 'Q_cond', 'Q_rad', 'dv_list'])
+                                        'Vacuum Gap (m)', 'Inner Tank Length (m)', 'Vh2 (m^3)','R_in (m)','CO2 (kg)','Embodied Energy (MJ)','Angle of winding inner','Angle of winding outer', 'P_vent','Qleak', 'Q_cond', 'Q_rad', 'dv_list', 'Outer Tank Length (m)', 'Outer Tank Radius (m)'])
                     # Write data
-                    writer.writerow([material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w,p_vent,Qleak, Qcond, Qrad, dv_list])
+                    writer.writerow([material, material2, MAWP, Vt, Mt, mass_error, t1, t2, dv, L_in, Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w,p_vent,Qleak, Qcond, Qrad, dv_list,L_out, R_out])
 
 
 if OPEN:
@@ -519,9 +522,9 @@ if plot1:
         if x_values and y_values:
             plt.plot(x_values, y_values, label=label, color=color, marker=marker, linestyle='-')
 
-    plt.xlabel("P_vent (Pa)")
-    plt.ylabel("Tank Volume (m^3)")
-    plt.title("Tank Volume vs P_vent")
+    plt.xlabel("$P_{vent}$ (Pa)")
+    plt.ylabel("Tank Volume ($m^3$)")
+    plt.title("Tank Volume vs $P_{vent}$")
     plt.subplots_adjust(left=0.1, right=0.6, wspace=0.3)
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
     plt.show()
@@ -563,11 +566,11 @@ if plot2:
                 marker=marker
             )
 
-    plt.xlabel(r"$\eta_g$")
     plt.ylabel(r"$\eta_v$")
+    plt.xlabel(r"$\eta_g$")
     plt.xlim(0, 1)
     plt.ylim(0, 1)
-    plt.title(r"$\eta_g$ vs $\eta_v$")
+    plt.title(r"$\eta_v$ vs $\eta_g$")
 
     color_handles = [
         mlines.Line2D([], [], color=color_map[comb], marker='o', linestyle='None', markersize=8, label=f"{comb[0]}-{comb[1]}")
@@ -582,7 +585,8 @@ if plot2:
     ]
     legend2 = plt.legend(handles=marker_handles, title="P_vent (Bar)", loc='upper left', bbox_to_anchor=(1.01, 0.2), frameon=False, fontsize='x-small', title_fontsize='small')
     plt.gca().add_artist(legend2)
-
+    plt.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
+    
     plt.subplots_adjust(left=0.1, right=0.55, wspace=0.3, top=0.85, bottom=0.15)
     plt.show()
 
@@ -611,7 +615,7 @@ if plot3:
             idx = i + j * n_combinations
             marker = marker_map[pvent]
             eta_g = mass_h2 / plot_masses[idx]
-            eta_v = plot_vh2[idx] / plot_volumes[idx]
+            eta_v = plot_vh2[0] / plot_volumes[idx]
             metric = eta_g * eta_v
             # Plot kg of CO2 vs metric
             ax1.scatter(
