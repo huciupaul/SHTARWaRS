@@ -1,4 +1,5 @@
 import cantera as ct
+ct.suppress_thermo_warnings()
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 from tqdm import tqdm
@@ -18,8 +19,8 @@ MECH = 'gri30.yaml'  # Mechanism for H2 combustion with NOx
 # Rich zone exhaust mix
 mdot_rich_ex = 0.23071218802678672  # kg/s
 X_rich_ex = "N2:0.27396853378378067, H2:0.5784925158354742, H:0.0005133907896591396, O2:7.393652373124469e-10, O:4.591482831748451e-09, H2O:0.14701811528905126, OH:7.430992453322465e-06, H2O2:1.1742925935728515e-10, HO2:3.6285427485688574e-12, NO:5.4364866743951985e-09, N2O:9.901157119223157e-12, N:4.953608429224339e-12, NH:1.4251848100599631e-11, NNH:1.977256219409285e-09, NH2:4.148258601540983e-10"
-T_rich_ex = 703.0     # K
-P_rich_ex = 12.1 * ct.one_atm     # Pa
+T_rich_ex = 734.22      # K
+P_rich_ex = 12.1 * 1e5  # Pa
 
 # Air
 mdot_air_tot = 4.635545784891179     # kg/s
@@ -35,10 +36,10 @@ T_air = 603.0  #  K
 # Water
 mdot_h2o = np.arange(0, 0.26, 1e-2) # kg/s
 X_h2o = "H2O:1"
-T_h2o = 750.0  # K
+T_h2o = 333.0  # K
 
 # Total time for mixing
-t_mix_tot = np.arange(0, 1.01, 1e-2)  # seconds
+t_mix_tot = np.arange(0.01, 1.01, 1e-2)  # seconds
 
 #----------Outputs----------
 times_to_mix = []
@@ -54,8 +55,8 @@ for t_end in tqdm(t_mix_tot):
             t = 0.0
             dt = 1e-2
             NOx_tot = 0.0
-            m_air2_step = mdot_air2_i * (t_end / dt)
-            m_h2o_step = mdot_h2o_i * (t_end / dt)
+            m_air2_step = mdot_air2_i * (dt / t_end)
+            m_h2o_step = mdot_h2o_i * (dt / t_end)
 
             # Create three separate gas objects for each stream to avoid overwriting state
             gas_rich_ex = ct.Solution(MECH)
@@ -68,6 +69,7 @@ for t_end in tqdm(t_mix_tot):
 
             gas_h2o = ct.Solution(MECH)
             gas_h2o.TPX = T_h2o, P_rich_ex, X_h2o
+            gas_h2o.HP = gas_h2o.enthalpy_mass + 1.9871*1e6, P_rich_ex
             stream3 = ct.Quantity(gas_h2o, mass=m_h2o_step)
 
             while t <= t_end and NOx_tot <= NOx_limit:
