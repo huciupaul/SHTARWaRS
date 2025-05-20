@@ -58,7 +58,7 @@ class Tank:
         self.x0 = self.mg0/(self.mg0+self.ml0) #unitless (vapor quality)
 
         # ---------------------------------------------- Constraint ---------------------------------------------------
-        self.R_in = 0.8 #m
+        self.R_in = 0.7 #m
         self.Q_leak_min = 10 #W (determined from Nicolas's thesis)
         self.Q_leak_max = 1000 #W (determined from Nicolas's thesis)
         
@@ -314,10 +314,10 @@ mat_properties = [[2800,495*1e6*SF,134,0.11,7.795,106,0],
                   [7970,257.5*1e6*SF,15,0.35,4.265,49.75,0]]
 #MAWPS = [600000,650000,800000,1000000,1200000,1280000] #bar to Pa
 MAWP = 1200000
-P_vents = [600000,700000,800000,900000,1000000]
+P_vents = [300000, 400000, 500000, 600000,700000,800000,900000,1000000]
 
 n_mats = 5
-n_vent = 2
+n_vent = len(P_vents)
 materials = materials[:n_mats]
 mat_properties = mat_properties[:n_mats]
 P_vents = P_vents[:n_vent]
@@ -333,7 +333,7 @@ co2_kevlar = 13.1 #kg/kg (Kevlar 149)
 kevlar_ee = 257 #MJ/kg (Embodied Energy for Kevlar 149)
 
 #Our values
-mass_h2 = 339.1 #kg
+mass_h2 = 368.3 #kg
 estimated_mass = mass_h2/grav_idx - mass_h2
 t_limit = 0.001 #m (minimum thickness of the tank wall)
 
@@ -499,10 +499,10 @@ if OPEN:
             plot_dv.append(row[20])
 
 # ------------------------------------------------- Plotting ------------------------------------------------------
-plot1 = False
+plot1 = True
 plot2 = True
-plot3 = False
-plot4 = False
+plot3 = True
+plot4 = True
 
 if plot1:
     plt.figure(figsize=(10, 6))
@@ -557,7 +557,7 @@ if plot2:
             marker = marker_map[pvent]
             plt.scatter(
                 mass_h2 / plot_masses[idx],
-                plot_vh2[idx] / plot_volumes[idx],
+                plot_vh2[0] / plot_volumes[idx],
                 label=f"{material}-{material2}-PVENT={pvent/100000} Bar",
                 color=color,
                 marker=marker
@@ -671,7 +671,7 @@ if plot4:
     plt.show()
 
 #-------------------------------------------------- Draw Tank ---------------------------------------------------
-draw_best = False 
+draw_best = True 
 draw_all = False	
 
 best_metric = 0
