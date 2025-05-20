@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 
 # Local imports
-from common.constants import MAXC, G_0, A_inlet
+from common.constants import MAXC, G_0
 from common.atmosphere import isa_atmosphere
 from turboprop import Turboprop
 
@@ -361,22 +361,19 @@ class FlightMission:
         for pp, sl in self.__pp_slices(phase_arr, time_arr):
             if pp.power is not None:
                 # Powerpoint with power
-                Pr_arr[sl] = pp.power*self.ac.MAXC
-                # Propulsive efficiency
-                Th = Pr_arr[sl]/V_arr[sl]
+                Pa_arr[sl] = pp.power*self.ac.MAXC
                 
                 # Fuel mass flow using Torenbeek method (PSFC)
-                mdot_fuel_arr[sl], eta_th_arr[sl], eta_prop_arr[sl] = self.ac.eng.compute(
-                    T_arr[sl], P_arr[sl], rho_arr[sl], V_arr[sl], R_LHV=self.R_LHV, Pr=Pr_arr[sl]
+                mdot_fuel_arr[sl], eta_th_arr[sl], eta_prop_arr[sl], mdot_air_arr[sl] = self.ac.eng.compute(
+                    T_arr[sl], P_arr[sl], rho_arr[sl], V_arr[sl], R_LHV=self.R_LHV, Pa=Pa_arr[sl]
                 )
                 
-                # Available power
-                Pa_arr[sl] = Pr_arr[sl]/eta_prop_arr[sl]
+                # Required power
+                Pr_arr[sl] = Pa_arr[sl] * eta_prop_arr[sl]
                 
                 m_start = m_arr[sl.start - 1] if sl.start > 0 else self.ac.MTOW
                 burn = np.cumsum(mdot_fuel_arr[sl]) * self.dt          # cumulative fuel burnt _within_ slice
                 m_arr[sl] = m_start - np.concatenate(([0.0], burn[:-1]))
-                mdot_air_arr[sl] = rho_arr[sl] * V_arr[sl] * A_inlet
         
             else:
                 # Compute power from drag balance
@@ -395,8 +392,8 @@ class FlightMission:
                     m_curr = m_arr[i]
                     Pr = self.__drag_balance(m_curr, rho_arr[i], V_arr[i])                                
                     
-                    mdot_fuel, eta_th, eta_prop = self.ac.eng.compute(
-                        T_arr[i], P_arr[i], rho_arr[i], V_arr[i]
+                    mdot_fuel, eta_th, eta_prop, mdot_air = self.ac.eng.compute(
+                        T_arr[i], P_arr[i], rho_arr[i], V_arr[i], R_LHV=self.R_LHV, Pr=Pr
                     )
                     
                     Pa = Pr/eta_prop
@@ -406,7 +403,7 @@ class FlightMission:
                     Pr_arr[i] = Pr
                     Pa_arr[i] = Pa
                     mdot_fuel_arr[i] = mdot_fuel
-                    mdot_air_arr[i] = rho_arr[i] * V_arr[i] * A_inlet
+                    mdot_air_arr[i] = mdot_air
                     eta_th_arr[i] = eta_th
                     eta_prop_arr[i] = eta_prop     
 
@@ -457,9 +454,9 @@ if __name__ == "__main__":
         Waypoint("takeoff", 0.0, 54.0167, 797 / 60),
         Waypoint("climb1", 2_438.4, 61.73333, 797 / 60),
         Waypoint("climb2", 4_876.8, 61.73333, 797 / 60),
-        Waypoint("cruise", 7_620.0, 142.501, 0.0),
-        Waypoint("descent1", 7_620.0, 142.501, -7.62),
-        Waypoint("hold", 450.0, 102.88889, 0.0, hold_time=45 * 60, nominal=True),
+        Waypoint("cruise", 7_620.0, 133.755556, 0.0),
+        Waypoint("descent1", 7_620.0, 133.755556, -7.62),
+        Waypoint("hold", 450.0, 102.88889, 0.0, hold_time=45 * 60, nominal=False),
         Waypoint("descent2", 450.0, 102.88889, -7.62),
         Waypoint("approach", 304.8, 60.2, -3.1506),
         Waypoint("taxi\\landing", 0.0, 8.231111, 0.0, hold_time=10 * 60),
@@ -478,6 +475,8 @@ if __name__ == "__main__":
     
     turboprop_JA1 = Turboprop(
         name="PT6A-67D",
+        delta_mdot=4.9895161-4.5359237,
+        mdot_min=4.5359237,
         eta_in=1,
         PI_comp=12.0,
         eta_comp=0.85,
@@ -495,6 +494,8 @@ if __name__ == "__main__":
     
     turboprop_H2 = Turboprop(
         name="PT6A-67D-H2",
+        delta_mdot=4.9895161-4.5359237,
+        mdot_min=4.5359237,
         eta_in=1,
         PI_comp=12.0,
         eta_comp=0.85,
@@ -514,7 +515,7 @@ if __name__ == "__main__":
         name="Beechcraft 1900D",
         wing_area=28.79,
         wing_span=17.64,
-        CD0=0.0215,
+        CD0=0.024,
         prop_diameter=2.78,
         eng=turboprop_JA1,
         MTOW=7_765.0,
@@ -524,22 +525,23 @@ if __name__ == "__main__":
         name="Beechcraft 1900D-H2",
         wing_area=28.79,
         wing_span=17.64,
-        CD0=0.023,
+        CD0=0.024*1.17, # Literature increase due to heat exchangers
         prop_diameter=2.78,
         eng=turboprop_H2,
-        MTOW=7_765.0,
+        MTOW=8037.6,
     )
 
-    mission_JA1 = FlightMission(ac_model_JA1, wps, pws, R_LHV=1.0, dt=0.5, total_range_m=2_368e3)
+    mission_JA1 = FlightMission(ac_model_JA1, wps, pws, R_LHV=1.0, dt=0.1, total_range_m=2315e3)
     # mission_H2_dummy = FlightMission(ac_model_H2, wps, pws, dt=0.5, total_range_m=1311e3)
-    mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=0.5, total_range_m=707e3)
+    mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=0.1, total_range_m=707e3)
     m_start = mission_JA1.profile['mass'][0]
     m_fin = mission_JA1.profile['mass'][-1]
+    burn_JA1 = m_start - m_fin
     print(f"Aircraft: {ac_model_JA1.name}")
     print(f"Engine: {ac_model_JA1.eng.name}")
     print(f"Initial mass: {m_start:.1f} kg")
     print(f"Final mass: {m_fin:.1f} kg")
-    print(f"Fuel burn: {m_start - m_fin:.1f} kg")
+    print(f"Fuel burn: {burn_JA1:.1f} kg")
         
     # m_H2_cc = mass_adjustment(mission_JA1.profile['mdot_fuel'], mission_JA1.profile['time'], 
     #                     ac_model_JA1.eng.LHV_fuel/ac_model_H2.eng.LHV_fuel,
@@ -554,11 +556,11 @@ if __name__ == "__main__":
     # # print(np.min(mission_JA1.profile['mdot_air'])/2, np.max(mission_JA1.profile['mdot_air'])/2)
     m_start = mission_H2.profile['mass'][0]
     m_fin = mission_H2.profile['mass'][-1]
-    burn_cc = m_start - m_fin
+    burn_cc = (m_start - m_fin)*2022/burn_JA1
     
     R_eta_th = mission_H2.profile['eta_th']/0.7
     burn_fc = mass_adjustment(mission_H2.profile['mdot_fuel'], mission_H2.profile['time'],
-                        1, R_eta_th)
+                        1, R_eta_th)*2022/burn_JA1
     
     print("----")
     print(f"Aircraft: {ac_model_H2.name}")
@@ -567,6 +569,68 @@ if __name__ == "__main__":
     print(f"Final mass: {m_fin:.1f} kg")
     print(f"Fuel burn (CC only): {burn_cc:.1f} kg")
     print(f"Fuel burn (FC only): {burn_fc:.1f} kg")
+    
+    # Get cruise power data
+    cruise_mask_JA1 = mission_JA1.profile["phase"] == "cruise"
+    cruise_power_JA1 = mission_JA1.profile["Pa"][cruise_mask_JA1]
+    
+    max_cruise_power_JA1 = np.max(cruise_power_JA1)
+    
+
+    cruise_mask_H2 = mission_H2.profile["phase"] == "cruise"
+    cruise_power_H2 = mission_H2.profile["Pa"][cruise_mask_H2]
+    max_cruise_power_H2 = np.max(cruise_power_H2)
+    
+    # Get cruise altitude data
+    cruise_alt_JA1 = mission_JA1.profile["alt"][cruise_mask_JA1]
+    cruise_alt_H2 = mission_H2.profile["alt"][cruise_mask_H2]
+
+    # Calculate average temperature and pressure at cruise
+    T_cruise_JA1, P_cruise_JA1, _, _ = isa_atmosphere(cruise_alt_JA1)
+    T_cruise_H2, P_cruise_H2, _, _ = isa_atmosphere(cruise_alt_H2)
+
+    avg_temp_JA1 = np.mean(T_cruise_JA1)
+    avg_press_JA1 = np.mean(P_cruise_JA1)
+    avg_temp_H2 = np.mean(T_cruise_H2)
+    avg_press_H2 = np.mean(P_cruise_H2)
+
+    print(f"Maximum power available during cruise (JA1): {max_cruise_power_JA1} W [{(max_cruise_power_JA1/MAXC)*100:.3f} % MAXC]")
+    print(f"Maximum power available during cruise (H2): {max_cruise_power_H2} W [{(max_cruise_power_H2/MAXC)*100:.3f} % MAXC]")
+    print(f"Average temperature at cruise: {avg_temp_JA1-273.15:.2f} °C ({avg_temp_JA1:.2f} K)")
+    print(f"Average pressure at cruise: {avg_press_JA1/1000:.2f} kPa")
+    
+    # Calculate average velocities for different flight phases
+    def calc_phase_avg_velocity(mission, phase_names):
+        """Calculate average velocity for specified phases"""
+        mask = np.zeros_like(mission.profile["phase"], dtype=bool)
+        for phase in phase_names:
+            mask = mask | (mission.profile["phase"] == phase)
+        
+        if not np.any(mask):
+            return None
+            
+        return np.mean(mission.profile["V"][mask])
+
+    # Define phase groups
+    climb_phases = ["takeoff", "climb1", "climb2"]
+    cruise_phases = ["cruise"]
+    descent_phases = ["descent1", "descent2", "approach"]
+
+    # Calculate for JA1 mission
+    ja1_climb_avg_v = calc_phase_avg_velocity(mission_JA1, climb_phases)
+    ja1_cruise_avg_v = calc_phase_avg_velocity(mission_JA1, cruise_phases)
+    ja1_descent_avg_v = calc_phase_avg_velocity(mission_JA1, descent_phases)
+
+    # Calculate for H2 mission
+    h2_climb_avg_v = calc_phase_avg_velocity(mission_H2, climb_phases)
+    h2_cruise_avg_v = calc_phase_avg_velocity(mission_H2, cruise_phases)
+    h2_descent_avg_v = calc_phase_avg_velocity(mission_H2, descent_phases)
+
+    # Print results
+    print("\nAverage Velocities:")
+    print(f"  - Climb: {ja1_climb_avg_v:.2f} m/s ({ja1_climb_avg_v*3.6:.2f} km/h)")
+    print(f"  - Cruise: {ja1_cruise_avg_v:.2f} m/s ({ja1_cruise_avg_v*3.6:.2f} km/h)")
+    print(f"  - Descent: {ja1_descent_avg_v:.2f} m/s ({ja1_descent_avg_v*3.6:.2f} km/h)")
     
     mission_JA1.quicklook()
     mission_H2.quicklook()
