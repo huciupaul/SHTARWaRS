@@ -19,7 +19,7 @@ g        = 9.8056
 rho_SL   = 1.225
 
 # Geometry & aero
-C_d_0_orig = 0.024
+C_d_0_orig = 0.023
 AR, e      = 10.808, 0.735809
 k          = 1 / (np.pi * AR * e)
 S          = 28.79                       # [m²]
@@ -104,7 +104,7 @@ MTOW_orig = 7_765   * g
 MTOW_mod  = 8_037.6 * g
 
 cur_orig = constraint_curves(C_d_0_orig,            MTOW_orig)
-cur_mod  = constraint_curves(C_d_0_orig * 1.17,     MTOW_mod)
+cur_mod  = constraint_curves(C_d_0_orig ,     MTOW_mod)
 
 # ------------------------------------------------------------------
 # 6. Plot
@@ -116,11 +116,9 @@ ax.plot(WS, cur_orig["PW_TO"],  label="Take-off",          lw=2)          # blue
 ax.plot(WS, cur_mod["PW_TO"],   label="Take-off (mod)",    lw=2,
         ls=":",   c="blue")
 ax.plot(WS, cur_orig["PW_cr"],  label="Cruise",            lw=2)          # orange
-ax.plot(WS, cur_mod["PW_cr"],   label="Cruise (mod)",      lw=2,
-        ls=":",   c="orange")
+#ax.plot(WS, cur_mod["PW_cr"],   label="Cruise (mod)",      lw=2,ls=":",   c="orange")
 ax.plot(WS, cur_orig["PW_cl"],  label="Climb requirement", lw=2,  c="green")
-ax.plot(WS, cur_mod["PW_cl"],   label="Climb req. (mod)",  lw=2,
-        ls=":",  c="green")
+#ax.plot(WS, cur_mod["PW_cl"],   label="Climb req. (mod)",  lw=2,ls=":",  c="green")
 
 # Vertical limits
 ax.axvline(cur_orig["WS_stall"], c="red",    label="Stall limit")
@@ -145,25 +143,19 @@ ax.fill_between(WS[mask_gain], cur_mod["PW_req"][mask_gain], y_max,
 
 # Additional P/W gap (amber) – only where both designs share W/S
 mask_common = WS <= cur_orig["WS_stall"]
-ax.fill_between(WS[mask_common],
-                cur_orig["PW_req"][mask_common],
-                cur_mod ["PW_req"][mask_common],
-                color="#ffdf8d", alpha=0.45, zorder=0,
-                label="Reduced P/W (mod)")
+#ax.fill_between(WS[mask_common],cur_orig["PW_req"][mask_common],cur_mod ["PW_req"][mask_common],color="#ffdf8d", alpha=0.45, zorder=0,)
 
 # ---------------- Design points ------------------------------------
 # Baseline
 ax.scatter(cur_orig["WS_stall"], cur_orig["PW_stall_int"],
            marker="x", s=100, c="k", lw=2, label="Design pt")
-ax.scatter(cur_orig["WS_x"],     cur_orig["PW_x"],
-           marker="x", s=100, c="k", lw=2)
+#ax.scatter(cur_orig["WS_x"],     cur_orig["PW_x"], marker="x", s=100, c="k", lw=2)
 
 # Modified
 ax.scatter(cur_mod["WS_stall"],  cur_mod["PW_stall_int"],
            marker="o", s=90, facecolors="none", edgecolors="k", lw=1.8,
            label="Design pt (mod)")
-ax.scatter(cur_mod["WS_x"],      cur_mod["PW_x"],
-           marker="o", s=90, facecolors="none", edgecolors="k", lw=1.8)
+ax.scatter(cur_mod["WS_x"],      cur_mod["PW_x"], marker="o", s=90, facecolors="none", edgecolors="k", lw=1.8)
 
 print("Left point", cur_mod["WS_x"], cur_mod["PW_x"])
 print("Right point", cur_mod["WS_stall"], cur_mod["PW_stall_int"])
@@ -172,7 +164,7 @@ print("Right point", cur_mod["WS_stall"], cur_mod["PW_stall_int"])
 ax.set_xlim(WS.min(), WS.max())
 ax.set_ylim(0, y_max)
 ax.set_xlabel("Wing loading  W/S  [N m⁻²]")
-ax.set_ylabel("Power-to-weight  P/W  [W N⁻¹]")
+ax.set_ylabel("Power loading  P/W  [W N⁻¹]")
 ax.grid(True, which="both", ls=":")
 ax.legend(loc="upper right")
 plt.tight_layout()
