@@ -5,8 +5,9 @@ import matplotlib.lines as mlines
 import scipy.optimize as opt
 from scipy.optimize import fsolve
 import csv
-from matplotlib.colors import ListedColormap
 import ast
+import matplotlib.colors as mcolors
+
 
 
 class Tank:
@@ -77,7 +78,7 @@ class Tank:
         Ps = [self.P0]
         time = [0]
         dt = 250 # Time step in seconds
-        # Run the simulation until the pressure reaches the venting pressure
+        # Run the simulation until the pressure reaches the venting pressure [code section extracted from Nicolas's thesis]
         while P[-1]<self.Pvent:
             # Compute derivatives
             delrhog_delP = CP.PropsSI('d(D)/d(P)|T', 'T', T[-1], 'Q', 1, 'ParaHydrogen')
@@ -151,7 +152,7 @@ class Tank:
             #Calc membrane loads
             N_theta_p = P_test * self.R_in
             N_phi_p = P_test * self.R_in / 2
-            self.mat_property[1] = self.mat_property[1] #may add safety factors
+            self.mat_property[1] = self.mat_property[1] #may add safety factors later
             angle = np.arange(1, 54, 0.1) #helical winding angle in degrees
             t_min = 1000
             #thicknesses = []
@@ -190,7 +191,7 @@ class Tank:
         T_amb = 300 # K
         P_amb = 101325 # Pa
         r_in = self.R_in
-        Q_in_max = Qmax
+        Q_in_max = Qmax -Q_str
         k_1 = self.mat_property[2]
         k_2 = self.mat2_property[2]
         eps2 = self.mat2_property[3]
@@ -224,22 +225,16 @@ class Tank:
             else:
                 return (5.670374419e-8 * (T_amb**4 - T_tank**4))/((n_mli+1)/emis_mli) * A1
 
-
-
-        # Total heat influx...
         def total_heat_influx(dv):
             Q_cond_value = Q_cond(dv)
             Q_rad_value = Q_rad(dv)
             return Q_cond_value + Q_rad_value + Q_str
 
-        # Optimization eq...
         def equation(dv):
             return total_heat_influx(dv) - Q_in_max
 
-        # Initial guess for dv
         dv_initial_guess = 0.1  # Initial guess for the vacuum gap thickness (m)
 
-        # Solve for dv...
         dv_solution = fsolve(equation, dv_initial_guess)
 
         dv = dv_solution[0]  # Extract the solution from the array
@@ -316,8 +311,6 @@ mat_properties = [[2800,495*1e6*SF,134,0.11,7.795,106,0],
 #MAWPS = [600000,650000,800000,1000000,1200000,1280000] #bar to Pa
 MAWP = 1200000
 P_vents = [300000, 400000, 500000, 600000,700000,800000,900000,1000000]
-P_vents = [500000,600000]
-
 n_mats = 5
 n_vent = len(P_vents)
 materials = materials[:n_mats]
@@ -335,7 +328,7 @@ co2_kevlar = 13.1 #kg/kg (Kevlar 149)
 kevlar_ee = 257 #MJ/kg (Embodied Energy for Kevlar 149)
 
 #Our values
-mass_h2 = 309.2288 #kg
+mass_h2 = 292.5273  #kg
 estimated_mass = mass_h2/grav_idx - mass_h2
 t_limit = 0.001 #m (minimum thickness of the tank wall)
 
@@ -502,10 +495,10 @@ if OPEN:
             plot_dv.append(row[20])
 
 # ------------------------------------------------- Plotting ------------------------------------------------------
-plot1 = True
-plot2 = True
-plot3 = True
-plot4 = True
+plot1 = False
+plot2 = False
+plot3 = False
+plot4 = False
 
 if plot1:
     plt.figure(figsize=(10, 6))
@@ -517,12 +510,12 @@ if plot1:
         color = colors[idx % len(colors)]
         marker = markers[idx % len(markers)]
         label = f"{material}-{material2}"
-        x_values = [plot_P_vents[k] for k in range(len(plot_P_vents)) if plot_mats[k] == material and plot_mats2[k] == material2]
+        x_values = [plot_P_vents[k]/100000 for k in range(len(plot_P_vents)) if plot_mats[k] == material and plot_mats2[k] == material2]
         y_values = [plot_volumes[k] for k in range(len(plot_volumes)) if plot_mats[k] == material and plot_mats2[k] == material2]
         if x_values and y_values:
             plt.plot(x_values, y_values, label=label, color=color, marker=marker, linestyle='-')
 
-    plt.xlabel("$P_{vent}$ (Pa)")
+    plt.xlabel("$P_{vent}$ (bar)")
     plt.ylabel("Tank Volume ($m^3$)")
     plt.title("Tank Volume vs $P_{vent}$")
     plt.subplots_adjust(left=0.1, right=0.6, wspace=0.3)
@@ -535,18 +528,13 @@ if plot2:
     material_combinations = [(m1, m2) for m1 in materials for m2 in materials]
     n_combinations = len(material_combinations)
 
-    # Generate a list of visually distinct colors for all combinations
-    import matplotlib.colors as mcolors
-    # Use tab20, tab20b, tab20c for up to 60 unique colors
     base_cmaps = [plt.get_cmap('tab20'), plt.get_cmap('tab20b'), plt.get_cmap('tab20c')]
     color_list = []
     for cmap in base_cmaps:
         color_list.extend([cmap(i) for i in range(cmap.N)])
-    # If more combinations than colors, use a color cycle from hsv
     if len(color_list) < n_combinations:
         extra_colors = [mcolors.hsv_to_rgb((i / n_combinations, 0.7, 0.9)) for i in range(n_combinations - len(color_list))]
         color_list.extend(extra_colors)
-    # Truncate to exactly n_combinations
     color_list = color_list[:n_combinations]
 
     color_map = {comb: color_list[idx % len(color_list)] for idx, comb in enumerate(material_combinations)}
@@ -572,9 +560,16 @@ if plot2:
     plt.ylim(0, 1)
     plt.title(r"$\eta_v$ vs $\eta_g$")
 
+    legend_combinations = [
+        ('Carbon Fibre UD (Prepreg)', 'Carbon Fibre UD (Prepreg)'),
+        ('Carbon Fibre UD (Prepreg)', 'G10'),
+        ('G10', 'Carbon Fibre UD (Prepreg)'),
+        ('G10', 'G10'),
+        ('Carbon Fibre UD (Prepreg)', 'Al-7075-T6')
+    ]
     color_handles = [
-        mlines.Line2D([], [], color=color_map[comb], marker='o', linestyle='None', markersize=8, label=f"{comb[0]}-{comb[1]}")
-        for comb in material_combinations
+        mlines.Line2D([], [], color=color_map[comb], marker='o', linestyle='None', markersize=8, label=f"{comb[0]}--{comb[1]}")
+        for comb in legend_combinations
     ]
     legend1 = plt.legend(handles=color_handles, title="Material Combination", loc='upper left', bbox_to_anchor=(1.01, 1), frameon=False, fontsize='x-small', title_fontsize='small')
     plt.gca().add_artist(legend1)
@@ -583,16 +578,30 @@ if plot2:
         mlines.Line2D([], [], color='black', marker=marker, linestyle='None', markersize=8, label=f'P_vent={pvent/100000:.1f} Bar')
         for pvent, marker in marker_map.items()
     ]
-    legend2 = plt.legend(handles=marker_handles, title="P_vent (Bar)", loc='upper left', bbox_to_anchor=(1.01, 0.2), frameon=False, fontsize='x-small', title_fontsize='small')
+    legend2 = plt.legend(handles=marker_handles, title="P_vent (Bar)", loc='upper left', bbox_to_anchor=(1.01, 0.5), frameon=False, fontsize='x-small', title_fontsize='small')
     plt.gca().add_artist(legend2)
     plt.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
-    
+   
+    # Draw iso-material lines (lines joining points with the same material combination)
+    for (material, material2) in material_combinations:
+        color = color_map[(material, material2)]
+        x_vals = []
+        y_vals = []
+        for j, pvent in enumerate(P_vents):
+            idx = material_combinations.index((material, material2)) + j * n_combinations
+            if idx < len(plot_masses):
+                x = mass_h2 / plot_masses[idx]
+                y = plot_vh2[0] / plot_volumes[idx]
+                x_vals.append(x)
+                y_vals.append(y)
+        if len(x_vals) > 1:
+            plt.plot(x_vals, y_vals, color=color, linewidth=1, alpha=0.7, zorder=0)
     plt.subplots_adjust(left=0.1, right=0.55, wspace=0.3, top=0.85, bottom=0.15)
     plt.show()
 
 
 if plot3:
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4.5))  # Smaller and more horizontal
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4.5))
 
     material_combinations = [(m1, m2) for m1 in materials for m2 in materials]
     n_combinations = len(material_combinations)
@@ -639,8 +648,6 @@ if plot3:
     ax2.set_ylabel("Embodied Energy (MJ)")
     ax2.set_title("Embodied Energy vs Metric")
 
-    # Material combination legend (colors)
-    import matplotlib.lines as mlines
     color_handles = [
         mlines.Line2D([], [], color=color_map[comb], marker='o', linestyle='None', markersize=8, label=f"{comb[0]}-{comb[1]}")
         for comb in material_combinations
@@ -648,7 +655,6 @@ if plot3:
     legend1 = ax2.legend(handles=color_handles, title="Material Combination", loc='upper left', bbox_to_anchor=(1.02, 1), frameon=False, fontsize='x-small', title_fontsize='small')
     ax2.add_artist(legend1)
 
-    # P_vent legend (markers)
     marker_handles = [
         mlines.Line2D([], [], color='black', marker=marker, linestyle='None', markersize=8, label=f'P_vent={pvent/100000:.1f} Bar')
         for pvent, marker in marker_map.items()
@@ -677,7 +683,7 @@ if plot4:
 #-------------------------------------------------- Draw Tank ---------------------------------------------------
 draw_best = True 
 draw_all = False	
-
+'''
 best_metric = 0
 for i, (Vt,Mt,Vh2) in enumerate(zip(
     [float(row[3]) for row in csv.reader(open('tank_results.csv')) if row[0] != 'Material Inner'],
@@ -691,6 +697,8 @@ for i, (Vt,Mt,Vh2) in enumerate(zip(
     if metric > best_metric:
         best_metric = metric
         best_idx = i
+'''
+best_idx = 31
     
 if draw_best:
     with open('tank_results.csv', mode='r') as file:
@@ -796,7 +804,6 @@ if draw_best:
 
     # Ensure ax2 plot is square (equal aspect ratio)
     ax2.set_aspect('equal', adjustable='box')
-    # Add overall title
     fig.suptitle(f"Tank Design Visualization", fontsize=16)
 
     # Add subtitles for the cross-section plots
@@ -809,17 +816,16 @@ if draw_best:
     # Add legend to the left of the plots for ax1
     ax1.legend(
         loc='center left',
-        bbox_to_anchor=(-0.85, 0.5),  # Move further left
+        bbox_to_anchor=(-0.85, 0.5),  
         title=(
             f"Tank Details\n"
-            f"Total Volume: {Vt:.4f} m³\n"
-            f"Total Mass: {Mt:.4f} kg\n"
+            f"Total Volume: {Vt:.3f} m³\n"
+            f"Total Mass: {Mt:.3f} kg\n"
             f"Inner Material: {material}\n"
             f"Outer Material: {material2}"
         )
     )
 
-    # Show the figure
     plt.show()
 
 
@@ -922,17 +928,14 @@ if draw_all:
 
         # Ensure ax2 plot is square (equal aspect ratio)
         ax2.set_aspect('equal', adjustable='box')
-        # Add overall title
         fig.suptitle(f"Tank Design Visualization", fontsize=16)
 
         # Add subtitles for the cross-section plots
         ax1.set_title("Top-down Cross-section", fontsize=14)
         ax2.set_title("Side Cross-section", fontsize=14)
 
-        # Adjust the layout to move the graphs slightly to the right
         fig.subplots_adjust(left=0.25, right=0.9, wspace=0.3)
 
-        # Add legend to the left of the plots for ax1
         ax1.legend(
             loc='center left', 
             bbox_to_anchor=(-0.7, 0.5), 
@@ -945,5 +948,4 @@ if draw_all:
             )
         )
 
-        # Show the figure
         plt.show()
