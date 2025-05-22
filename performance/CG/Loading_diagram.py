@@ -122,89 +122,18 @@ print(f'Fuel CG: ', X_fuel[-1])
 
 plt.figure(figsize=(8, 6))
 plt.scatter(X_cargo, W_cargo, color='blue', label="Cargo")
-plt.scatter(X_seat_front, W_seat_front, color='red', label="Window Passengers Front to Back")
-plt.scatter(X_seat_back, W_seat_back, color='green', label="Window Passengers Back to Front")
-plt.scatter(X_seat_aisle, W_seat_aisle, color='orange', label="Aisle Passengers Front to Back")
-plt.scatter(X_seat_back_aisle, W_seat_back_aisle, color='purple', label="Aisle Passengers Back to Front")
-plt.scatter(X_fuel, W_fuel_value, color='black', label="Fuel")
+plt.scatter(X_seat_front, W_seat_front, color='red', label="Passengers Front to Back")
+plt.scatter(X_seat_back, W_seat_back, color='green', label="Passengers Back to Front")
+plt.scatter(X_fuel, W_fuel, color='black', label="Fuel")
 
-plt.plot(X_seat, W_seat, color='red')
+plt.plot(X_seat_front, W_seat_front, color='red')
 plt.plot(X_seat_back, W_seat_back, color='green')
-plt.plot(X_seat_aisle, W_seat_aisle, color='orange')
-plt.plot(X_seat_back_aisle, W_seat_back_aisle, color='purple')
-plt.plot(X_fuel, W_fuel_value, color='black')
+plt.plot(X_fuel, W_fuel, color='black')
+plt.plot([X_OEW, X_cargo], [OEW, W_cargo], 'blue')
 
-plt.plot([X_cargo[0], X_cargo[1]], [OEW, W_OEW_fc], 'b-')  # OEW to Front Cargo
-plt.plot([X_cargo[1], X_cargo[3]], [W_OEW_fc, W_OEW_c], 'b-')  # Front Cargo to Both Cargo
-plt.plot([X_cargo[0], X_cargo[2]], [OEW, W_OEW_rc], 'b-')  # OEW to Rear Cargo
-plt.plot([X_cargo[2], X_cargo[3]], [W_OEW_rc, W_OEW_c], 'b-')  # Rear Cargo to Both Cargo
-
-plt.xlabel("X_cg/MAC [-]")
+plt.xlabel("X_cg [m]")
 plt.ylabel("Weight [kg]")
 plt.title("Aircraft CG Position vs. Weight")
 plt.legend()
 plt.grid(True)
-
-
-# Loading diagram with comparison
-X_cargo_new, W_cargo_new, XCG_CW_new = cargo(XCG_fc_new, W_fc_new, XCG_rc_new, W_rc_new, X_OEW_with_Batt_new, OEW_with_Batt_new, X_LEMAC_new, MAC_new)
-W_OEW_c_new, W_OEW_fc_new, W_OEW_rc_new = W_cargo_new[3], W_cargo_new[1], W_cargo_new[2]
-X_seat_new, W_seat_new, X_seat_back_new, W_seat_back_new, X_seat_aisle_new, W_seat_aisle_new, X_seat_back_aisle_new, W_seat_back_aisle_new = passengers(XCG_CW_new, W_OEW_c_new, W_seat_value_new, num_seats_new, X_most_forward_seat_new, X_most_aft_seat_new, X_LEMAC_new, MAC_new)
-X_fuel_new, W_fuel_value_new = fuel(X_seat_aisle_new, W_seat_aisle_new, XCG_fuel_new, W_fuel_new, X_LEMAC_new, MAC_new)
-min_cg_new, max_cg_new = min_max_X_cg_positions(X_cargo_new, X_seat_new, X_seat_back_new, X_seat_aisle_new, X_seat_back_aisle_new, X_fuel_new)
-
-
-print(f'OEW CG: ', X_OEW_with_Batt_new, convert_to_MAC_reference_inverse(X_OEW_with_Batt_new, X_LEMAC_new, MAC_new))
-print(f'Front cargo CG: ', X_cargo_new[1], convert_to_MAC_reference_inverse(X_cargo_new[1], X_LEMAC, MAC))
-print(f'Rear cargo CG: ', X_cargo_new[2], convert_to_MAC_reference_inverse(X_cargo_new[2], X_LEMAC, MAC))
-print(f'Fuel CG: ', X_fuel_new[-1], convert_to_MAC_reference_inverse(X_fuel_new[-1], X_LEMAC_new, MAC_new))
-
-plt.figure(figsize=(8, 6))
-# Reference
-plt.scatter(X_cargo, W_cargo, color='gray', label="Original Aircraft")
-plt.scatter(X_seat, W_seat, color='gray')
-plt.scatter(X_seat_back, W_seat_back, color='gray')
-plt.scatter(X_seat_aisle, W_seat_aisle, color='gray')
-plt.scatter(X_seat_back_aisle, W_seat_back_aisle, color='gray')
-plt.scatter(X_fuel, W_fuel_value, color='gray')
-
-plt.plot(X_seat, W_seat, color='gray')
-plt.plot(X_seat_back, W_seat_back, color='gray')
-plt.plot(X_seat_aisle, W_seat_aisle, color='gray')
-plt.plot(X_seat_back_aisle, W_seat_back_aisle, color='gray')
-plt.plot(X_fuel, W_fuel_value, color='gray')
-
-plt.plot([X_cargo[0], X_cargo[1]], [OEW, W_OEW_fc], 'gray')  # OEW to Front Cargo
-plt.plot([X_cargo[1], X_cargo[3]], [W_OEW_fc, W_OEW_c], 'gray')  # Front Cargo to Both Cargo
-plt.plot([X_cargo[0], X_cargo[2]], [OEW, W_OEW_rc], 'gray')  # OEW to Rear Cargo
-plt.plot([X_cargo[2], X_cargo[3]], [W_OEW_rc, W_OEW_c], 'gray')  # Rear Cargo to Both Cargo
-
-# Modified
-plt.scatter(X_cargo_new, W_cargo_new, color='blue', label="Cargo")
-plt.scatter(X_seat_new, W_seat_new, color='red', label="Window Passengers Front to Back")
-plt.scatter(X_seat_back_new, W_seat_back_new, color='green', label="Window Passengers Back to Front")
-plt.scatter(X_seat_aisle_new, W_seat_aisle_new, color='orange', label="Aisle Passengers Front to Back")
-plt.scatter(X_seat_back_aisle_new, W_seat_back_aisle_new, color='purple', label="Aisle Passengers Back to Front")
-plt.scatter(X_fuel_new, W_fuel_value_new, color='black', label="Fuel")
-
-plt.plot(X_seat_new, W_seat_new, color='red')
-plt.plot(X_seat_back_new, W_seat_back_new, color='green')
-plt.plot(X_seat_aisle_new, W_seat_aisle_new, color='orange')
-plt.plot(X_seat_back_aisle_new, W_seat_back_aisle_new, color='purple')
-plt.plot(X_fuel_new, W_fuel_value_new, color='black')
-
-plt.plot([X_cargo_new[0], X_cargo_new[1]], [OEW_with_Batt_new, W_OEW_fc_new], 'b-')  # OEW to Front Cargo
-plt.plot([X_cargo_new[1], X_cargo_new[3]], [W_OEW_fc_new, W_OEW_c_new], 'b-')  # Front Cargo to Both Cargo
-plt.plot([X_cargo_new[0], X_cargo_new[2]], [OEW_with_Batt_new, W_OEW_rc_new], 'b-')  # OEW to Rear Cargo
-plt.plot([X_cargo_new[2], X_cargo_new[3]], [W_OEW_rc_new, W_OEW_c_new], 'b-')  # Rear Cargo to Both Cargo
-
-plt.xlabel("X_cg/MAC [-]")
-plt.ylabel("Weight [kg]")
-plt.title("Aircraft CG Position vs. Weight")
-plt.legend()
-plt.grid(True)
-
-# save_path = os.path.join('Output', f"Potato_diagram.pdf")
-# plt.savefig(save_path, format='pdf')
-
 plt.show()
