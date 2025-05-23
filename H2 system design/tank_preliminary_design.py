@@ -194,15 +194,20 @@ class Tank:
         Q_in_max = Qmax -Q_str
         k_1 = self.mat_property[2]
         k_2 = self.mat2_property[2]
+        eps1 = self.mat_property[3]
         eps2 = self.mat2_property[3]
+        if n_mli == 0:
+            t_mli = 0
         # Conduction...
         def Q_cond(dv):
             # Conduction resistance
             R_cond = 0.0
             R_cond = np.log((r_in + t1) / r_in) / (2 * np.pi * L_in_max * k_1)
-            R_cond += np.log((r_in + t1 + t_mli) / (r_in + t1)) / (2 * np.pi * L_in_max * k_mli)
             R_cond += np.log((r_in + t1 + t_mli + dv) / (r_in + t1 + t_mli)) / (2 * np.pi * L_in_max * k_vac)
             R_cond += np.log((r_in + t1 + dv + t_mli + t2) / (r_in + t1 + dv + t_mli)) / (2 * np.pi * L_in_max * k_2)
+            if n_mli != 0:
+               R_cond += np.log((r_in + t1 + t_mli) / (r_in + t1)) / (2 * np.pi * L_in_max * k_mli) 
+
             return (T_amb - T_tank) / R_cond
 
         # Radiation...
@@ -220,10 +225,15 @@ class Tank:
             #return 5.670374419e-8 * A2 * (T_amb**4 - T_tank**4) / denom
             #return num * A2 / denom
             #
+            A_rat = A1/A2
             if n_mli == 0:
-                return (5.670374419e-8 * (T_amb**4 - T_tank**4))/((1/self.mat_emissivity) + (1/eps2) - 1) * A1
+                B21 = A_rat * eps1 / (1-(1-eps1)*(1-eps2)*A_rat-(1-eps2)*(1-A_rat))
+                return (5.670374419e-8 * eps2 * B21 * (T_amb**4 - T_tank**4))
             else:
-                return (5.670374419e-8 * (T_amb**4 - T_tank**4))/((n_mli+1)/emis_mli) * A1
+                #return (5.670374419e-8 * (T_amb**4 - T_tank**4))/((n_mli+1)/emis_mli) * A1
+                e_mli = (1 / (2 / emis_mli - 1)) * (1 / (N_MLI+1))
+                B21 = A_rat * e_mli / (1-(1-e_mli)*(1-eps2)*A_rat-(1-eps2)*(1-A_rat))
+                return (5.670374419e-8 * eps2 * B21 * (T_amb**4 - T_tank**4))
 
         def total_heat_influx(dv):
             Q_cond_value = Q_cond(dv)
@@ -333,14 +343,15 @@ estimated_mass = mass_h2/grav_idx - mass_h2
 t_limit = 0.001 #m (minimum thickness of the tank wall)
 
 #Insulation
-t_mli = 0.03 *1e-3 #https://www.sciencedirect.com/science/article/pii/S135943112200391X
+
 dens_mli = 7900 #kg/m^3 https://www.sciencedirect.com/science/article/pii/S135943112200391X
 emis_mli = 0.21  #https://www.thermalengineer.com/library/effective_emittance.htm
 k_vac = 0.015*1e-1#3 # W/mK https://www.researchgate.net/publication/321219004_Cylindrical_Cryogenic_Calorimeter_Testing_of_Six_Types_of_Multilayer_Insulation_Systems
 k_mli = 17.4 # W/mK  https://www.sciencedirect.com/science/article/pii/S135943112200391X
 mli_co2 = 3 #kg/kg (for SS)
 mli_ee = 42.74 #MJ/kg (Embodied Energy for SS)
-N_MLI = 40
+N_MLI = 0
+t_mli = 0.03 *1e-3 * N_MLI #https://www.sciencedirect.com/science/article/pii/S135943112200391X
 
 def fA(mh2, P_vent, fl_final = 0.98):
 
