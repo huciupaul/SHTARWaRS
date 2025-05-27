@@ -311,7 +311,7 @@ class Tank:
 # -------------------------------------------------------------------------------------------------------------------
 # ------------------------------------------------- Tank Database ---------------------------------------------------
 materials = ['Al-7075-T6','G10','SS-304','Carbon Fibre UD (Prepreg)','SS-316'] #From Granta and Engineering Toolbox
-SF = 0.9
+SF = 1/1.5 #NASA s safety factor for the materials
 #density in kg/m^3, yield strength in Pa, thermal conductivity in W/mK, emissivity in [-], CO2 [kg/kg], Embodied Energy in MJ/kg, Fibre Ratio
 mat_properties = [[2800,495*1e6*SF,134,0.11,7.795,106,0], 
                   [1905,1730*1e6*SF,0.745,0.95,7.22,116.5,0.675],
