@@ -36,6 +36,7 @@ eff_prop   = 0.80
 mu_TO      = 0.04
 S_g, S_land = 1163, 851
 LW_max     = 7_604 * g
+TOGA = 1908*1000
 
 # Dynamic pressures
 q_climb = 0.5 * rho_SL     * V_climb**2
@@ -147,16 +148,26 @@ mask_common = WS <= cur_orig["WS_stall"]
 
 # ---------------- Design points ------------------------------------
 # Baseline
-ax.scatter(cur_orig["WS_stall"], cur_orig["PW_stall_int"],
-           marker="x", s=100, c="k", lw=2, label="Design pt")
+#ax.scatter(cur_orig["WS_stall"], cur_orig["PW_stall_int"],marker="x", s=100, c="k", lw=2, label="Design pt")
 #ax.scatter(cur_orig["WS_x"],     cur_orig["PW_x"], marker="x", s=100, c="k", lw=2)
 
 # Modified
-ax.scatter(cur_mod["WS_stall"],  cur_mod["PW_stall_int"],
-           marker="o", s=90, facecolors="none", edgecolors="k", lw=1.8,
-           label="Design pt (mod)")
-ax.scatter(cur_mod["WS_x"],      cur_mod["PW_x"], marker="o", s=90, facecolors="none", edgecolors="k", lw=1.8)
+#ax.scatter(cur_mod["WS_stall"],  cur_mod["PW_stall_int"],marker="o", s=90, facecolors="none", edgecolors="k", lw=1.8,label="Design pt (mod)")
+#ax.scatter(cur_mod["WS_x"],      cur_mod["PW_x"], marker="o", s=90, facecolors="none", edgecolors="k", lw=1.8)
 
+# Beechcraft 1900D legit
+W__S = MTOW_orig/S
+P__W = TOGA/MTOW_orig
+
+ax.scatter(W__S, P__W, marker="X", s=90, facecolors="none", edgecolors="k", lw=1.8)
+
+# Modified Beechcraft 1900D legit
+W__S_mod = MTOW_mod/S
+P__W_mod = TOGA/MTOW_mod
+
+#ax.scatter(W__S_mod, P__W_mod, marker="o", s=90, facecolors="none", edgecolors="k", lw=1.8)
+
+#print("Orginal Beech", W__S, P__W)
 print("Left point", cur_mod["WS_x"], cur_mod["PW_x"])
 print("Right point", cur_mod["WS_stall"], cur_mod["PW_stall_int"])
 
@@ -168,5 +179,5 @@ ax.set_ylabel("Power loading  P/W  [W N⁻¹]")
 ax.grid(True, which="both", ls=":")
 ax.legend(loc="upper right")
 plt.tight_layout()
-plt.show()
+plt.savefig("Diagrams/deez.png", dpi = 600)
 

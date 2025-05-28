@@ -53,7 +53,7 @@ class Powerpoint:
 def mass_adjustment(mdot_fuel: np.ndarray, t: np.ndarray, R_eta_th: np.ndarray, R_LHV) -> float:
     """Get the H2 mass required to achieve the same thrust as the JA1 engine."""
     mdot_H2 = mdot_fuel * R_eta_th * R_LHV
-    m_H2 = np.trapezoid(mdot_H2, t)  # Integrate fuel flow over time
+    m_H2 = np.trapz(mdot_H2, t)  # Integrate fuel flow over time
     return m_H2
     
 class FlightMission:
