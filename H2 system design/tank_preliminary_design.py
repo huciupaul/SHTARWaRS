@@ -350,7 +350,7 @@ k_vac = 0.015*1e-1#3 # W/mK https://www.researchgate.net/publication/321219004_C
 k_mli = 17.4 # W/mK  https://www.sciencedirect.com/science/article/pii/S135943112200391X
 mli_co2 = 3 #kg/kg (for SS)
 mli_ee = 42.74 #MJ/kg (Embodied Energy for SS)
-N_MLI = 0
+N_MLI = 40
 t_mli = 0.03 *1e-3 * N_MLI #https://www.sciencedirect.com/science/article/pii/S135943112200391X
 
 def fA(mh2, P_vent, fl_final = 0.98):
@@ -438,6 +438,7 @@ plot_dv = []
 
 if RUN:
     for P_vent in P_vents:
+        MAWP = P_vent
         V_in, fill_ratio = fA(mass_h2, P_vent)
         V_in = V_in
         Qmax = compute_Qleak(materials[0], materials[0], mat_properties[0], MAWP,mass_h2,0,mat_properties[0],0,fill_ratio,V_in, P_vent)
