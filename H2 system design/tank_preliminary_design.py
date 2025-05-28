@@ -146,7 +146,7 @@ class Tank:
 
     
     def inner_tank_thickness(self):
-        P_test = (self.MAWP + 0.2*100000) * 1.3 #Safety factor
+        P_test = (self.MAWP) * 1.5 #Safety factor
         alpha = 0
         if self.material == 'G10' or self.material == 'Carbon Fibre UD (Prepreg)':
             #Calc membrane loads
@@ -249,7 +249,7 @@ class Tank:
 
         dv = dv_solution[0]  # Extract the solution from the array
         t2_min = 1000
-        P_test = (P_amb+20000)*1.3 #Safety factor
+        P_test = (P_amb)*1.5 #Safety factor
         alpha = 0
         if self.material2 == 'G10' or self.material2 == 'Carbon Fibre UD (Prepreg)':
             #Calc membrane loads
@@ -319,8 +319,8 @@ mat_properties = [[2800,495*1e6*SF,134,0.11,7.795,106,0],
                   [1565,1955*1e6*SF,5.25,0.77,50.9,728.5,0.675],
                   [7970,257.5*1e6*SF,15,0.35,4.265,49.75,0]]
 #MAWPS = [600000,650000,800000,1000000,1200000,1280000] #bar to Pa
-MAWP = 1200000
-P_vents = [300000, 400000, 500000, 600000,700000,800000,900000,1000000]
+MAWP = 600000
+P_vents = [300000, 400000, 500000, 600000]
 n_mats = 5
 n_vent = len(P_vents)
 materials = materials[:n_mats]
@@ -338,7 +338,7 @@ co2_kevlar = 13.1 #kg/kg (Kevlar 149)
 kevlar_ee = 257 #MJ/kg (Embodied Energy for Kevlar 149)
 
 #Our values
-mass_h2 = 292.5273  #kg
+mass_h2 = 278.9577  #kg
 estimated_mass = mass_h2/grav_idx - mass_h2
 t_limit = 0.001 #m (minimum thickness of the tank wall)
 
@@ -438,7 +438,7 @@ plot_dv = []
 
 if RUN:
     for P_vent in P_vents:
-        MAWP = P_vent
+        #MAWP = P_vent
         V_in, fill_ratio = fA(mass_h2, P_vent)
         V_in = V_in
         Qmax = compute_Qleak(materials[0], materials[0], mat_properties[0], MAWP,mass_h2,0,mat_properties[0],0,fill_ratio,V_in, P_vent)
