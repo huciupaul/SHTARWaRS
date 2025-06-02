@@ -1,11 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-P_req = 1000  # Required power in watts
+P_req = 1000  #[W] Required power in watts
 
-def eps_weight(P):
+def motor_weight(P):
     """Calculate the weight of the EPS based on the required power."""
-    return P_req / 10 + 0.97 * P_req /25
+    return P_req / 10 
+
+def inverter_weight(P):
+    return 0.97 * P_req /20
 
 def heat_dissipation(P):
     """Calculate the heat dissipation of the EPS."""
@@ -31,3 +34,6 @@ def motor_sizing(lambd, P_req):
 def motor_volume(radius, length):
     """Calculate the volume of the EPS."""
     return np.pi * radius**2 * length
+
+def inverter_volume(P):
+    return 0.97 * P / 18.7
