@@ -37,3 +37,6 @@ def motor_volume(radius, length):
 
 def inverter_volume(P):
     return 0.97 * P / 18.7
+
+
+#cables: 0.0015 kg/kW/m 
