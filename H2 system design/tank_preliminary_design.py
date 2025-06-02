@@ -148,7 +148,7 @@ class Tank:
     def inner_tank_thickness(self):
         P_test = (self.MAWP) * 1.5 #Safety factor
         alpha = 0
-        if self.material == 'G10' or self.material == 'Carbon Fibre UD (Prepreg)':
+        if self.material == 'S-Glass Fiber' or self.material == 'Carbon Fiber':
             #Calc membrane loads
             N_theta_p = P_test * self.R_in
             N_phi_p = P_test * self.R_in / 2
@@ -206,7 +206,9 @@ class Tank:
             R_cond += np.log((r_in + t1 + t_mli + dv) / (r_in + t1 + t_mli)) / (2 * np.pi * L_in_max * k_vac)
             R_cond += np.log((r_in + t1 + dv + t_mli + t2) / (r_in + t1 + dv + t_mli)) / (2 * np.pi * L_in_max * k_2)
             if n_mli != 0:
-               R_cond += np.log((r_in + t1 + t_mli) / (r_in + t1)) / (2 * np.pi * L_in_max * k_mli) 
+                R_cond += np.log((r_in + t1 + t_mli) / (r_in + t1)) / (2 * np.pi * L_in_max * k_mli) 
+            
+            
 
             return (T_amb - T_tank) / R_cond
 
@@ -251,7 +253,7 @@ class Tank:
         t2_min = 1000
         P_test = (P_amb)*1.5 #Safety factor
         alpha = 0
-        if self.material2 == 'G10' or self.material2 == 'Carbon Fibre UD (Prepreg)':
+        if self.material2 == 'S-Glass Fiber' or self.material2 == 'Carbon Fiber':
             #Calc membrane loads
             N_theta_p = P_test * (r_in+t1+dv+t_mli)
             N_phi_p = P_test * (r_in+t1+dv+t_mli) / 2
@@ -310,7 +312,7 @@ class Tank:
 
 # -------------------------------------------------------------------------------------------------------------------
 # ------------------------------------------------- Tank Database ---------------------------------------------------
-materials = ['Al-7075-T6','G10','SS-304','Carbon Fibre UD (Prepreg)','SS-316'] #From Granta and Engineering Toolbox
+materials = ['Al-7075-T6','S-Glass Fiber','SS-304','Carbon Fiber','SS-316'] #From Granta and Engineering Toolbox
 SF = 1/1.5 #NASA s safety factor for the materials
 #density in kg/m^3, yield strength in Pa, thermal conductivity in W/mK, emissivity in [-], CO2 [kg/kg], Embodied Energy in MJ/kg, Fibre Ratio
 mat_properties = [[2800,495*1e6*SF,134,0.11,7.795,106,0], 
@@ -351,19 +353,20 @@ k_mli = 17.4 # W/mK  https://www.sciencedirect.com/science/article/pii/S13594311
 mli_co2 = 3 #kg/kg (for SS)
 mli_ee = 42.74 #MJ/kg (Embodied Energy for SS)
 N_MLI = 40
+N_MLI = 40
 t_mli = 0.03 *1e-3 * N_MLI #https://www.sciencedirect.com/science/article/pii/S135943112200391X
 
 def fA(mh2, P_vent, fl_final = 0.98):
 
     # From the heat influx get the maximum initial fill fraction
     rho_l_f = CP.PropsSI('D', 'P', P_vent, 'Q', 0, 'ParaHydrogen')  # Final liquid density
-    print(f"Final liquid density: {rho_l_f} kg/m^3")
+    # print(f"Final liquid density: {rho_l_f} kg/m^3")
     V_l_fin = mh2 / rho_l_f  # Final liquid volume
     V_tot   = V_l_fin / fl_final
 
     # Calculate the initial fill fraction
     rho_l_0 = CP.PropsSI('D', 'P', 101325, 'Q', 0, 'ParaHydrogen')  # Initial liquid density
-    print(f"Initial liquid density: {rho_l_0} kg/m^3")
+    # print(f"Initial liquid density: {rho_l_0} kg/m^3")
     V_l_0   = mh2 / rho_l_0  # Initial liquid volume
     fl_init = V_l_0 / V_tot  # Initial fill fraction
 
@@ -376,7 +379,7 @@ def compute_Qleak(material, material2, mat_property, MAWP,mass_h2, Q_str,mat2_pr
 
     if Q_solution.converged:
         Qmax = Q_solution.root
-        print(f"Calculated Qin: {Qmax:.4f} W")
+        # print(f"Calculated Qin: {Qmax:.4f} W")
     else:
         print("Failed to find an Qin_max. Adjust the bounds.")
     return Qmax
@@ -389,7 +392,7 @@ def compute_tank(material, material2, mat_property, MAWP,mass_h2, Q_str,mat2_pro
 
     if L_solution.converged:
         L_in = L_solution.root
-        print(f"Calculated length: {L_in:.4f} meters")
+        # print(f"Calculated length: {L_in:.4f} meters")
     else:
         print("Failed to find an inner length. Adjust the bounds.")
 
@@ -444,7 +447,7 @@ if RUN:
         Qmax = compute_Qleak(materials[0], materials[0], mat_properties[0], MAWP,mass_h2,0,mat_properties[0],0,fill_ratio,V_in, P_vent)
         for material, mat_property in zip(materials, mat_properties):
             for material2, mat2_property in zip(materials, mat_properties):
-                if material == 'G10' or  material == 'Carbon Fibre UD (Prepreg)': #Composites
+                if material == 'S-Glass Fiber' or  material == 'Carbon Fiber': #Composites
                     og_tank_mass = 4.8+3.15
                 else: #Metallic materials (compared to aluminium)
                     og_tank_mass = 8.4+3.6
@@ -507,10 +510,12 @@ if OPEN:
             plot_dv.append(row[20])
 
 # ------------------------------------------------- Plotting ------------------------------------------------------
-plot1 = False
-plot2 = False
+plot1 = False # Volume vs Pvent
+plot2 = False #Material Map
+plot2_2 = False
 plot3 = False
-plot4 = False
+plot4 = False # Only for dv convergence
+plot5 = False # Only when running for several MAWP
 
 if plot1:
     plt.figure(figsize=(10, 6))
@@ -550,6 +555,51 @@ if plot2:
     color_list = color_list[:n_combinations]
 
     color_map = {comb: color_list[idx % len(color_list)] for idx, comb in enumerate(material_combinations)}
+
+    # Only plot for P_vent = 600000 and MAWP = 600000
+    target_pvent = 600000
+    target_mawp = 600000
+
+    for i, (material, material2) in enumerate(material_combinations):
+        # Find the index for this material combination and the target P_vent and MAWP
+        for idx in range(len(plot_mats)):
+            if (plot_mats[idx] == material and plot_mats2[idx] == material2 and
+                plot_P_vents[idx] == target_pvent and plot_MAWPS[idx] == target_mawp):
+                color = color_map[(material, material2)]
+                plt.scatter(
+                    mass_h2 / plot_masses[idx],
+                    plot_vh2[idx] / plot_volumes[idx],
+                    label=f"{material}-{material2}",
+                    color=color,
+                    marker='o'
+                )
+                break  # Only one point per combination
+
+    plt.xlabel(r"$\eta_g$")
+    plt.ylabel(r"$\eta_v$")
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
+    plt.title(r"$\eta_v$ vs $\eta_g$")
+    plt.legend(bbox_to_anchor=(1.01, 1), loc='upper left', fontsize='small', frameon=False)
+    plt.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
+    plt.tight_layout(rect=[0, 0, 0.8, 1])
+    plt.show()
+
+if plot2_2:
+    plt.figure(figsize=(10, 6))
+    material_combinations = [(m1, m2) for m1 in materials for m2 in materials]
+    n_combinations = len(material_combinations)
+
+    base_cmaps = [plt.get_cmap('tab20'), plt.get_cmap('tab20b'), plt.get_cmap('tab20c')]
+    color_list = []
+    for cmap in base_cmaps:
+        color_list.extend([cmap(i) for i in range(cmap.N)])
+    if len(color_list) < n_combinations:
+        extra_colors = [mcolors.hsv_to_rgb((i / n_combinations, 0.7, 0.9)) for i in range(n_combinations - len(color_list))]
+        color_list.extend(extra_colors)
+    color_list = color_list[:n_combinations]
+
+    color_map = {comb: color_list[idx % len(color_list)] for idx, comb in enumerate(material_combinations)}
     markers = ['o', 's', 'D', '^', 'v', '<', '>', 'p', '*', 'h', 'H', 'X', 'd']
     marker_map = {pvent: markers[idx % len(markers)] for idx, pvent in enumerate(P_vents)}
 
@@ -573,11 +623,11 @@ if plot2:
     plt.title(r"$\eta_v$ vs $\eta_g$")
 
     legend_combinations = [
-        ('Carbon Fibre UD (Prepreg)', 'Carbon Fibre UD (Prepreg)'),
-        ('Carbon Fibre UD (Prepreg)', 'G10'),
-        ('G10', 'Carbon Fibre UD (Prepreg)'),
-        ('G10', 'G10'),
-        ('Carbon Fibre UD (Prepreg)', 'Al-7075-T6')
+        ('Carbon Fiber', 'Carbon Fiber'),
+        ('Carbon Fiber', 'S-Glass Fiber'),
+        ('S-Glass Fiber', 'Carbon Fiber'),
+        ('S-Glass Fiber', 'S-Glass Fiber'),
+        ('Carbon Fiber', 'Al-7075-T6')
     ]
     color_handles = [
         mlines.Line2D([], [], color=color_map[comb], marker='o', linestyle='None', markersize=8, label=f"{comb[0]}--{comb[1]}")
@@ -610,6 +660,7 @@ if plot2:
             plt.plot(x_vals, y_vals, color=color, linewidth=1, alpha=0.7, zorder=0)
     plt.subplots_adjust(left=0.1, right=0.55, wspace=0.3, top=0.85, bottom=0.15)
     plt.show()
+
 
 
 if plot3:
@@ -653,10 +704,10 @@ if plot3:
                 marker=marker
             )
 
-    ax1.set_xlabel("Metric (ηg * ηv)")
+    ax1.set_xlabel("Metric ($η_g \cdot η_v$)")
     ax1.set_ylabel("CO2 Emissions (kg)")
     ax1.set_title("CO2 Emissions vs Metric")
-    ax2.set_xlabel("Metric (ηg * ηv)")
+    ax2.set_xlabel("Metric ($η_g \cdot η_v$)")
     ax2.set_ylabel("Embodied Energy (MJ)")
     ax2.set_title("Embodied Energy vs Metric")
 
@@ -668,10 +719,10 @@ if plot3:
     ax2.add_artist(legend1)
 
     marker_handles = [
-        mlines.Line2D([], [], color='black', marker=marker, linestyle='None', markersize=8, label=f'P_vent={pvent/100000:.1f} Bar')
+        mlines.Line2D([], [], color='black', marker=marker, linestyle='None', markersize=8, label=f'{pvent/100000:.1f} Bar')
         for pvent, marker in marker_map.items()
     ]
-    legend2 = ax2.legend(handles=marker_handles, title="P_vent (Bar)", loc='upper left', bbox_to_anchor=(1.02, 0.3), frameon=False, fontsize='x-small', title_fontsize='small')
+    legend2 = ax2.legend(handles=marker_handles, title="$P_{vent}$ (Bar)", loc='upper left', bbox_to_anchor=(1.02, 0.3), frameon=False, fontsize='x-small', title_fontsize='small')
     ax2.add_artist(legend2)
 
     plt.tight_layout(rect=[0, 0, 0.8, 1])  # Leave space for legend on the right
@@ -692,9 +743,45 @@ if plot4:
     plt.grid(True)
     plt.show()
 
+
+if plot5:
+    import matplotlib.tri as tri
+
+    plt.figure(figsize=(10, 6))
+
+    # Prepare data for triangulation
+    x = np.array(plot_MAWPS)
+    y = np.array(plot_P_vents)
+    z = np.array(plot_volumes)
+    m = np.array(plot_masses)
+
+    # Create a triangulation object
+    triang = tri.Triangulation(x, y)
+
+    # Plot tank mass as a color map
+    contourf = plt.tricontourf(triang, m, levels=30, cmap='viridis')
+    #scatter = plt.scatter(x, y, c=m, cmap='viridis', s=80, edgecolor='k')
+
+    # Add isolines for tank volume
+    volume_levels = np.linspace(np.min(z), np.max(z), 20)
+    volume_contours = plt.tricontour(triang, z, levels=volume_levels, colors='white', linewidths=1.5)
+    plt.clabel(volume_contours, fmt="%.2f m³", colors='white', fontsize=8)
+
+    plt.xlabel("MAWP (Pa)")
+    plt.ylabel("P_vent (Pa)")
+    plt.title("MAWP vs P_vent\nColor: Tank Mass (kg), Isolines: Tank Volume (m³)")
+    cbar = plt.colorbar(contourf)
+    cbar.set_label("Tank Mass (kg)")
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.legend(loc='best', fontsize=8)
+    plt.tight_layout()
+    plt.show()
+
+
 #-------------------------------------------------- Draw Tank ---------------------------------------------------
 draw_best = True 
-draw_all = False	
+draw_all = False
+
 '''
 best_metric = 0
 for i, (Vt,Mt,Vh2) in enumerate(zip(
@@ -710,7 +797,7 @@ for i, (Vt,Mt,Vh2) in enumerate(zip(
         best_metric = metric
         best_idx = i
 '''
-best_idx = 31
+best_idx = 81
     
 if draw_best:
     with open('tank_results.csv', mode='r') as file:
@@ -733,12 +820,25 @@ if draw_best:
     R_in = float(best_row[11])
     p_vent = float(best_row[16])
 
+    print(f"Best Tank Design:")
+    print(f"Material Inner: {material}, Material Outer: {material2}, MAWP: {MAWP} Pa")
+    print(f"Tank Volume: {Vt:.4f} m^3")
+    print(f"Tank Mass: {Mt:.4f} kg")
+    print(f"Inner Tank Thickness: {t1:.4f} m, Outer Tank Thickness: {t2:.4f} m")
+    print(f"Vacuum Gap: {dv:.4f} m")
+    print(f"Vh2: {Vh2:.4f} m^3")
+    print(f"R_in: {R_in:.4f} m")
+    
+
     # Tank dimensions
     r_inner = R_in
     r_inner_wall = r_inner + t1
     r_mli_outer = r_inner_wall + t_mli
     r_vacuum_outer = r_mli_outer + dv
     r_outer = r_vacuum_outer + t2
+
+    L_out = 2 * r_outer + L_in - 2 * r_inner  # Outer length of the tank
+    print(f"Outer Length: {L_out:.4f} m")
 
     # Create the figure
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
@@ -771,6 +871,9 @@ if draw_best:
     padding = r_outer * 0.2
     ax1.set_xlim(-r_outer - padding, r_outer + padding)
     ax1.set_ylim(-r_outer - padding, r_outer + padding)
+    ax1.set_ylabel("Radius (m)")
+    ax1.set_xlabel("Radius (m)")
+
 
     # ---------------- Side cross-section ----------------
     # Draw the inner tank wall (side view)
@@ -813,6 +916,9 @@ if draw_best:
     max_dim = max(L_in / 2 + padding, r_outer + padding)
     ax2.set_xlim(-max_dim*1.5, max_dim*1.5)
     ax2.set_ylim(-max_dim*1.5, max_dim*1.5)
+    # Add axis labels with units in meters
+    ax2.set_xlabel("Length (m)")
+    ax2.set_ylabel("Radius (m)")
 
     # Ensure ax2 plot is square (equal aspect ratio)
     ax2.set_aspect('equal', adjustable='box')

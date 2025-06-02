@@ -1,8 +1,8 @@
 import numpy as np
 
-V_init = 5.986
-L_init = 3.44
-R_init = 0.8018
+V_init = 5.264557258013054
+L_init = 3.296301437924847
+R_init = 0.7765962162020262
 t2 = 0.001
 
 # Torispherical head size
