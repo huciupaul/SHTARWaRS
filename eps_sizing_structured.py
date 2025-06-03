@@ -6,7 +6,7 @@ class EPS:
     def __init__(self,
                  P_TOGA: float = P_TOGA, # TOGA power [W]
                  fc_split: float = 0.0,
-                 Cable_length: float = 20, # Cable length [m]
+                 Cable_length: float = 20, # Cable length [m]   TODO: estimate the length better
                  Spec_W_cable: float = 0.0015, # Cables specific weight [kg/kW/m]
                  lambd: float = 0.5,
                  ): 
@@ -34,22 +34,8 @@ class EPS:
     def heat_dissipation_inverter(self):
         """Calculate the heat dissipation of the EPS."""
         return self.P_req * (1/0.99 - 1)
-
     
-
-if __name__ == "__main__":
-    eps = EPS(fc_split = fc_split, Cable_length = 20, Spec_W_cable = 0.0015, lambd = 0.5)
-    print("Motor weight:", eps.motor_weight())
-    print("Inverter weight:", eps.inverter_weight())
-    print("Cable weight:", eps.cable_weight())
-    print("Total EPS weight:", eps.motor_weight() + eps.inverter_weight() + eps.cable_weight())
-    print("Heat dissipation motor:", eps.heat_dissipation_motor())
-    print("Heat dissipation inverter:", eps.heat_dissipation_inverter())
-    print("Total EPS heat dissipation:", eps.heat_dissipation_motor() + eps.heat_dissipation_inverter())
-
-
-'''
-    def motor_sizing(self):
+    def __motor_sizing(self):
         """Calculate the EPS sizing parameters."""
         c1 = 0.000805
         c2 = 0.00161
@@ -63,14 +49,36 @@ if __name__ == "__main__":
         r_tot = ((0.737 * (r_out ** 2)) - 0.580 * r_out + 1.1599) * r_out
         return r_tot, l
 
-    def motor_volume(radius, length):
+    def motor_volume(self):
         """Calculate the volume of the EPS."""
-        return np.pi * radius**2 * length
+        r_tot, l = self.__motor_sizing()
+        return np.pi * r_tot**2 * l
 
     def inverter_volume(self):
         return 0.97 * self.P_req / 18.7
+
     
-    def fc_power_needed(self):
-        """Calculate the total power needed from the fuel cell."""
-        return self.P_req / (0.97*0.99)
-'''
+def main(fc_split: float = 0.0):
+    eps = EPS(fc_split=fc_split)
+
+    comp = np.zeros(7)
+    tot = np.zeros(2)
+
+    comp = eps.motor_weight(), eps.inverter_weight(), eps.cable_weight(), eps.heat_dissipation_motor(), eps.heat_dissipation_inverter(), eps.motor_volume(), eps.inverter_volume()
+    tot = np.sum(comp[:3]), np.sum(comp[3:5]) # volume not summed as not relevant
+
+    return comp, tot
+
+
+if __name__ == "__main__":
+    comp, tot = main(fc_split=0.5)
+
+    print("Motor weight (kg):", comp[0])
+    print("Inverter weight (kg):", comp[1])
+    print("Cable weight (kg):", comp[2])
+    print("Total EPS weight (kg):", tot[0])
+    print("Motor heat dissipation (W):", comp[3])
+    print("Inverter heat dissipation (W):", comp[4])
+    print("Total EPS heat dissipation (W):", tot[1])
+    print("Motor volume (m^3):", comp[5])
+    print("Inverter volume (m^3):", comp[6])
