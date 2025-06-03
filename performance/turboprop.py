@@ -191,7 +191,7 @@ class Turboprop:
         return C_p
     
     @staticmethod
-    def __eta_prop(
+    def _eta_prop(
         M0: np.ndarray,
         eta_prop_max: float = 0.85
     ):
@@ -252,7 +252,7 @@ class Turboprop:
         M0 = V0/np.sqrt(self.k_air*R_AIR*T0)
         
         # Propeller efficiency
-        eta_prop = self.__eta_prop(M0)
+        eta_prop = self._eta_prop(M0)
         
         if Pa is None:
             Pa = Pr/eta_prop
