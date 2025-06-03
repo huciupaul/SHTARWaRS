@@ -13,39 +13,6 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import global_constants
 from global_constants import * # Import global constants
 
-# Constants
-# dormancy = 24       #[hours]
-# stratification_factor = 2
-# k_str = 1.9         #[W/mK]
-# MAWP_global = 600000       #[Pa]
-# p_vent_global = 600000     #[Pa]
-# P_sl = 101325             #[Pa]
-# r_in = 0.75                #[m]
-# Q_leak_min = 10 #W (determined from Nicolas's thesis)
-# Q_leak_max = 1000 #W (determined from Nicolas's thesis)
-# T_hot = 40      #[Celsius]
-# gf = 'S-Glass fiber'
-# fos = 2/3
-# gf_density, gf_tensile_strength, gf_thermal_cond, gf_thermal_emis, gf_co2, gf_ee, gf_fvf = 1905,1730*1e6*fos,0.745,0.95,7.22,116.5,0.675
-# Thesis values
-# Q_original_str = 0.4 #W
-# kevlar_thermal_cond = 1.9 #W/mK
-# mass_original_str = 2.1 #kg
-# mass_originalg_lh2 = 6.2 #kg
-# gravimetric_index = 0.35 #from NASA report
-# kevlar_co2 = 13.1 #kg/kg (Kevlar 149)
-# kevlar_emb_energy = 257 #MJ/kg (Embodied Energy for Kevlar 149)
-# t_min = 0.001 #m (minimum thickness of the tank wall)
-# mli_density = 7900 #kg/m^3 https://www.sciencedirect.com/science/article/pii/S135943112200391X
-# mli_emis = 0.21  #https://www.thermalengineer.com/library/effective_emittance.htm
-# vacuum_thermal_cond = 0.015*1e-1#3 # W/mK https://www.researchgate.net/publication/321219004_Cylindrical_Cryogenic_Calorimeter_Testing_of_Six_Types_of_Multilayer_Insulation_Systems
-# mli_thermal_cond = 17.4 # W/mK  https://www.sciencedirect.com/science/article/pii/S135943112200391X
-# mli_ss_co2 = 3 #kg/kg (for SS)
-# mli_ss_ee = 42.74 #MJ/kg (Embodied Energy for SS)
-# mli_layers = 40
-# mli_thickness = 0.03 *1e-3 * mli_layers #https://www.sciencedirect.com/science/article/pii/S135943112200391X
-
-
 
 def main_storage(m_h2):
     
