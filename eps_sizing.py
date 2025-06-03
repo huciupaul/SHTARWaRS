@@ -1,15 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from PIL.WmfImagePlugin import WmfHandler
 
-P_req = 3000000#[W] Required power in watts
+P_req = 1000  #[W] Required power in watts
 
 def motor_weight(P):
     """Calculate the weight of the EPS based on the required power."""
-    return P_req / 10 / 1000
+    return P_req / 10 
 
 def inverter_weight(P):
-    return 0.97 * P_req /20 / 1000
+    return 0.97 * P_req /20
 
 def heat_dissipation(P):
     """Calculate the heat dissipation of the EPS."""
@@ -21,13 +20,13 @@ def fc_power_needed(P_req):
 
 def motor_sizing(lambd, P_req):
     """Calculate the EPS sizing parameters."""
-    c1 = 0.000805
-    c2 = 0.00161
-    c3 = 0.1934
-    hs = 0.025
+    c1 = 0.0004
+    c2 = 0.0008
+    c3 = 1.0744
+    hs = 0.0366
     P_req = P_req / 2
     r = (lambd * P_req)**(1/3) * c1
-    l = c2 * 1/lambd * (lambd * P_req)**(1/3)
+    l = (lambd * P_req)**(1/3) * c2 * 1/lambd
     hy = r * c3
     r_tot = r + hs + hy
     return r_tot, l
@@ -39,10 +38,5 @@ def motor_volume(radius, length):
 def inverter_volume(P):
     return 0.97 * P / 18.7
 
-x = motor_sizing(0.5, P_req)
-V = motor_volume(x[0], x[1])
-Wm = motor_weight(P_req)
-Wi = inverter_weight(P_req)
-print(Wm, Wi)
-print(x)
-print(V)
+
+#cables: 0.0015 kg/kW/m 
