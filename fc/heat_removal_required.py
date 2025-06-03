@@ -8,18 +8,15 @@ import hydrogen_storage
 Class which defines the design point of the fuel cell & flight condition
 This class is used to store all the values found for the design point
 '''
-
+# IMPORT THESE FROM CONSTANTS
 LHV_H2 = 120000000  # Lower heating value of hydrogen in J/kg
 
+
 class Design_point:
-    def __init__(self, fuel_cell, flight_condition, hydrogen_storage, P_C):
+    def __init__(self, fuel_cell, flight_condition, hydrogen_storage):
         self.fuel_cell = fuel_cell
         self.flight_condition = flight_condition
         self.hydrogen_storage = hydrogen_storage
-        p_diff = self.fuel_cell.P_C - self.fuel_cell.P_A
-        self.fuel_cell.P_C = P_C
-        self.fuel_cell.P_A = P_C - p_diff
-
             
     def O2_cooling_required(self):
         # Calculate the heat removal required from the oxygen for the fuel cell
@@ -65,7 +62,7 @@ class Design_point:
         self.fuel_cell.m_O2_out = self.fuel_cell.m_O2_tot - self.fuel_cell.m_O2_used
         self.fuel_cell.m_rest_out = self.fuel_cell.m_tot - self.fuel_cell.m_H2O_out - self.fuel_cell.m_H2_out - self.fuel_cell.m_O2_out
 
-        print(f"Mass flow rate of hydrogen used in fuel cell: {self.fuel_cell.m_H2_tot} kg/s")
+        print(f"Mass flow rate of hydrogen used in fuel cell: {self.fuel_cell.m_H2_used} kg/s")
         print(f"Mass flow rate of used oxygen for fuel cell: {self.fuel_cell.m_O2_used} kg/s")
         print(f"Mass flow rate of air for fuel cell: {self.fuel_cell.m_air} kg/s")
         print(f"Mass flow rate of hydrogen for fuel cell: {self.fuel_cell.m_H2_tot} kg/s")
@@ -84,7 +81,8 @@ class Design_point:
 
         # Calculate the required mass flow rate of hydrogen for the combustion chamber
         self.cc_power = self.flight_condition.power_required * (1 - self.flight_condition.power_split)
-        self.m_H2_cc = self.cc_power / (self.flight_condition.thermal_efficiency * self.flight_condition.propulsive_efficiency * LHV_H2)
+        #self.m_H2_cc = self.cc_power / (self.flight_condition.thermal_efficiency * self.flight_condition.propulsive_efficiency * LHV_H2)
+        self.m_H2_cc = 0.029449 * 2 * (1 - self.flight_condition.power_split)
 
         # Calculate the total mass flow rate
         self.m_H2_tot = self.m_H2_cc + self.fuel_cell.m_H2_tot
