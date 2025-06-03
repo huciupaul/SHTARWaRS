@@ -4,12 +4,19 @@ import flight_condition
 import hydrogen_storage
 import heat_removal_required
 
+
+# IMPORT THESE FROM CONSTANTS
+LHV_H2 = 120000000  # Lower heating value of hydrogen in J/kg
+P_TOGA = 1908000
+power_split = 0.5  # Proportion of power outputted from the fuel cell
+
+
 class MainSimulation:
     def __init__(self):
         # Define fuel cells
-        self.LTPEM = fuel_cell_info.FuelCell(
-            name="LTPEM",
-            stack_efficiency=0.6,
+        self.HTPEM = fuel_cell_info.FuelCell(
+            name="HTPEM",
+            stack_efficiency=0.7,
             T=273.15 + 160,
             P_A=1.8 * 101325 + 0.06 * 1e5,
             P_C=1.8 * 101325,
@@ -29,7 +36,7 @@ class MainSimulation:
             RH_amb=0,
             V=0,
             actual_power_required=1_908_000 / 0.85,
-            power_split=1,
+            power_split=0.5,
             thermal_efficiency=0.4,
             propulsive_efficiency=0.85,
             P_cc=12.1 * 101325,
@@ -42,7 +49,7 @@ class MainSimulation:
             P_amb=37594.02446,
             RH_amb=0,
             V=0,
-            actual_power_required= 650_740,
+            actual_power_required= 807291.7269993153*0.85,
             power_split=1,
             thermal_efficiency=0.4,
             propulsive_efficiency=0.85,
@@ -51,14 +58,14 @@ class MainSimulation:
         )
 
         # Define hydrogen storage
-        self.LH2 = hydrogen_storage.HydrogenStorage(name="LH2", T=20, P=6 * 101325)
+        self.LH2 = hydrogen_storage.HydrogenStorage(name="LH2", T = 20, P = 6 * 101325)
         self.CcH2 = hydrogen_storage.HydrogenStorage(name="CcH2", T=273.15-207, P=350*101325)
         self.GCH2 = hydrogen_storage.HydrogenStorage(name="GCH2", T=273.15+20, P=700*101325)
 
         # Set design point
         self.design_point = heat_removal_required.Design_point(
-            fuel_cell=self.LTPEM,
-            flight_condition=self.cruise,
+            fuel_cell=self.HTPEM,
+            flight_condition=self.takeoff,
             hydrogen_storage=self.LH2,
             P_C=1.85 * 101325
         )
@@ -121,6 +128,68 @@ class MainSimulation:
         P = self.heat_exchanger.P(T_in, T_air_in, T_air_out)
         print(f"P: {P:.2f} ")
 
+
+# main fuel cell simulation function
+
+def main(power_split):
+
+    # MAKE THESE CONSTS
+    fuel_cell = fuel_cell_info.FuelCell(
+        name="HTPEM",
+        stack_efficiency=0.7,
+        T=273.15 + 160,
+        P_A=1.8 * 101325 + 0.06 * 1e5,
+        P_C=1.8 * 101325,
+        RH_A=0.5,
+        RH_C=0.38,
+        stoic_ratio_C=1.8,
+        stoic_ratio_A=1.05,
+        spec_power = 2750,
+        spec_vol_power = 3100000
+    )
+
+    flight_cond = flight_condition.FlightCondition(
+        name="Takeoff",
+        T_amb=273.15 + 55,
+        P_amb=101325,
+        RH_amb=0,
+        V=0,
+        actual_power_required=1_908_000 / 0.85,   # IMPORT THIS FROM CONSTANTS   
+        power_split=power_split,
+        thermal_efficiency=0.4,
+        propulsive_efficiency=0.85,
+        P_cc=12.1 * 101325,
+        T_cc=573.15
+    )  
+
+    # Define hydrogen storage
+    LH2 = hydrogen_storage.HydrogenStorage(name="LH2", T = 20, P = 6 * 101325)
+
+    design_point = heat_removal_required.Design_point(
+        fuel_cell=fuel_cell,
+        flight_condition=flight_cond,
+        hydrogen_storage=LH2
+    )
+
+    design_point.O2_cooling_required()
+    design_point.mass_flow_calculation()
+    design_point.heat_removal_available()
+
+    fc_mass = design_point.fuel_cell.mass
+    fc_volume = design_point.fuel_cell.volume # no BoP
+
+    fc_m_H2 = design_point.fuel_cell.m_H2_tot
+    fc_m_air = design_point.fuel_cell.m_air
+    fc_qdot = design_point.fuel_cell.heat_power
+
+    return fc_mass, fc_volume, fc_m_H2, fc_m_air, fc_qdot
+
+
+
+
+
 if __name__ == "__main__":
-    sim = MainSimulation()
-    sim.run()
+    # sim = MainSimulation()
+    # sim.run()
+    power_split = 0.5  # Proportion of power outputted from the fuel cell
+    print(main(power_split))
