@@ -2,9 +2,11 @@ import numpy as np
 from scipy.optimize import fsolve
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
+import matplotlib.pyplot as plt
+
 
 # Local imports
-from common.constants import MAXC, G_0, A_inlet
+from common.constants import MAXC, G_0, E_SCALE, R_AIR, k_air
 from common.atmosphere import isa_atmosphere
 from turboprop import Turboprop
 
@@ -18,7 +20,9 @@ class Aircraft:
     prop_diameter: float
     eng: Turboprop
     MTOW: float
+    P_cc_min: float = 0.0
     MAXC: float = MAXC
+    AP: float = 0.0
     n_prop: int = 2  # Added n_prop for number of propellers
     
     @property
@@ -50,11 +54,46 @@ class Powerpoint:
     time: float=None  # [s]
     until_phase: str=None   # e.g. "cruise"
 
-def mass_adjustment(mdot_fuel: np.ndarray, t: np.ndarray, R_eta_th: np.ndarray, R_LHV) -> float:
-    """Get the H2 mass required to achieve the same thrust as the JA1 engine."""
-    mdot_H2 = mdot_fuel * R_eta_th * R_LHV
-    m_H2 = np.trapz(mdot_H2, t)  # Integrate fuel flow over time
-    return m_H2
+# def calculate_nominal_flight_time_minus_hold(mission: 'FlightMission') -> float:
+#     """
+#     Calculates the total flight time for nominal mission phases.
+#     This excludes time spent in any segment initiated by a waypoint explicitly named "hold" (case-insensitive),
+#     regardless of that "hold" waypoint's nominal status.
+#     All other segments initiated by nominal waypoints, including any of their specified hold_times, are included.
+#     Returns time in seconds.
+#     """
+#     profile = mission.profile
+#     if not profile or 'time' not in profile or not profile['time'].size:
+#         return 0.0
+
+#     dt = mission.dt
+#     wp_map = {wp.name: wp for wp in mission.wps}
+
+#     total_nominal_time_excluding_hold_wp_segments = 0.0
+#     phase_array = profile['phase']
+#     time_array = profile['time']
+
+#     for i in range(len(time_array)):
+#         current_phase_name = phase_array[i]
+#         waypoint_of_current_segment_start = wp_map.get(current_phase_name)
+
+#         if waypoint_of_current_segment_start:
+#             # Check if the waypoint that started this segment is nominal
+#             is_nominal_waypoint = waypoint_of_current_segment_start.nominal
+            
+#             # Check if the waypoint that started this segment is NOT named "hold"
+#             is_not_a_hold_waypoint = waypoint_of_current_segment_start.name.lower() != "hold"
+
+#             if is_nominal_waypoint and is_not_a_hold_waypoint:
+#                 total_nominal_time_excluding_hold_wp_segments += dt
+            
+#     return total_nominal_time_excluding_hold_wp_segments
+
+# def mass_adjustment(mdot_fuel: np.ndarray, t: np.ndarray, R_eta_th: np.ndarray, R_LHV) -> float:
+#     """Get the H2 mass required to achieve the same thrust as the JA1 engine."""
+#     mdot_H2 = mdot_fuel * R_eta_th * R_LHV
+#     m_H2 = np.trapezoid(mdot_H2, t)  # Integrate fuel flow over time
+#     return m_H2
     
 class FlightMission:
     """Time-resolved kinematic + power mission profile.
@@ -72,7 +111,9 @@ class FlightMission:
                  R_LHV: float = 1.0,
                  dt: float = 1.0,
                  total_range_m: Optional[float] = None,
-                 cruise_wp_name: str = "cruise") -> None:
+                 cruise_wp_name: str = "cruise",
+                 P_fc_max: float = 0.0,
+                 P_fc_min: float = 0.0) -> None:
         if len(waypoints) < 2:
             raise ValueError("Need at least two waypoints.")
         self.ac = aircraft
@@ -82,6 +123,8 @@ class FlightMission:
         self.dt = dt
         self.total_range = total_range_m
         self.cruise_wp_name = cruise_wp_name.lower()
+        self.P_fc_max = P_fc_max # [W] Combustion chamber activation threshold power
+        self.P_fc_min = P_fc_min # [W] Minimum fuel cell power (FC IDLE)
         self._profile: Dict[str, np.ndarray] = {}
 
     # ---------------------------------------------------------------------
@@ -123,7 +166,20 @@ class FlightMission:
         P = T*V_inf
         
         return P
-
+    
+    # ---------------------------------------------------------------------
+    #  INTERNAL HELPERS – fuel cell
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def __mdot_fc(Pa: float):
+        """Compute mass flow rate of fuel from the fuel cell available power.
+        Args:
+            Pa: Available power [W]
+        Returns:
+            mdot_fc: Mass flow rate of fuel [kg/s]
+        """
+        return 0.01560072557 * Pa/1e6  # 0.01560072557 kg/s per MW
+    
     # ---------------------------------------------------------------------
     #  CORE MISSION BUILDER
     # ---------------------------------------------------------------------
@@ -220,6 +276,7 @@ class FlightMission:
                 if "taxi" in wp.name.lower() or "taxi" in nxt.name.lower():
                     __append(nxt.airspeed, wp.altitude, 0.0, wp.name)
                     continue
+                
                 # Otherwise interpolate speed change
                 if abs(dv) < 1e-6:
                     continue
@@ -361,22 +418,39 @@ class FlightMission:
         for pp, sl in self.__pp_slicer(phase_arr, time_arr):
             if pp.power is not None:
                 # Powerpoint with power
-                Pr_arr[sl] = pp.power*self.ac.MAXC
-                # Propulsive efficiency
-                Th = Pr_arr[sl]/V_arr[sl]
+                Pa_total = pp.power * self.ac.MAXC # Add auxiliary power
+                
+                if self.P_fc_max < Pa_total:
+                    Pa_cc = Pa_total - self.P_fc_max
+                    Pa_fc = self.P_fc_max + self.ac.AP
+                    if Pa_cc < self.ac.P_cc_min:
+                        Pa_cc = self.ac.P_cc_min
+                        Pa_fc = Pa_total - Pa_cc + self.ac.AP
+                        if Pa_fc < self.P_fc_min:
+                            Pa_cc = Pa_total + self.ac.AP
+                            Pa_fc = 0.0
+                else:
+                    Pa_fc = Pa_total + self.ac.AP
+                    Pa_cc = 0.0
+                    
+                
+                Pa_cc_arr = Pa_cc * np.ones_like(V_arr[sl])
+                Pa_arr[sl] = Pa_total              
                 
                 # Fuel mass flow using Torenbeek method (PSFC)
-                mdot_fuel_arr[sl], eta_th_arr[sl], eta_prop_arr[sl] = self.ac.eng.compute(
-                    T_arr[sl], P_arr[sl], rho_arr[sl], V_arr[sl], R_LHV=self.R_LHV, Pr=Pr_arr[sl]
+                mdot_fuel_arr[sl], eta_th_arr[sl], eta_prop_arr[sl], mdot_air_arr[sl] = self.ac.eng.compute(
+                    T_arr[sl], P_arr[sl], rho_arr[sl], V_arr[sl], R_LHV=self.R_LHV, Pa=Pa_cc_arr
                 )
                 
-                # Available power
-                Pa_arr[sl] = Pr_arr[sl]/eta_prop_arr[sl]
+                # Add fuel cell mass flow from threshold power
+                mdot_fuel_arr[sl] += self.__mdot_fc(Pa_fc)
+                
+                # Required power
+                Pr_arr[sl] = Pa_arr[sl] * eta_prop_arr[sl]
                 
                 m_start = m_arr[sl.start - 1] if sl.start > 0 else self.ac.MTOW
                 burn = np.cumsum(mdot_fuel_arr[sl]) * self.dt          # cumulative fuel burnt _within_ slice
                 m_arr[sl] = m_start - np.concatenate(([0.0], burn[:-1]))
-                mdot_air_arr[sl] = rho_arr[sl] * V_arr[sl] * A_inlet
         
             else:
                 # Compute power from drag balance
@@ -393,20 +467,42 @@ class FlightMission:
                 # Repeat for next time step
                 for i in range(sl.start, sl.stop):
                     m_curr = m_arr[i]
-                    Pr = self.__drag_balance(m_curr, rho_arr[i], V_arr[i])                                
+                    Pr = self.__drag_balance(m_curr, rho_arr[i], V_arr[i])
                     
-                    mdot_fuel, eta_th, eta_prop = self.ac.eng.compute(
-                        T_arr[i], P_arr[i], rho_arr[i], V_arr[i]
+                    # Hijack turboprop propeller efficiency internal method to compute available power
+                    a0 = np.sqrt(k_air * R_AIR * T_arr[i])
+                    M0 = V_arr[i] / a0
+                    eta_prop = self.ac.eng._eta_prop(M0)
+                    
+                    Pa_total = Pr / eta_prop  # Add auxiliary power
+                    
+                    if self.P_fc_max < Pa_total:
+                        Pa_cc = Pa_total - self.P_fc_max
+                        Pa_fc = self.P_fc_max + self.ac.AP
+                        if Pa_cc < self.ac.P_cc_min:
+                            Pa_cc = self.ac.P_cc_min
+                            Pa_fc = Pa_total - Pa_cc + self.ac.AP
+                            if Pa_fc < self.P_fc_min:
+                                Pa_cc = Pa_total + self.ac.AP
+                                Pa_fc = 0.0
+                    else:
+                        Pa_fc = Pa_total + self.ac.AP
+                        Pa_cc = 0.0
+                    
+                    mdot_fuel, eta_th, eta_prop, mdot_air = self.ac.eng.compute(
+                        T_arr[i], P_arr[i], rho_arr[i], V_arr[i], R_LHV=self.R_LHV, Pa=Pa_cc
                     )
                     
-                    Pa = Pr/eta_prop
+                    # Add fuel cell mass flow from threshold power
+                    mdot_fuel += self.__mdot_fc(Pa_fc)
+
                     m_arr[i+1] = m_arr[i] - mdot_fuel*self.dt
                     
                     # 7) Store results @current time step
                     Pr_arr[i] = Pr
-                    Pa_arr[i] = Pa
+                    Pa_arr[i] = Pa_total
                     mdot_fuel_arr[i] = mdot_fuel
-                    mdot_air_arr[i] = rho_arr[i] * V_arr[i] * A_inlet
+                    mdot_air_arr[i] = mdot_air
                     eta_th_arr[i] = eta_th
                     eta_prop_arr[i] = eta_prop     
 
@@ -421,7 +517,6 @@ class FlightMission:
     #  QUICK‑LOOK PLOTS (kinematics + power)
     # ---------------------------------------------------------------------
     def quicklook(self) -> None:
-        import matplotlib.pyplot as plt
         p = self.profile
         fig, axs = plt.subplots(3, 4, figsize=(18, 4))
         axs[0, 0].plot(p["time"], p["alt"])
@@ -451,122 +546,90 @@ class FlightMission:
         plt.show()
 
     
-if __name__ == "__main__":
+def main(fc_split: float=0.0, MTOW: float = 8037.6, CD_HEX: float = 0.0, dt: float=0.1) -> tuple:
+    """Main flight performance function to obtain the fuel mass and shaft power profile.
+    Args:
+        
+        MTOW: Maximum Take-Off Weight in kg.
+        CD_HEX: Coefficient of drag for the heat exchangers fuselage.
+        
+    Returns:
+        tuple: A tuple containing the fuel mass required for the mission and the maximum fuel cell power.
+    """
     wps = [
         Waypoint("taxi\\TO", 0.0, 8.231111, 0.0, hold_time=10 * 60),
         Waypoint("takeoff", 0.0, 54.0167, 797 / 60),
         Waypoint("climb1", 2_438.4, 61.73333, 797 / 60),
         Waypoint("climb2", 4_876.8, 61.73333, 797 / 60),
-        Waypoint("cruise", 7_620.0, 142.501, 0.0),
-        Waypoint("descent1", 7_620.0, 142.501, -7.62),
-        Waypoint("hold", 450.0, 102.88889, 0.0, hold_time=45 * 60, nominal=True),
-        Waypoint("descent2", 450.0, 102.88889, -7.62),
+        Waypoint("cruise", 7_620.0, 133.755556, 0.0),
+        Waypoint("descent1", 7_620.0, 133.755556, -7.62),
+        Waypoint("hold", 1525, 102.88889, 0.0, hold_time=45 * 60, nominal=False),
+        Waypoint("descent2", 1525, 102.88889, -7.62),
         Waypoint("approach", 304.8, 60.2, -3.1506),
         Waypoint("taxi\\landing", 0.0, 8.231111, 0.0, hold_time=10 * 60),
     ]
-
     pws = [
         Powerpoint("taxi\\TO", 0.1415, until_phase="takeoff"),
         Powerpoint("takeoff", 1.04, time=5 * 60),
-        Powerpoint("climb", 0.85, until_phase="cruise"),
+        Powerpoint("climb", 0.95, until_phase="cruise"),
         Powerpoint("cruise", until_phase="descent1"),  # power filled by placeholder
-        Powerpoint("descent1", 0.50, until_phase="hold"),
+        Powerpoint("descent1", 0.30, until_phase="hold"),
         Powerpoint("hold", until_phase="descent2"),    # power filled by placeholder
-        Powerpoint("final", 0.50, until_phase="taxi\\landing"),
+        Powerpoint("final", 0.30, until_phase="taxi\\landing"),
         Powerpoint("taxi\\landing", 0.1415, time=10 * 60),
     ]
-    
-    turboprop_JA1 = Turboprop(
-        name="PT6A-67D",
+    turboprop_H2 = Turboprop(
+        name="PT6A-67D-H2",
+        delta_mdot=4.9895161-4.5359237,
+        mdot_min=4.5359237,
         eta_in=1,
         PI_comp=12.0,
         eta_comp=0.85,
-        PI_cc=0.95,
+        PI_cc=0.9733,
         eta_cc=0.97,
-        LHV_fuel=42.8e6,
+        LHV_fuel=119.96e6,
         T04=1274.15,
         eta_turb=0.85,
         eta_mech=0.95,
         c_pa=1005.0,
         k_air=1.4,
-        c_pg=1_150.0,
-        k_gas=1.33
-    )
-    
-    turboprop_H2 = Turboprop(
-        name="PT6A-67D-H2",
-        eta_in=1,
-        PI_comp=12.0,
-        eta_comp=0.85,
-        PI_cc=0.9733,
-        eta_cc=0.995,
-        LHV_fuel=119.96e6,
-        T04=1274.15,
-        eta_turb=0.89,
-        eta_mech=0.99,
-        c_pa=1005.0,
-        k_air=1.4,
         c_pg=1157.4,
         k_gas=1.364729742
     )
-
-    ac_model_JA1 = Aircraft(
-        name="Beechcraft 1900D",
-        wing_area=28.79,
-        wing_span=17.64,
-        CD0=0.0215,
-        prop_diameter=2.78,
-        eng=turboprop_JA1,
-        MTOW=7_765.0,
-    )
-    
     ac_model_H2 = Aircraft(
         name="Beechcraft 1900D-H2",
         wing_area=28.79,
         wing_span=17.64,
-        CD0=0.023,
+        CD0=0.024+CD_HEX,  # Add heat exchanger drag
         prop_diameter=2.78,
         eng=turboprop_H2,
-        MTOW=7_765.0,
+        MTOW=MTOW,
+        P_cc_min=0.1415 * MAXC,  # [W] Minimum combustion chamber power
+        AP=8.4e3,  # [W] Auxiliary Power
     )
-
-    mission_JA1 = FlightMission(ac_model_JA1, wps, pws, R_LHV=1.0, dt=0.5, total_range_m=2_368e3)
-    # mission_H2_dummy = FlightMission(ac_model_H2, wps, pws, dt=0.5, total_range_m=1311e3)
-    mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=0.5, total_range_m=707e3)
-    m_start = mission_JA1.profile['mass'][0]
-    m_fin = mission_JA1.profile['mass'][-1]
-    print(f"Aircraft: {ac_model_JA1.name}")
-    print(f"Engine: {ac_model_JA1.eng.name}")
-    print(f"Initial mass: {m_start:.1f} kg")
-    print(f"Final mass: {m_fin:.1f} kg")
-    print(f"Fuel burn: {m_start - m_fin:.1f} kg")
-        
-    # m_H2_cc = mass_adjustment(mission_JA1.profile['mdot_fuel'], mission_JA1.profile['time'], 
-    #                     ac_model_JA1.eng.LHV_fuel/ac_model_H2.eng.LHV_fuel,
-    #                     np.divide(mission_JA1.profile['eta_th'], mission_H2_dummy.profile['eta_th']))
+    # Get the combustion chamber threshold power before being used to supplement the fuel cell
+    P_fc_max = pws[1].power * MAXC * fc_split
+    P_fc_min = P_fc_max * 0.09 # NOTE: 9% idle taken from literature
     
-    # m_H2_fc = mass_adjustment(mission_JA1.profile['mdot_fuel'], mission_JA1.profile['time'],
-    #                     ac_model_JA1.eng.LHV_fuel/ac_model_H2.eng.LHV_fuel,
-    #                     mission_JA1.profile['eta_th']/0.7)
+    mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=dt, total_range_m=707e3, P_fc_max=P_fc_max, P_fc_min=P_fc_min)
     
-    # print(f"H2 mass, pure combustion: {m_H2_cc:.1f} kg")
-    # print(f"H2 mass, solely fuel cell: {m_H2_fc:.1f} kg")
-    # # print(np.min(mission_JA1.profile['mdot_air'])/2, np.max(mission_JA1.profile['mdot_air'])/2)
-    m_start = mission_H2.profile['mass'][0]
-    m_fin = mission_H2.profile['mass'][-1]
-    burn_cc = m_start - m_fin
+    H2_burnt = (mission_H2.profile['mass'][0] - mission_H2.profile['mass'][-1])/(1 - E_SCALE)
+    print(f"Total H2 mass burnt: {H2_burnt:.2f} kg")
     
-    R_eta_th = mission_H2.profile['eta_th']/0.7
-    burn_fc = mass_adjustment(mission_H2.profile['mdot_fuel'], mission_H2.profile['time'],
-                        1, R_eta_th)
+    # Determine the maximum fuel cell power across the three splits
+    FC_power = P_fc_max + ac_model_H2.AP # TODO: ADD REDUNDANCY
     
-    print("----")
-    print(f"Aircraft: {ac_model_H2.name}")
-    print(f"Engine: {ac_model_H2.eng.name}")
-    print(f"Initial mass: {m_start:.1f} kg")
-    print(f"Final mass: {m_fin:.1f} kg")
-    print(f"Fuel burn (CC only): {burn_cc:.1f} kg")
-    print(f"Fuel burn (FC only): {burn_fc:.1f} kg")
+    return H2_burnt, FC_power
     
-    mission_JA1.quicklook()
-    mission_H2.quicklook()
+    
+if __name__ == "__main__":
+    splits = np.linspace(0.0, 1.0, 101)
+    
+    mH2 = np.zeros_like(splits)
+    
+    for i, split in enumerate(splits):
+        print(f"Split {i+1}/{len(splits)}: {split:.2f}")
+        mH2[i], _ = main(fc_split=split)
+    
+    plt.plot(splits, mH2)
+    plt.show()
