@@ -63,6 +63,11 @@ hole_diameter_mm = 1.0
 meredith_recovery = 0.50
 inlet_cd = 0.02 
 
+# Fan 
+fan_eff = 0.7
+ra_density = ambient_conditions['rho']  # kg/m³, air density
+delta_pressure = 1000  # Pa, pressure drop across the fan
+
 
 #Skin HX -----------------------------------------------	
 area_wing = 4.6
@@ -263,6 +268,28 @@ class ThermoElectricGenerator(HeatSink):
         return P_out  # return the heat that still needs disposal
 
 
+# -------------------------------- Additional Components -------------------------------
+class Fan():
+    def __init__(self, fan_eff, ra_mf, ra_density, delta_pressure):
+        self.fan_eff = fan_eff
+        self.ra_mf = ra_mf
+        self.ra_density = ra_density
+        self.delta_pressure = delta_pressure
+    def power(self):
+        return (self.ra_mf * self.delta_pressure) / (self.fan_eff * self.ra_density)
+    
+class Pump(): # Only for liquid coolant systems
+    def __init__(self, pump_eff, coolant_mf, coolant_density, delta_pressure):
+        self.pump_eff = pump_eff
+        self.coolant_mf = coolant_mf
+        self.coolant_density = coolant_density
+        self.delta_pressure = delta_pressure
+    def power(self):
+        return (self.coolant_mf * self.delta_pressure) / (self.pump_eff * self.coolant_density)
+    
+    
+# ------------------------------ FUNCTIONS -----------------------------------
+
 def size_thermal_management(heat_sources, sinks):
     total_heat = sum(src.waste_heat() for src in heat_sources)
     print(f"Total waste heat = {total_heat/1000:.1f} kW")
@@ -304,6 +331,15 @@ def size_thermal_management(heat_sources, sinks):
                 print(f"Raw inlet drag: {sizing['drag_N']:.1f} N")
                 print(f"Net drag after Meredith (50% recovery): {sizing['net_drag_N']:.1f} N")
 
+                fan = Fan(
+                    fan_eff=fan_eff,
+                    ra_mf=sizing['m_dot_air'],
+                    ra_density=ambient_conditions['rho'],
+                    delta_pressure=delta_pressure
+                )
+                fan_power = fan.power()
+                print(f"Fan power required during Take-off: {fan_power/1000:.2f} kW")
+
                 remaining_heat = 0
     if remaining_heat > 0:
         print(f"WARNING: {remaining_heat/1000:.1f} kW of heat could not be dissipated!")
@@ -335,14 +371,4 @@ sinks = [lh2_tank, lh2_tank_1,teg, skin_hx, ram_air_hx]
 if __name__ == "__main__":
     size_thermal_management(heat_sources, sinks)
 
-
-# -------------------------------- Additional Components -------------------------------
-class Pump():
-    def __init__(self, fan_eff, ra_mf, ra_density, delta_pressure):
-        self.fan_eff = fan_eff
-        self.ra_mf = ra_mf
-        self.ra_density = ra_density
-        self.delta_pressure = delta_pressure
-    def power(self):
-        return (self.ra_mf * self.delta_pressure) / (self.fan_eff * self.ra_density)
 
