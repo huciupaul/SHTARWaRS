@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 P_req = 500000  #[W] Required power in watts
+Cable_length = 20 #Cable length in meter
+Spec_W_cable = 0.0015 # cables: 0.0015 kg/kW/m
 
 def motor_weight(P):
     """Calculate the weight of the EPS based on the required power."""
@@ -10,13 +12,20 @@ def motor_weight(P):
 def inverter_weight(P):
     return 0.97 * P_req /20 / 1000
 
-def heat_dissipation(P):
+def cable_weight(P, L):
+    return L * Spec_W_cable * P / 1000
+
+def heat_dissipation_motor(P):
     """Calculate the heat dissipation of the EPS."""
-    return P_req * (1 - 0.97) + P_req * (1 - 0.97)**2
+    return P_req * (1/0.97 - 1)
+
+def heat_dissipation_inverter(P):
+    """Calculate the heat dissipation of the EPS."""
+    return P_req * (1/0.99 - 1)
 
 def fc_power_needed(P_req):
     """Calculate the total power needed from the fuel cell."""
-    return P_req / (0.97**2)
+    return P_req / (0.97*0.99)
 
 def motor_sizing(lambd, P_req):
     """Calculate the EPS sizing parameters."""
@@ -24,13 +33,12 @@ def motor_sizing(lambd, P_req):
     c2 = 0.00161
     c3 = 0.1934
     hs = 0.025
-    P_req = P_req / 2
-    r = (lambd * P_req)**(1/3) * c1
-    l = c2 * 1/lambd * (lambd * P_req)**(1/3)
+    P_req2 = P_req / 2
+    r = (lambd * P_req2)**(1/3) * c1
+    l = c2 * 1/lambd * (lambd * P_req2)**(1/3)
     hy = r * c3
     r_out = r + hs + hy
     r_tot = ((0.737 * (r_out ** 2)) - 0.580 * r_out + 1.1599) * r_out
-
     return r_tot, l
 
 def motor_volume(radius, length):
@@ -39,7 +47,7 @@ def motor_volume(radius, length):
 
 def inverter_volume(P):
     return 0.97 * P / 18.7
-print(motor_weight(P_req), inverter_weight(P_req))
-print(motor_sizing(0.5, P_req))
+print("Motors weight:",motor_weight(P_req),"Inverter Weight:", inverter_weight(P_req),"Cable weight:", cable_weight(P_req, Cable_length) )
+print("1 Motor radius and length:",motor_sizing(0.5, P_req))
 
 #cables: 0.0015 kg/kW/m 
