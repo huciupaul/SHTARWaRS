@@ -435,10 +435,11 @@ def main_storage(m_h2):
                 str_mass = estimated_mass * ratio
                 Q_str = Q_og_str * np.sqrt(ratio/ratio) #Assuming Volume increase with the same ratio as the mass
                 Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in,Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w, p_vent, Qleak, Qcond, Qrad, dv_list, L_out, R_out = compute_tank(material, material2, mat_property, MAWP,mass_h2,Q_str,mat2_property,str_mass,fill_ratio,V_in, P_vent,Qmax)
-                print(f"Material In: {material}, Material Out: {material2}, MAWP: {MAWP} Pa, P_vent:{P_vent}")
-                print(f"Tank Volume: {Vt:.4f} m^3")
-                print(f"Tank Mass: {Mt:.4f} kg")
-                print(f"CO2 emissions: {co2_kg:.4f} kg")
-                print(f"Embodied Energy: {emb_energy:.4f} MJ")
+                # print(f"Material In: {material}, Material Out: {material2}, MAWP: {MAWP} Pa, P_vent:{P_vent}")
+                # print(f"Tank Volume: {Vt:.4f} m^3")
+                # print(f"Tank Mass: {Mt:.4f} kg")
+                # print(f"CO2 emissions: {co2_kg:.4f} kg")
+                # print(f"Embodied Energy: {emb_energy:.4f} MJ")
+    return Mt, Vt
 
-main_storage(278.9577)  # Example mass of hydrogen in kg
+print(main_storage(278.9577))  # Example mass of hydrogen in kg
