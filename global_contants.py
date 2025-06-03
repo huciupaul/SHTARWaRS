@@ -21,8 +21,8 @@ AR, e = 10.808, 0.735809
 k = 1 / (np.pi * AR * e)
 S = 28.79                                           # [m²]
 MTOW_orig = 7_765   * G_0                           # [N] Original Maximum Take-Off Weight
+#Modified Aircraft MTOW(requirement)
 MTOW_mod  = 8_037.6 * G_0                           # [N] Modified Maximum Take-Off Weight  
-
 
 # Orifinal aircraft performance constants
 V_TO, V_L  = 54.0167, 54.0167
