@@ -8,6 +8,47 @@ import csv
 import ast
 import matplotlib.colors as mcolors
 
+# Constants
+
+dormancy = 24       #[hours]
+stratification_factor = 2
+k_str = 1.9         #[W/mK]
+MAWP_global = 600000       #[Pa]
+p_vent_global = 600000     #[Pa]
+p_sl = 101325             #[Pa]
+
+r_in = 0.75                #[m]
+
+Q_leak_min = 10 #W (determined from Nicolas's thesis)
+Q_leak_max = 1000 #W (determined from Nicolas's thesis)
+
+T_hot = 40      #[Celsius]
+
+gf = 'S-Glass fiber'
+fos = 2/3
+gf_density, gf_tensile_strength, gf_thermal_cond, gf_thermal_emis, gf_co2, gf_ee, gf_fvf = 1905,1730*1e6*fos,0.745,0.95,7.22,116.5,0.675
+
+# Thesis values
+Q_original_str = 0.4 #W
+kevlar_thermal_cond = 1.9 #W/mK
+mass_original_str = 2.1 #kg
+mass_originalg_lh2 = 6.2 #kg
+gravimetric_index = 0.35 #from NASA report
+kevlar_co2 = 13.1 #kg/kg (Kevlar 149)
+kevlar_emb_energy = 257 #MJ/kg (Embodied Energy for Kevlar 149)
+
+t_min = 0.001 #m (minimum thickness of the tank wall)
+
+mli_density = 7900 #kg/m^3 https://www.sciencedirect.com/science/article/pii/S135943112200391X
+mli_emis = 0.21  #https://www.thermalengineer.com/library/effective_emittance.htm
+vacuum_thermal_cond = 0.015*1e-1#3 # W/mK https://www.researchgate.net/publication/321219004_Cylindrical_Cryogenic_Calorimeter_Testing_of_Six_Types_of_Multilayer_Insulation_Systems
+mli_thermal_cond = 17.4 # W/mK  https://www.sciencedirect.com/science/article/pii/S135943112200391X
+mli_ss_co2 = 3 #kg/kg (for SS)
+mli_ss_ee = 42.74 #MJ/kg (Embodied Energy for SS)
+mli_layers = 40
+mli_thickness = 0.03 *1e-3 * mli_layers #https://www.sciencedirect.com/science/article/pii/S135943112200391X
+
+
 
 def main_storage(m_h2):
     
@@ -35,11 +76,11 @@ def main_storage(m_h2):
             self.mat2_fibre_ratio = mat2_property[6]
 
             # ---------------------------------------------Constants ----------------------------------------------------------------
-            self.dormancy = 24 #hours
+            self.dormancy = dormancy #hours
             self.fill_ratio = fill #percentage of LH2 at the start
             self.mass_h2 = mass_h2 #kg
-            self.stratification_factor = 2
-            self.k_str = 1.9 #[W/mK]
+            self.stratification_factor = stratification_factor
+            self.k_str = k_str #[W/mK]
 
 
             # --------------------------------------------- Inputs ------------------------------------------------------------------
@@ -48,7 +89,7 @@ def main_storage(m_h2):
             self.Pvent = p_vent #Assumption
 
             # Hydrogen properties
-            self.P0 = 101325 # Initial pressure in Pa
+            self.P0 = p_sl # Initial pressure in Pa
             self.T0 = CP.PropsSI('T', 'P', self.P0, 'Q', 0.1, 'ParaHydrogen') # Initial temperature in K
             self.rhol0 = CP.PropsSI('D', 'T', self.T0, 'Q', 0, 'ParaHydrogen') # density of liquid hydrogen
             self.rhog0 = CP.PropsSI('D', 'T', self.T0, 'Q', 1, 'ParaHydrogen') # density of gas hydrogen
@@ -60,9 +101,9 @@ def main_storage(m_h2):
             self.x0 = self.mg0/(self.mg0+self.ml0) #unitless (vapor quality)
 
             # ---------------------------------------------- Constraint ---------------------------------------------------
-            self.R_in = 0.75 #m
-            self.Q_leak_min = 10 #W (determined from Nicolas's thesis)
-            self.Q_leak_max = 1000 #W (determined from Nicolas's thesis)
+            self.R_in = r_in #m
+            self.Q_leak_min = Q_leak_min #W (determined from Nicolas's thesis)
+            self.Q_leak_max = Q_leak_max #W (determined from Nicolas's thesis)
             
 
         # ----------------------------------------------- Maximum Heat Load ---------------------------------------------------
@@ -189,8 +230,8 @@ def main_storage(m_h2):
 
         def heat_influx(self, L_in_max, Q_str,t1,emis_mli,k_vac,t_mli, k_mli,Qmax,n_mli,t2):
             T_tank = self.T0
-            T_amb = 300 # K
-            P_amb = 101325 # Pa
+            T_amb = 273.15 + T_hot # K
+            P_amb = p_sl # Pa
             r_in = self.R_in
             Q_in_max = Qmax -Q_str
             k_1 = self.mat_property[2]
@@ -314,43 +355,39 @@ def main_storage(m_h2):
     # -------------------------------------------------------------------------------------------------------------------
     # ------------------------------------------------- Tank Database ---------------------------------------------------
     materials = ['S-Glass Fiber'] #From Granta and Engineering Toolbox
-    SF = 1/1.5 #NASA s safety factor for the materials
+    SF = fos #NASA s safety factor for the materials
     #density in kg/m^3, yield strength in Pa, thermal conductivity in W/mK, emissivity in [-], CO2 [kg/kg], Embodied Energy in MJ/kg, Fibre Ratio
-    mat_properties = [ [1905,1730*1e6*SF,0.745,0.95,7.22,116.5,0.675]]
+    mat_properties = [ [gf_density, gf_tensile_strength, gf_thermal_cond, gf_thermal_emis, gf_co2, gf_ee, gf_fvf]]
     #MAWPS = [600000,650000,800000,1000000,1200000,1280000] #bar to Pa
-    MAWP = 600000
-    P_vents = [600000]
-    n_mats = 1
-    n_vent = len(P_vents)
-    materials = materials[:n_mats]
-    mat_properties = mat_properties[:n_mats]
-    P_vents = P_vents[:n_vent]
+    MAWP = MAWP_global
+    P_vent = p_vent_global
 
     # ------------------------------------------------- Structure ------------------------------------------------------
     # Thesis values
-    Q_og_str = 0.4 #W
-    k_kevlar = 1.9 #W/mK
-    og_str_mass = 2.1 #kg
-    og_lh2 = 6.2 #kg
-    grav_idx = 0.35 #from NASA report
-    co2_kevlar = 13.1 #kg/kg (Kevlar 149)
-    kevlar_ee = 257 #MJ/kg (Embodied Energy for Kevlar 149)
+    Q_og_str = Q_original_str #W
+    k_kevlar = kevlar_thermal_cond #W/mK
+    og_str_mass = mass_original_str #kg
+    og_lh2 = mass_originalg_lh2 #kg
+    grav_idx = gravimetric_index #from NASA report
+    co2_kevlar = kevlar_co2 #kg/kg (Kevlar 149)
+    kevlar_ee = kevlar_emb_energy #MJ/kg (Embodied Energy for Kevlar 149)
 
     #Our values
     mass_h2 = m_h2#278.9577  #kg
     estimated_mass = mass_h2/grav_idx - mass_h2
-    t_limit = 0.001 #m (minimum thickness of the tank wall)
+    t_limit = t_min #m (minimum thickness of the tank wall)
 
     #Insulation
 
-    dens_mli = 7900 #kg/m^3 https://www.sciencedirect.com/science/article/pii/S135943112200391X
-    emis_mli = 0.21  #https://www.thermalengineer.com/library/effective_emittance.htm
-    k_vac = 0.015*1e-1#3 # W/mK https://www.researchgate.net/publication/321219004_Cylindrical_Cryogenic_Calorimeter_Testing_of_Six_Types_of_Multilayer_Insulation_Systems
-    k_mli = 17.4 # W/mK  https://www.sciencedirect.com/science/article/pii/S135943112200391X
-    mli_co2 = 3 #kg/kg (for SS)
-    mli_ee = 42.74 #MJ/kg (Embodied Energy for SS)
-    N_MLI = 40
-    t_mli = 0.03 *1e-3 * N_MLI #https://www.sciencedirect.com/science/article/pii/S135943112200391X
+    dens_mli = mli_density #kg/m^3 https://www.sciencedirect.com/science/article/pii/S135943112200391X
+    emis_mli = mli_emis  #https://www.thermalengineer.com/library/effective_emittance.htm
+    k_vac = vacuum_thermal_cond#3 # W/mK https://www.researchgate.net/publication/321219004_Cylindrical_Cryogenic_Calorimeter_Testing_of_Six_Types_of_Multilayer_Insulation_Systems
+    k_mli = mli_thermal_cond # W/mK  https://www.sciencedirect.com/science/article/pii/S135943112200391X
+    mli_co2 = mli_ss_co2 #kg/kg (for SS)
+    mli_ee = mli_ss_ee #MJ/kg (Embodied Energy for SS)
+    N_MLI = mli_layers
+    t_mli = mli_thickness #https://www.sciencedirect.com/science/article/pii/S135943112200391X
+
 
     def fA(mh2, P_vent, fl_final = 0.98):
 
@@ -361,7 +398,7 @@ def main_storage(m_h2):
         V_tot   = V_l_fin / fl_final
 
         # Calculate the initial fill fraction
-        rho_l_0 = CP.PropsSI('D', 'P', 101325, 'Q', 0, 'ParaHydrogen')  # Initial liquid density
+        rho_l_0 = CP.PropsSI('D', 'P', p_sl, 'Q', 0, 'ParaHydrogen')  # Initial liquid density
         # print(f"Initial liquid density: {rho_l_0} kg/m^3")
         V_l_0   = mh2 / rho_l_0  # Initial liquid volume
         fl_init = V_l_0 / V_tot  # Initial fill fraction
@@ -420,26 +457,24 @@ def main_storage(m_h2):
 
     # ------------------------------------------------- Main ------------------------------------------------------
 
-    for P_vent in P_vents:
-        #MAWP = P_vent
-        V_in, fill_ratio = fA(mass_h2, P_vent)
-        V_in = V_in
-        Qmax = compute_Qleak(materials[0], materials[0], mat_properties[0], MAWP,mass_h2,0,mat_properties[0],0,fill_ratio,V_in, P_vent)
-        for material, mat_property in zip(materials, mat_properties):
-            for material2, mat2_property in zip(materials, mat_properties):
-                if material == 'S-Glass Fiber' or  material == 'Carbon Fiber': #Composites
-                    og_tank_mass = 4.8+3.15
-                else: #Metallic materials (compared to aluminium)
-                    og_tank_mass = 8.4+3.6
-                ratio = og_str_mass / (og_tank_mass+og_lh2)
-                str_mass = estimated_mass * ratio
-                Q_str = Q_og_str * np.sqrt(ratio/ratio) #Assuming Volume increase with the same ratio as the mass
-                Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in,Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w, p_vent, Qleak, Qcond, Qrad, dv_list, L_out, R_out = compute_tank(material, material2, mat_property, MAWP,mass_h2,Q_str,mat2_property,str_mass,fill_ratio,V_in, P_vent,Qmax)
-                # print(f"Material In: {material}, Material Out: {material2}, MAWP: {MAWP} Pa, P_vent:{P_vent}")
-                # print(f"Tank Volume: {Vt:.4f} m^3")
-                # print(f"Tank Mass: {Mt:.4f} kg")
-                # print(f"CO2 emissions: {co2_kg:.4f} kg")
-                # print(f"Embodied Energy: {emb_energy:.4f} MJ")
+    V_in, fill_ratio = fA(mass_h2, P_vent)
+    V_in = V_in
+    Qmax = compute_Qleak(materials[0], materials[0], mat_properties[0], MAWP,mass_h2,0,mat_properties[0],0,fill_ratio,V_in, P_vent)
+    for material, mat_property in zip(materials, mat_properties):
+        for material2, mat2_property in zip(materials, mat_properties):
+            if material == 'S-Glass Fiber' or  material == 'Carbon Fiber': #Composites
+                og_tank_mass = 4.8+3.15
+            else: #Metallic materials (compared to aluminium)
+                og_tank_mass = 8.4+3.6
+            ratio = og_str_mass / (og_tank_mass+og_lh2)
+            str_mass = estimated_mass * ratio
+            Q_str = Q_og_str * np.sqrt(ratio/ratio) #Assuming Volume increase with the same ratio as the mass
+            Vt, Mt, mass_error,Vh2,t1,t2,dv,L_in,Vh2,R_in,co2_kg,emb_energy, ang1_w, ang2_w, p_vent, Qleak, Qcond, Qrad, dv_list, L_out, R_out = compute_tank(material, material2, mat_property, MAWP,mass_h2,Q_str,mat2_property,str_mass,fill_ratio,V_in, P_vent,Qmax)
+            # print(f"Material In: {material}, Material Out: {material2}, MAWP: {MAWP} Pa, P_vent:{P_vent}")
+            # print(f"Tank Volume: {Vt:.4f} m^3")
+            # print(f"Tank Mass: {Mt:.4f} kg")
+            # print(f"CO2 emissions: {co2_kg:.4f} kg")
+            # print(f"Embodied Energy: {emb_energy:.4f} MJ")
     return Mt, Vt
 
-print(main_storage(278.9577))  # Example mass of hydrogen in kg
+print(main_storage(378.9577))  # Example mass of hydrogen in kg
