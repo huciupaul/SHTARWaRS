@@ -18,7 +18,6 @@ class EPS:
         self.lambd = lambd
 
     def motor_weight(self):
-        """Calculate the weight of the EPS based on the required power."""
         return self.P_req / 10 / 1000
 
     def inverter_weight(self):
@@ -28,15 +27,12 @@ class EPS:
         return self.L * self.Spec_W_cable * self.P_req / 1000
 
     def heat_dissipation_motor(self):
-        """Calculate the heat dissipation of the EPS."""
         return self.P_req * (1/0.97 - 1)
 
     def heat_dissipation_inverter(self):
-        """Calculate the heat dissipation of the EPS."""
         return self.P_req * (1/0.99 - 1)
     
     def __motor_sizing(self):
-        """Calculate the EPS sizing parameters."""
         c1 = 0.000805
         c2 = 0.00161
         c3 = 0.1934
@@ -50,7 +46,6 @@ class EPS:
         return r_tot, l
 
     def motor_volume(self):
-        """Calculate the volume of the EPS."""
         r_tot, l = self.__motor_sizing()
         return np.pi * r_tot**2 * l
 
@@ -59,6 +54,14 @@ class EPS:
 
     
 def main(fc_split: float = 0.0):
+    """
+    Main function to calculate the EPS components weight, heat dissipation and volume.
+    Args:
+        fc_split (float): Fraction of TOGA power allocated to the fuel cell. 
+    Returns:
+        comp (np.ndarray): Array containing the weights, heat dissipations and volumes of the EPS components.
+        tot (np.ndarray): Array containing the total weight and heat dissipation of the EPS (volume excluded as not relevant).
+    """
     eps = EPS(fc_split=fc_split)
 
     comp = np.zeros(7)
