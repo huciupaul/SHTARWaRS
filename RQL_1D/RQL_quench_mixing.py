@@ -10,7 +10,7 @@ from mixture_properties import (
 
 '''
 This script is used to estimate the maximum mixing time in the quench zone of a RQL combustor 
-to keep the NOx emissions under the specified limit. 
+to keep the NOx emissions under the specified limit.
 '''
 
 #----------Inputs----------
@@ -39,6 +39,8 @@ X_h2o = "H2O:1"
 T_h2o = 333.0  # K
 
 # Total time for mixing
+
+# What should be the range of mixing times???
 t_mix_tot = np.arange(0.01, 1.01, 1e-2)  # seconds
 
 #----------Outputs----------
