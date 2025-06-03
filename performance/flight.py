@@ -418,20 +418,20 @@ class FlightMission:
         for pp, sl in self.__pp_slices(phase_arr, time_arr):
             if pp.power is not None:
                 # Powerpoint with power
-                Pa_total = pp.power * self.ac.MAXC + self.ac.AP  # Add auxiliary power
+                Pa_total = pp.power * self.ac.MAXC # Add auxiliary power
                 
                 if self.P_fc_max < Pa_total:
                     Pa_cc = Pa_total - self.P_fc_max
-                    Pa_fc = self.P_fc_max
+                    Pa_fc = self.P_fc_max + self.ac.AP
                     if Pa_cc < self.ac.P_cc_min:
                         Pa_cc = self.ac.P_cc_min
-                        Pa_fc = Pa_total - Pa_cc
+                        Pa_fc = Pa_total - Pa_cc + self.ac.AP
                         if Pa_fc < self.P_fc_min:
-                            Pa_cc = Pa_total
+                            Pa_cc = Pa_total + self.ac.AP
                             Pa_fc = 0.0
                 else:
-                    Pa_cc = Pa_total
-                    Pa_fc = 0.0
+                    Pa_fc = Pa_total + self.ac.AP
+                    Pa_cc = 0.0
                     
                 
                 Pa_cc_arr = Pa_cc * np.ones_like(V_arr[sl])
@@ -474,20 +474,20 @@ class FlightMission:
                     M0 = V_arr[i] / a0
                     eta_prop = self.ac.eng._eta_prop(M0)
                     
-                    Pa_total = Pr / eta_prop + self.ac.AP  # Add auxiliary power
+                    Pa_total = Pr / eta_prop  # Add auxiliary power
                     
                     if self.P_fc_max < Pa_total:
                         Pa_cc = Pa_total - self.P_fc_max
-                        Pa_fc = self.P_fc_max
+                        Pa_fc = self.P_fc_max + self.ac.AP
                         if Pa_cc < self.ac.P_cc_min:
                             Pa_cc = self.ac.P_cc_min
-                            Pa_fc = Pa_total - Pa_cc
+                            Pa_fc = Pa_total - Pa_cc + self.ac.AP
                             if Pa_fc < self.P_fc_min:
-                                Pa_cc = Pa_total
+                                Pa_cc = Pa_total + self.ac.AP
                                 Pa_fc = 0.0
                     else:
-                        Pa_cc = Pa_total
-                        Pa_fc = 0.0
+                        Pa_fc = Pa_total + self.ac.AP
+                        Pa_cc = 0.0
                     
                     mdot_fuel, eta_th, eta_prop, mdot_air = self.ac.eng.compute(
                         T_arr[i], P_arr[i], rho_arr[i], V_arr[i], R_LHV=self.R_LHV, Pa=Pa_cc
@@ -617,10 +617,19 @@ def main(fc_split: float=0.0, MTOW: float = 8037.6, CD_HEX: float = 0.0, dt: flo
     print(f"Total H2 mass burnt: {H2_burnt:.2f} kg")
     
     # Determine the maximum fuel cell power across the three splits
-    FC_power = P_fc_max # TODO: ADD REDUNDANCY
+    FC_power = P_fc_max + ac_model_H2.AP # TODO: ADD REDUNDANCY
     
     return H2_burnt, FC_power
     
     
 if __name__ == "__main__":
-    main(fc_split=0.3)
+    splits = np.linspace(0.0, 1.0, 101)
+    
+    mH2 = np.zeros_like(splits)
+    
+    for i, split in enumerate(splits):
+        print(f"Split {i+1}/{len(splits)}: {split:.2f}")
+        mH2[i], _ = main(fc_split=split)
+    
+    plt.plot(splits, mH2)
+    plt.show()
