@@ -7,15 +7,15 @@ from common.constants import R_AIR, MAXC
 class Turboprop:
     """Full model of a turboprop engine. The model is based on the following
     assumptions:
-    - Brayton cycle
-    - Constant inlet, compressor, combustion chamber, and turbine efficiencies
-    - Constant specific heat ratio of air and combustion products
-    - Constant specific heat of combustion products
-    - Constant pressure ratio across the compressor and combustion chamber
-    - Constant turbine inlet temperature
-    - ISA atmosphere
-    - No bleed air extraction
-    - No variable geometry
+        - Brayton cycle
+        - Constant inlet, compressor, combustion chamber, and turbine efficiencies
+        - Constant specific heat ratio of air and combustion products
+        - Constant specific heat of combustion products
+        - Constant pressure ratio across the compressor and combustion chamber
+        - Constant turbine inlet temperature
+        - ISA atmosphere
+        - No bleed air extraction
+        - No variable geometry
     """
     def __init__(
         self,
