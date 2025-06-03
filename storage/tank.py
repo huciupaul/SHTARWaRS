@@ -473,5 +473,3 @@ def main_storage(m_h2):
             # print(f"CO2 emissions: {co2_kg:.4f} kg")
             # print(f"Embodied Energy: {emb_energy:.4f} MJ")
     return Mt, Vt
-
-print(main_storage(278.9577))  # Example call with a mass of 278.9577 kg of hydrogen
