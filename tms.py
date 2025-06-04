@@ -52,7 +52,7 @@ cp_air = 1005.0
 T_air_in = ambient_conditions['T']
 T_air_out = ambient_conditions['T'] + 20.0
 
-# Cooland and HX Properties
+# Coolant and HX Properties
 h_cool = 1500 # average coolant heat transfer coefficient for double phase
 U_ra = 1 / (1/h_air + 1/h_cool) # overall heat transfer coefficient
 ra_coolant_temp = 350.0 # K
@@ -73,7 +73,7 @@ delta_pressure = 1000  # Pa, pressure drop across the fan
 area_wing = 4.6
 
 #Coolant
-k_in = 0.6
+k_in = 0.258 # thermal conductivity of coolant [W/m.K]
 prandtl_in = 0.71 # fluid
 Reynolds = 1e4 # fluid
 f = (0.79 * math.log(Reynolds) - 1.64) ** -2
@@ -88,8 +88,19 @@ reynolds_air = 1e7
 h_ext = ambient_conditions['rho'] * ambient_conditions['V'] * cp_air * 0.185 * (math.log10(reynolds_air))**-2.584 * prandtl_air**-0.66
 recovery_factor = prandtl_air ** 0.33  
 
-
 U_wing = 1/(1/h_in + 1/h_ext)
+
+
+# HX 1 (FC-FC) -----------------------------------------------
+# Coolant properties
+coolant_cp = 3672.348 # (3672.347969811853, 4222.1975576689)  
+k_coolant = 0.485  #  (0.48537754234800523, 0.6806615139526146)
+mu_coolant = 0.0002636  # (0.0001982859557074688, 0.0002636263335097737) 
+
+# H2 properties
+#h2_cp =  # (9384.657038075966, 16485.931431151545)
+mu_h2 = 1.4246e-05  # (1.494409455847204e-06, 1.4246629589288973e-05)
+k_h2 = 0.0272 # (0.02721713884147831, 0.24471920308558517)
 
 
 # Main Classes for Thermal Management System (TMS) -------------------------------	
@@ -252,7 +263,6 @@ class RamAirHeatExchanger(HeatSink):
             'net_drag_N': net_drag_N
         }
 
-
 class ThermoElectricGenerator(HeatSink):
     def __init__(self, hot_temp_K, cold_temp_K, efficiency):
         super().__init__("TEG")
@@ -286,8 +296,112 @@ class Pump(): # Only for liquid coolant systems
         self.delta_pressure = delta_pressure
     def power(self):
         return (self.coolant_mf * self.delta_pressure) / (self.pump_eff * self.coolant_density)
-    
-    
+
+class HX():
+    def __init__(self, name, fluid_cold, fluid_hot, Q_req):
+        self.name = name
+        self.fluid_cold = fluid_cold
+        self.fluid_hot = fluid_hot
+        self.Q_req = Q_req
+
+    def size(self):
+        # Plate propeties
+        plate_thickness = 0.6 * 1e-3 #m
+        plate_thermal_conductivity = 17.5 # W/(m·K), SS
+        size_factor = 1.15 #(1.15-1.25)
+        gap_bt_plates = 3e-3
+        N_plates = 8
+
+
+        # Pipe Properties
+        N_passes = 1
+        dh_coolant = 2*gap_bt_plates / size_factor
+        dh_h2 = dh_coolant
+        
+
+
+        #initial guess for mass flow rate of coolant
+        self.fluid_hot.mf_calculated = self.Q_req / (self.fluid_hot.cp * (self.fluid_hot.T - self.fluid_cold.T))
+        
+        area = 2.3 # assumed area of heat exchanger plate in m²
+        H_hx = 500 # Overall heat exchange coefficient for HX [W/m².K]
+        self.fluid_cold.cp = 9384
+        # Calculation
+        Q = 1000
+        while abs(Q-self.Q_req) > 1e-5:
+        #for i in range(5):
+
+            
+            t_hot_out = self.Q_req / (self.fluid_hot.mf_calculated * self.fluid_hot.cp) + self.fluid_hot.T
+
+
+            t_hot_in = self.fluid_hot.T
+            t_cold_in = self.fluid_cold.T
+            #t_cold_out = self.fluid_hot.T - 5
+            t_cold_out = t_cold_in + 445/9.384
+            delta_t1 = t_hot_out - t_cold_in
+            delta_t2 = t_hot_in - t_cold_out
+            
+            lmtd = (delta_t2 - delta_t1) / math.log(delta_t2 / delta_t1)
+            S_eff = self.Q_req / (lmtd * H_hx)
+            #s_eff = area * size_factor #assumed area of heat exchanger plate
+            #N_plates = math.ceil(S_eff / s_eff)
+            s_eff = (area - 2* math.pi * (dh_coolant/2)**2 ) * size_factor
+            N_plates = min(math.ceil(S_eff / s_eff),8)
+            n_channels = math.ceil((N_plates-1) / 2)
+            volume = N_plates * area * (plate_thickness+gap_bt_plates)  # m³
+            
+            # Coolant
+            C_h_coolant = 0.348
+            y_coolant = 0.663
+            R_fh = 0.0003526
+            Pr_coolant = self.fluid_hot.mu * self.fluid_hot.cp / self.fluid_hot.k
+            Re_coolant = self.fluid_hot.mf_calculated * 4/  (math.pi * dh_coolant * self.fluid_hot.mu) 
+            Nu_coolant = C_h_coolant * Re_coolant**y_coolant * Pr_coolant**0.33 * 1 # Assuming (mu/mu_w)**0.17 = 1, given the tubes are very narrow
+            hc_hot = Nu_coolant * self.fluid_hot.k / dh_coolant
+
+            # H2
+            C_h_h2 = 0.348  # Placeholder
+            y_h2 = 0.663 # Placeholder
+            R_fc = 8.815 * 1e-5 # for vapour
+            Pr_h2 = self.fluid_cold.mu * self.fluid_cold.cp / self.fluid_cold.k  # Prandtl number for H2
+            Re_h2 = self.fluid_cold.mf_calculated * 4/  (math.pi * dh_h2 * self.fluid_cold.mu) 
+            Nu_h2 = C_h_h2 * Re_h2**y_h2 * Pr_h2**0.33 * 1 # Assuming (mu/mu_w)**0.17 = 1, given the tubes are very narrow
+            hc_cold = Nu_h2 * self.fluid_cold.k / dh_h2
+
+
+            # Recalculate overall heat transfer coefficient
+            H_hx = 1/ (1/hc_cold + 1/hc_hot + R_fc + R_fh + plate_thickness/plate_thermal_conductivity)
+
+            Q = H_hx * s_eff * N_plates * lmtd  * N_passes
+            print("Try Q:{H_hx*}")
+            factor = self.Q_req / Q 
+            print(f"Iteration: Q = {Q:.2f} W, Required Q = {self.Q_req:.2f} W, Factor = {factor:.2f}")
+            print(f"Iterarion: Area = {area:.2f} m², Volume = {volume:.2f} m³, N_plates = {N_plates}, n_channels = {n_channels}")
+            hole_area = math.pi * (dh_coolant/2)**2
+            ratio =  hole_area / area
+            print(f"Pipe diameter: {dh_coolant:.3f} m")
+            print(f"Coolant mass flow rate: {self.fluid_hot.mf_calculated:.2f} kg/s")
+            print(f"Total Surface Required: {S_eff:.2f} m²") 
+
+            area *= factor            
+
+        return self.fluid_hot.mf_calculated, area, volume
+        
+        
+
+class Fluid():
+    def __init__(self, name, T, P, C,cp,mf,k, mu):
+        self.name = name
+        self.T = T  # Temperature in Kelvin
+        self.P = P  # Pressure in Pascals
+        self.C = C  # Heat capacity in J/(kg*K)
+        self.cp = cp
+        self.mf_calculated = C/cp
+        self.mf_given = mf
+        self.k = k
+        self.mu = mu
+
 # ------------------------------ FUNCTIONS -----------------------------------
 
 def size_thermal_management(heat_sources, sinks):
@@ -372,3 +486,15 @@ if __name__ == "__main__":
     size_thermal_management(heat_sources, sinks)
 
 
+
+    # Sizing
+    C_h2 = lh2_tank.absorb_heat(fuel_cell.waste_heat())/(t_fin_fc - t_init)
+    print(f"Capacity rate of LH2: {C_h2:.2f})") 
+    fluid_cold = Fluid(name="LH2", T=t_init, P=p_init_fc, C=C_h2, cp = C_h2/h2_mf_fc, k = k_h2, mu = mu_h2, mf = h2_mf_fc)
+    fluid_hot = Fluid(name="FuelCellCoolant", T=t_fin_fc, P=p_fin_fc, C=0, cp = h_cool, mf = 0, k=k_coolant, mu=mu_coolant) 
+
+    hx = HX(name="FuelCellHX", fluid_cold=fluid_cold, fluid_hot=fluid_hot, Q_req=lh2_tank.absorb_heat(fuel_cell.waste_heat()))
+    hx_cool_flow_mass, hx_area, hx_volume = hx.size()
+    print(f"Coolant Mass Flow: {hx_cool_flow_mass:.2f} kg/s")
+    print(f"Heat Exchanger Area: {hx_area:.2f} m²")
+    print(f"Heat Exchanger Volume: {hx_volume:.2f} m³")
