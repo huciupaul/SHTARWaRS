@@ -1,9 +1,11 @@
+import sys
+sys.path.append("..")  # Add parent directory to path
+
 import numpy as np
 from scipy.optimize import fsolve
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 import matplotlib.pyplot as plt
-
 
 # Local imports
 # from common.constants import MAXC, G_0, E_SCALE, R_AIR, k_air
@@ -11,7 +13,7 @@ import matplotlib.pyplot as plt
 from turboprop import Turboprop
 
 # Global imports
-from global_constants import MAXC, G_0, E_SCALE, R_AIR, k_air, isa_atmosphere
+from DSE_1.global_constants import MAXC, TOGA, G_0, E_SCALE, R_AIR, k_air, isa_atmosphere
 
 # Dataclass definitions
 @dataclass
@@ -25,7 +27,9 @@ class Aircraft:
     MTOW: float
     P_cc_min: float = 0.0
     MAXC: float = MAXC
-    AP: float = 0.0
+    TOGA: float = TOGA # [W] Take-Off/Go-Around propulsive power
+    base_AP: float = 0.0  # Operational auxiliary power
+    TMS_AP: float = 0.0  # Thermal Management System power
     n_prop: int = 2  # Added n_prop for number of propellers
     
     @property
@@ -126,7 +130,7 @@ class FlightMission:
         self.dt = dt
         self.total_range = total_range_m
         self.cruise_wp_name = cruise_wp_name.lower()
-        self.P_fc_max = P_fc_max # [W] Combustion chamber activation threshold power
+        self.P_fc_max = P_fc_max # [W] Maximum fuel cell power
         self.P_fc_min = P_fc_min # [W] Minimum fuel cell power (FC IDLE)
         self._profile: Dict[str, np.ndarray] = {}
 
@@ -412,6 +416,7 @@ class FlightMission:
         T_arr, P_arr, rho_arr, a_arr = isa_atmosphere(h_arr)
         Pr_arr = np.zeros_like(V_arr)
         Pa_arr = np.zeros_like(V_arr)
+        Pdumpy_arr = np.zeros_like(V_arr)
         m_arr  = np.zeros_like(V_arr);   m_arr[0] = self.ac.MTOW
         mdot_fuel_arr = np.zeros_like(V_arr)
         mdot_air_arr  = np.zeros_like(V_arr)
@@ -421,24 +426,32 @@ class FlightMission:
         for pp, sl in self.__pp_slicer(phase_arr, time_arr):
             if pp.power is not None:
                 # Powerpoint with power
-                Pa_total = pp.power * self.ac.MAXC # Add auxiliary power
+                Pa_total = pp.power * self.ac.MAXC
                 
+                if Pa_total < self.P_fc_min:
+                    Pa_fc = Pa_total
+                    P_fc_dumpy = self.P_fc_min - Pa_total
+                
+                elif Pa_total > self.P_fc_min and Pa_total < self.P_fc_min + self.ac.P_cc_min:
+
+
                 if self.P_fc_max < Pa_total:
                     Pa_cc = Pa_total - self.P_fc_max
-                    Pa_fc = self.P_fc_max + self.ac.AP
+                    Pa_fc = self.P_fc_max
                     if Pa_cc < self.ac.P_cc_min:
                         Pa_cc = self.ac.P_cc_min
-                        Pa_fc = Pa_total - Pa_cc + self.ac.AP
+                        Pa_fc = Pa_total - Pa_cc
                         if Pa_fc < self.P_fc_min:
-                            Pa_cc = Pa_total + self.ac.AP
+                            Pa_cc = Pa_total + self.ac.TMS_AP + self.ac.base_AP
                             Pa_fc = 0.0
                 else:
-                    Pa_fc = Pa_total + self.ac.AP
+                    Pa_fc = Pa_total
                     Pa_cc = 0.0
                     
                 
                 Pa_cc_arr = Pa_cc * np.ones_like(V_arr[sl])
-                Pa_arr[sl] = Pa_total              
+                Pa_arr[sl] = Pa_total        
+                Pdumpy_arr[sl] = P_fc_dumpy     
                 
                 # Fuel mass flow using Torenbeek method (PSFC)
                 mdot_fuel_arr[sl], eta_th_arr[sl], eta_prop_arr[sl], mdot_air_arr[sl] = self.ac.eng.compute(
@@ -481,15 +494,15 @@ class FlightMission:
                     
                     if self.P_fc_max < Pa_total:
                         Pa_cc = Pa_total - self.P_fc_max
-                        Pa_fc = self.P_fc_max + self.ac.AP
+                        Pa_fc = self.P_fc_max + self.ac.TMS_AP
                         if Pa_cc < self.ac.P_cc_min:
                             Pa_cc = self.ac.P_cc_min
-                            Pa_fc = Pa_total - Pa_cc + self.ac.AP
+                            Pa_fc = Pa_total - Pa_cc + self.ac.TMS_AP
                             if Pa_fc < self.P_fc_min:
-                                Pa_cc = Pa_total + self.ac.AP
+                                Pa_cc = Pa_total + self.ac.TMS_AP
                                 Pa_fc = 0.0
                     else:
-                        Pa_fc = Pa_total + self.ac.AP
+                        Pa_fc = Pa_total + self.ac.TMS_AP
                         Pa_cc = 0.0
                     
                     mdot_fuel, eta_th, eta_prop, mdot_air = self.ac.eng.compute(
@@ -549,7 +562,7 @@ class FlightMission:
         plt.show()
 
     
-def main(fc_split: float=0.0, MTOW: float = 8037.6, CD_HEX: float = 0.0, dt: float=0.1) -> tuple:
+def main(fc_split: float=0.0, MTOW: float = 8037.6, CD_HEX: float = 0.0, base_AP: float = 0.0, TMS_AP: float = 0.0, dt: float=0.1) -> tuple:
     """Main flight performance function to obtain the fuel mass and shaft power profile.
     Args:
         
@@ -608,12 +621,15 @@ def main(fc_split: float=0.0, MTOW: float = 8037.6, CD_HEX: float = 0.0, dt: flo
         prop_diameter=2.78,
         eng=turboprop_H2,
         MTOW=MTOW,
+        TOGA=TOGA,
         P_cc_min=0.1415 * MAXC,  # [W] Minimum combustion chamber power
-        AP=8.4e3,  # [W] Auxiliary Power
+        base_AP=base_AP,
+        TMS_AP=TMS_AP,  # [W] Thermal Management System power
     )
-    # Get the combustion chamber threshold power before being used to supplement the fuel cell
-    P_fc_max = pws[1].power * MAXC * fc_split
-    P_fc_min = P_fc_max * 0.09 # NOTE: 9% idle taken from literature
+    # Max fuel cell power (fuel cell always covers the TMS and base APs)
+    P_fc_max = TOGA * fc_split + TMS_AP + base_AP
+
+    P_fc_min = P_fc_max * 0.09 # NOTE: 9% max, taken from literature
     
     mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=dt, total_range_m=707e3, P_fc_max=P_fc_max, P_fc_min=P_fc_min)
     
@@ -621,7 +637,7 @@ def main(fc_split: float=0.0, MTOW: float = 8037.6, CD_HEX: float = 0.0, dt: flo
     print(f"Total H2 mass burnt: {H2_burnt:.2f} kg")
     
     # Determine the maximum fuel cell power across the three splits
-    FC_power = P_fc_max + ac_model_H2.AP # TODO: ADD REDUNDANCY
+    FC_power = P_fc_max # TODO: ADD REDUNDANCY
     
     return H2_burnt, FC_power
     
