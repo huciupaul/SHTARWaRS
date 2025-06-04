@@ -6,17 +6,9 @@ import matplotlib.pyplot as plt
 
 
 # Local imports
-<<<<<<< HEAD
 from common.constants import MAXC, G_0, E_SCALE, R_AIR, k_air
 from common.atmosphere import isa_atmosphere
-=======
-# from common.constants import MAXC, G_0, A_inlet
-# from common.atmosphere import isa_atmosphere
->>>>>>> 0eb575b4cdb32461b77f5c82d48a2f6a3583d7c5
 from turboprop import Turboprop
-
-# Global imports
-from global_constants import MAXC, TOGA, G_0, A_inlet, isa_atmosphere
 
 # Dataclass definitions
 @dataclass
