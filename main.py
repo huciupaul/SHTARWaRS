@@ -36,7 +36,7 @@ def main(args):
     for split in power_splits:
         #m_eps, Qdot_eps = eps_main(split, TOGA)
 
-        #P_cc, airspeed, T_cc = fpp_simple(TOGA, split)
+        #P_cc, airspeed, T_cc = fpp_simple(TOGA, split) 
         #mdot_h2_cc, T_cc, pressure_cc = Turboprop.function(P_cc)
         for fc_toga_percentage in fc_toga_percentages:
 
@@ -46,7 +46,7 @@ def main(args):
             #MTOW_mod = m_eps + m_fc + m_tms + m_h2 + m_sto
             for fc_cruise_percentage in range(fc_toga_percentage):
                 #m_h2 = fpp(split, fc_toga_percentage, fc_cruise_percentage, MTOW_mod, c_d_tms)
-                #m_sto, vol_sto, l_sto = sto_main(m_h2)
+                #m_sto, vol_sto = sto_main(m_h2)
 
                 
 
