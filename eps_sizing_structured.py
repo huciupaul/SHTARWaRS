@@ -1,6 +1,8 @@
 import numpy as np
-from common.constants import P_TOGA # update once there
+#from common.constants import P_TOGA # TODO: update once there
 import matplotlib.pyplot as plt
+
+P_TOGA = 100000 # TOGA power [W] - placeholder value, should be updated with actual value from constants
 
 class EPS:
     def __init__(self,
