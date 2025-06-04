@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Tuple
 
 """
 This file comprises global constants used throughout the project
@@ -10,10 +11,20 @@ G_0 = 9.80665                                           # [m/s²]
 LAPSE = -0.0065                                         # [K/m]
 k_air = 1.4                                             # [-] Specific heat ratio of air
 
-# Sea level atmosphere constans
+# Sea level atmosphere constants
 T_sl = 288.15                                           # [K] Sea level temperature
 P_sl = 101_325.0                                        # [Pa] Sea level pressure
 rho_sl = 1.225                                          # [kg/m³] Sea level density
+
+# ISA model
+def isa_atmosphere(h: np.ndarray, T_sl: float = T_sl, P_sl: float = P_sl) -> Tuple[float, float, float]:
+    """Thin-layer ISA (no tropopause).
+    Returns T [K], P [Pa], rho [kg/m^3], and speed of sound."""
+    T = T_sl + LAPSE * h
+    P = P_sl * (T / T_sl) ** (-G_0 / (LAPSE * R_AIR))
+    rho = P / (R_AIR * T)
+    a = np.sqrt(k_air * R_AIR * T)  # speed of sound
+    return T, P, rho, a
 
 # Original Aircraft geometry constants
 C_d_0_orig = 0.023
@@ -24,7 +35,7 @@ MTOW_orig = 7_765   * G_0                               # [N] Original Maximum T
 #Modified Aircraft MTOW(requirement)
 MTOW_mod  = 8_037.6 * G_0                               # [N] Modified Maximum Take-Off Weight  
 
-# Orifinal aircraft performance constants
+# Original aircraft performance constants
 V_TO, V_L  = 54.0167, 54.0167
 V_stall_L  = 46.3
 V_cruise   = 144.044
