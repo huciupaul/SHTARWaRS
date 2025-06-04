@@ -4,9 +4,12 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 
 # Local imports
-from common.constants import MAXC, G_0, A_inlet
-from common.atmosphere import isa_atmosphere
+# from common.constants import MAXC, G_0, A_inlet
+# from common.atmosphere import isa_atmosphere
 from turboprop import Turboprop
+
+# Global imports
+from global_constants import MAXC, TOGA, G_0, A_inlet, isa_atmosphere
 
 # Dataclass definitions
 @dataclass
