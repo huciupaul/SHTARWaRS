@@ -596,6 +596,7 @@ def main(fc_split: float=0.0, MTOW: float = 8037.6, CD_HEX: float = 0.0, dt: flo
         c_pg=1157.4,
         k_gas=1.364729742
     )
+    
     ac_model_H2 = Aircraft(
         name="Beechcraft 1900D-H2",
         wing_area=28.79,
@@ -629,7 +630,7 @@ if __name__ == "__main__":
     
     for i, split in enumerate(splits):
         print(f"Split {i+1}/{len(splits)}: {split:.2f}")
-        mH2[i], _ = main(fc_split=split)
+        mH2[i], _ = main(fc_split=split, dt=0.1)
     
     plt.plot(splits, mH2)
     plt.show()
