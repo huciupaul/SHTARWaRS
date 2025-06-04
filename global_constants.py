@@ -64,6 +64,7 @@ mu_TO      = 0.04
 S_g, S_land = 1163, 851
 LW_max     = 7_604 * G_0
 TOGA = 1908*1000 + 8.4 * 1000                           # [W] Take-Off/Go-Around power including auxiliary power(8.4 kW)
+E_SCALE = 0.0783632513412531                            # [-] Scale factor for the error
 
 # Dynamic pressures
 q_climb = 0.5 * rho_sl     * V_climb**2
