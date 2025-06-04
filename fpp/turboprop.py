@@ -2,7 +2,10 @@ import numpy as np
 from typing import Tuple
 
 # Local imports
-from common.constants import R_AIR, MAXC
+# from common.constants import R_AIR, MAXC
+
+# Global imports
+from global_constants import R_AIR, MAXC
 
 class Turboprop:
     """Full model of a turboprop engine. The model is based on the following
