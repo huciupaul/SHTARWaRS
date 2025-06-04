@@ -51,6 +51,10 @@ ROC, V_climb = 10.16, 73.43
 # From FC #
 ###########
 
+# Fuel Cell Stack Characteristics
+mass_specific_power = 5000                                  # [W/kg] Specific power of the fuel cell stack (FZO Roadmap-report)
+volume_specific_power = 4000000                             # [W/m^3] Volume specific power of the fuel cell stack (FZO Roadmap-report)
+
 
 ### FOR CODE CHECKING PURPOSES ONLY ###
 P_A=1.8 * 101325 + 0.06 * 1e5,                               # [Pa] Anode Pressure
