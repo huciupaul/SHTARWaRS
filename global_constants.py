@@ -51,7 +51,7 @@ eff_prop   = 0.80
 mu_TO      = 0.04
 S_g, S_land = 1163, 851
 LW_max     = 7_604 * G_0
-TOGA = 1908*1000
+TOGA = 1908*1000 + 8.4 * 1000                           # [W] Take-Off/Go-Around power including auxiliary power(8.4 kW)
 
 # Dynamic pressures
 q_climb = 0.5 * rho_sl     * V_climb**2
