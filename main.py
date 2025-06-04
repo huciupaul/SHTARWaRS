@@ -8,6 +8,7 @@ import argparse
 import warnings
 import matplotlib.pyplot as plt
 import numpy as np
+from global_constants import TOGA, MTOW_mod # Import global constants
 
 # Internal imports
 #...
@@ -20,16 +21,38 @@ def main(args):
     
     # Define power split array
     power_splits = np.linspace(args.min, args.max, args.n_splits+1)
+    fc_toga_percentages = np.linspace(0, 1, 200)  # Percentage of TOGA power for the fuel cell
     
     # Warn for logs to be overwritten
+    # for split in power_splits:
+    #     log_file = os.path.join(output_dir, f"log_{split:.5f}.csv")
+    #     if os.path.exists(log_file) and not args.overwrite:
+    #         warnings.warn(f"Log file {log_file} already exists. Use --overwrite to overwrite it.")
+    #     elif os.path.exists(log_file) and args.overwrite:
+    #         warnings.warn(f"Overwriting log file {log_file}.")
+    #     else:
+    #         pass
+
     for split in power_splits:
-        log_file = os.path.join(output_dir, f"log_{split:.5f}.csv")
-        if os.path.exists(log_file) and not args.overwrite:
-            warnings.warn(f"Log file {log_file} already exists. Use --overwrite to overwrite it.")
-        elif os.path.exists(log_file) and args.overwrite:
-            warnings.warn(f"Overwriting log file {log_file}.")
-        else:
-            pass
+        #m_eps, Qdot_eps = eps_main(split, TOGA)
+
+        #P_cc, airspeed, T_cc = fpp_simple(TOGA, split) 
+        #mdot_h2_cc, T_cc, pressure_cc = Turboprop.function(P_cc)
+        for fc_toga_percentage in fc_toga_percentages:
+
+            #m_fc, m_tms, c_d_tms, delta_ap = fuelcell_main(split, TOGA, fc_toga_percentage, mdot_h2_cc, T_cc, pressure_cc)
+
+            #MTOW_mod = MTOW_mod_init
+            #MTOW_mod = m_eps + m_fc + m_tms + m_h2 + m_sto
+            for fc_cruise_percentage in range(fc_toga_percentage):
+                #m_h2 = fpp(split, fc_toga_percentage, fc_cruise_percentage, MTOW_mod, c_d_tms)
+                #m_sto, vol_sto = sto_main(m_h2)
+
+                
+
+
+
+
     
     
     
