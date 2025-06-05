@@ -398,10 +398,16 @@ class FlightMission:
         m_dumpy = np.zeros_like(V_arr)
         eta_th_arr    = np.zeros_like(V_arr)
         eta_prop_arr  = np.zeros_like(V_arr)
+
+        TMS_outputs = ["fc_mass", "Qdot_fc", "mdot_fc", "mdot_fc_air_in", "mdot_fc_air_out", "mdot_fc_H20", "mdot_fc_H2_recirculation"]
         
         # Create IDLE, TOGA, CRUISE generalized masks
+        mask_idle   = phase_arr == "taxi\\to" | phase_arr == "taxi\\landing"
+        mask_toga   = phase_arr == "takeoff" | phase_arr == "climb1" | phase_arr == "climb2"
+        mask_cruise = ~(mask_idle | mask_toga)
         
-
+        throttle = mask_toga * self.ac.fc.TOGA_throttle + ~mask_toga * self.throttle_cruise
+        
         for pp, sl in self.__pp_slicer(phase_arr, time_arr):
             if pp.power is not None:
                 # Powerpoint with power
@@ -433,8 +439,9 @@ class FlightMission:
                 mdot_cc_arr[sl] = mdot_fuel_arr[sl]
                 
                 # Add fuel cell mass flow from threshold power
-                Qdot_fc, mdot_fc, mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H20, mdot_fc_H2_recirculation = self.ac.fc.get_TMS_values(Pa_fc)
-                mdot_fuel_arr[sl] += mdot_fc
+                Qdot_fc, mdot_fc_arr[sl][0], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H20, mdot_fc_H2_recirculation = self.ac.fc.get_TMS_values(power=Pa_fc)
+                TMS_outputs.append(self.ac.fc.fc_mass, Qdot_fc, mdot_fc_arr[sl][0], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H20, mdot_fc_H2_recirculation)
+                mdot_fuel_arr[sl][0] += mdot_fc_arr
 
                 _, mdot_dumpy, _, _, _, _ = self.ac.fc.get_TMS_values(P_fc_dumpy)
                 m_dumpy[sl] = mdot_dumpy * self.dt  # cumulative fuel dumped _within_ slice
@@ -493,11 +500,11 @@ class FlightMission:
                     mdot_cc_arr[i] = mdot_fuel
                     
                     # Add fuel cell mass flow from threshold power
-                    
-                    mdot_fc_arr[i] = self.__mdot_fc(Pa_fc)
+                    Qdot_fc, mdot_fc_arr[i], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H20, mdot_fc_H2_recirculation = self.ac.fc.get_TMS_values(power=Pa_fc)
+                    TMS_outputs.append(self.ac.fc.fc_mass, Qdot_fc, mdot_fc_arr[i], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H20, mdot_fc_H2_recirculation)
                     mdot_fuel += mdot_fc_arr[i]
 
-                    mdot_dumpy_arr[i] = self.__mdot_fc(P_fc_dumpy)
+                    _, mdot_dumpy, _, _, _, _ = self.ac.fc.get_TMS_values(P_fc_dumpy)
                     m_dumpy[i+1] = m_dumpy[i] + mdot_dumpy_arr[i] * self.dt
 
                     m_arr[i+1] = m_arr[i] - mdot_fuel*self.dt
@@ -517,7 +524,8 @@ class FlightMission:
                             mdot_fuel=mdot_fuel_arr, mdot_air=mdot_air_arr,
                             mdot_cc=mdot_cc_arr, mdot_fc=mdot_fc_arr,
                             mdot_dumpy=mdot_dumpy_arr, m_dumpy=m_dumpy,
-                            eta_th=eta_th_arr, eta_prop=eta_prop_arr, mass=m_arr
+                            eta_th=eta_th_arr, eta_prop=eta_prop_arr, mass=m_arr,
+                            TMS_outputs=TMS_outputs
                             )
 
     # ---------------------------------------------------------------------
@@ -649,8 +657,9 @@ def main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: floa
     FC_power = fc_model.power_max_throttle # TODO: ADD REDUNDANCY
     mdot_dumpy = mission_H2.profile['mdot_dumpy']
     m_dumpy = mission_H2.profile['m_dumpy']
+    TMS_outputs = mission_H2.profile['TMS_outputs']
     
-    return H2_burnt, FC_power, mdot_dumpy, m_dumpy
+    return H2_burnt, FC_power, mdot_dumpy, m_dumpy, TMS_outputs
     
     
 if __name__ == "__main__":
