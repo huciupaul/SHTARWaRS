@@ -25,8 +25,8 @@ def efficiency(j_0):
     D_b = 0.0259 # [cm^2/s] Effective diffusion coefficient of the GDL
     V_oc = 1.145 # [V] Open circuit voltage
     LHV_H2 = 120e6 # [J/kg] Lower heating value of hydrogen
-    stoic_ratio_A = 1.0 # Stoichiometric ratio of the anode
-    stoic_ratio_C = 2.0 # Stoichiometric ratio of the cathode
+    stoic_ratio_A = 1.0 # Stoichiometric ratio of the anode,  lambda_H2
+    stoic_ratio_C = 2.0 # Stoichiometric ratio of the cathode, labda_air
 
     # Variable parameters
     j_star = 2e-3 # [A/cm^3] Exchange current density (range 1e-3 to 4e-2 A/cm^3)
@@ -38,11 +38,13 @@ def efficiency(j_0):
 
     # i_star = F * S_0 * l * k_star * c_O2
 
-    j_star = sig_t * b - l_t
+    j_star = sig_t * b / l_t
     
 
     j_sig = np.sqrt(2 * j_star * sig_t * b)
     j_lim = 4 * F * D_b * c_h / l_b
+
+    print(f"j_star: {j_star}, j_sig: {j_sig}, j_lim: {j_lim}")
 
     beta = (np.sqrt(2 * j_0 / j_star)/ (1 + np.sqrt(1.12 * j_0 / j_star) * np.exp(np.sqrt(2 * j_0 / j_star))) 
             + np.pi * (j_0 / j_star) * (2 + j_0 / j_star))
