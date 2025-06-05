@@ -8,10 +8,13 @@ from CoolProp.CoolProp import PropsSI
 # Ambient Conditions --------------------------------
 ambient_conditions= {
     'T': 283.5,  # Ambient temperature in Kelvin
-    'Mach': 0.4,  # Flight Mach number
+    'M': 0.4,  # Flight Mach number
     'V': 100,  # Flight speed in m/s
     'rho': 1.225  # Air density at sea level in kg/m^3
 }
+
+# parameters
+gamma = 1.4
 
 # Power and Efficiency Parameters --------------------
 total_power = 1.812 *1e6
@@ -34,7 +37,7 @@ efficiency_teg = 0.05
 # H2 ---------------------------------------------------
 t_init = 20 # K
 # FC Loop
-h2_mf_fc = 0.0156  # kg/s per MW
+h2_mf_fc = 0.029  # kg/s per MW
 p_init_fc = 6e5 
 p_fin_fc = 3e5
 t_fin_fc = 180+273.15 # K
@@ -157,7 +160,7 @@ class LH2Tank(HeatSink):
         self.P_final = P_final
         self.P_init = P_init
     def absorb_heat(self,heat_w):
-        H_fin = PropsSI('H', 'T', self.T_final, 'P', self.P_final, 'ParaHydrogen')  # Final enthalpy
+        H_fin = PropsSI('H', 'Q', 1, 'P', self.P_final, 'ParaHydrogen')  # Final enthalpy
         H_init = PropsSI('H', 'P', self.P_init, 'Q', 0, 'ParaHydrogen')  # Initial enthalpy
         Q_absorbed = self.m_dot * (H_fin - H_init)  # Heat absorbed in Joules
         return Q_absorbed
@@ -170,9 +173,9 @@ class SkinHeatExchanger(HeatSink):
         self.coolant_temp = coolant_temp_K
         self.ambient_temp = None          # to be set based on flight condition
 
-    def set_ambient(self, T_ambient_K, recovery_factor=0.9, mach=0.3):
+    def set_ambient(self, T_ambient_K, recovery_factor=0.9, M=0.3):
         # Set effective ambient (adiabatic wall) temperature for convection calculations
-        T_aw = T_ambient_K * (1 + recovery_factor*0.5*(1.4-1)*mach**2)
+        T_aw = T_ambient_K * (1 + recovery_factor*0.5*(1.4-1)*M**2)
         self.ambient_temp = T_aw 
     def absorb_heat(self, heat_w):
         if self.ambient_temp is None:
@@ -251,20 +254,20 @@ class RamAirHeatExchanger(HeatSink):
         T0 = ambient_conditions['T']        # adjust to flight profile !!!!
         eta_p07 = 0.92  # plot for different eta_p07
         
-        comp_ratio = (1.0 + 0.5 * (gamma - 1.0) * M0**2) ** ((gamma - 1.0) / gamma)
+        comp_ratio = (1.0 + 0.5 * (self.gamma - 1.0) * M0**2) ** ((self.gamma - 1.0) / self.gamma)
 
         # Denominator inside the “1 − 1/…”
         D = comp_ratio * eta_p07
 
         # Main numerator pieces
-        term1 = 2.0 * gamma / (gamma - 1.0) * R
+        term1 = 2.0 * self.gamma / (self.gamma - 1.0) * R
         term2 = 1.0 - 1.0 / D
-        term3 = T0 * (1.0 + 0.5 * (gamma - 1.0) * M0**2) + deltaT_HX0
+        term3 = T0 * (1.0 + 0.5 * (self.gamma - 1.0) * M0**2) + deltaT_HX0
 
         numerator = term1 * term2 * term3
 
         # Full denominator under the radical
-        denominator = (M0 * math.sqrt(gamma * R * T0) *(1.0 + (CD_d_CD_sp) / 2.0))
+        denominator = (M0 * math.sqrt(self.gamma * R * T0) *(1.0 + (CD_d_CD_sp) / 2.0))
 
         TR = math.sqrt(numerator / denominator) - 1.0
 
@@ -342,29 +345,30 @@ class HX():
 
         # Pipe Properties
         N_passes = 1
-        dh_coolant = 2*gap_bt_plates / size_factor
-        dh_h2 = dh_coolant
+        dh_coolant = 2*gap_bt_plates / size_factor  # diameter of coolant pipes
+        dh_h2 = dh_coolant                          # diameter of hydrogen pipes
         
 
         #initial guess for mass flow rate of coolant
-        self.fluid_hot.mf_calculated = self.Q_req / (self.fluid_hot.cp * (self.fluid_hot.T - self.fluid_cold.T))
+        self.fluid_hot.mf_calculated = self.fluid_hot.mf_given # elf.Q_req / (self.fluid_hot.cp * (self.fluid_hot.T - self.fluid_cold.T))
         
-        area = 2.3 # assumed area of heat exchanger plate in m²
+        L_h2 = 447000
+        area = 2.3 # assumed area of heat exchanger plate in m² (total)
         H_hx = 500 # Overall heat exchange coefficient for HX [W/m².K]
         self.fluid_cold.cp = 9384
         # Calculation
         Q = 1000
+        iteration = 0
         while abs(Q-self.Q_req) > 1e-5:
         #for i in range(5):
 
-            
             t_hot_out = self.Q_req / (self.fluid_hot.mf_calculated * self.fluid_hot.cp) + self.fluid_hot.T
 
 
             t_hot_in = self.fluid_hot.T
             t_cold_in = self.fluid_cold.T
             #t_cold_out = self.fluid_hot.T - 5
-            t_cold_out = t_cold_in + 445/9.384
+            t_cold_out = t_cold_in + (self.fluid_cold.mf_given/self.fluid_hot.mf_given )*(L_h2/self.fluid_hot.cp)
             delta_t1 = t_hot_out - t_cold_in
             delta_t2 = t_hot_in - t_cold_out
             
@@ -372,14 +376,14 @@ class HX():
             S_eff = self.Q_req / (lmtd * H_hx)
             #s_eff = area * size_factor #assumed area of heat exchanger plate
             #N_plates = math.ceil(S_eff / s_eff)
-            s_eff = (area - 2* math.pi * (dh_coolant/2)**2 ) * size_factor
-            N_plates = min(math.ceil(S_eff / s_eff),8)
+            s_eff = (area - 4* math.pi * (dh_coolant/2)**2 ) * size_factor  # TOTAL EFF AREA
+            #N_plates = min(math.ceil(S_eff / s_eff),15)
             n_channels = math.ceil((N_plates-1) / 2)
             volume = N_plates * area * (plate_thickness+gap_bt_plates)  # m³
             
             # Coolant
-            C_h_coolant = 0.348
-            y_coolant = 0.663
+            C_h_coolant = 0.348 # Chevron angle of 30deg
+            y_coolant = 0.663   # Chevron angle of 30deg
             R_fh = 0.0003526
             Pr_coolant = self.fluid_hot.mu * self.fluid_hot.cp / self.fluid_hot.k
             Re_coolant = self.fluid_hot.mf_calculated * 4/  (math.pi * dh_coolant * self.fluid_hot.mu) 
@@ -387,8 +391,8 @@ class HX():
             hc_hot = Nu_coolant * self.fluid_hot.k / dh_coolant
 
             # H2
-            C_h_h2 = 0.348  # Placeholder
-            y_h2 = 0.663 # Placeholder
+            C_h_h2 = 0.348  # Chevron angle of 30deg
+            y_h2 = 0.663    # Chevron angle of 30deg
             R_fc = 8.815 * 1e-5 # for vapour
             Pr_h2 = self.fluid_cold.mu * self.fluid_cold.cp / self.fluid_cold.k  # Prandtl number for H2
             Re_h2 = self.fluid_cold.mf_calculated * 4/  (math.pi * dh_h2 * self.fluid_cold.mu) 
@@ -399,7 +403,8 @@ class HX():
             # Recalculate overall heat transfer coefficient
             H_hx = 1/ (1/hc_cold + 1/hc_hot + R_fc + R_fh + plate_thickness/plate_thermal_conductivity)
 
-            Q = H_hx * s_eff * N_plates * lmtd  * N_passes
+            # Recalculate the heat transferred
+            Q = H_hx * s_eff * lmtd * N_plates  * N_passes
             print("Try Q:{H_hx*}")
             factor = self.Q_req / Q 
             print(f"Iteration: Q = {Q:.2f} W, Required Q = {self.Q_req:.2f} W, Factor = {factor:.2f}")
@@ -410,9 +415,10 @@ class HX():
             print(f"Coolant mass flow rate: {self.fluid_hot.mf_calculated:.2f} kg/s")
             print(f"Total Surface Required: {S_eff:.2f} m²") 
 
-            area *= factor            
+            area *= factor    
+            iteration += 1        
 
-        return self.fluid_hot.mf_calculated, area, volume
+        return self.fluid_hot.mf_calculated, area, volume, iteration
         
 class Compressor():
     def __init__(self, comp_efficiency, pressure_ratio, fluid):
@@ -439,14 +445,13 @@ class Turbine():
 
     def power(self, T_in, T_out):
         # Calculate the power produced by the turbine
-        
         cp_gas = self.fluid.cp
         mdot = self.fluid.mf_given
         power_provide = mdot * cp_gas * (T_in - T_out) / self.efficiency  # Power in Watts\
         return power_provide
 
 class Fluid():
-    def __init__(self, name, T, P, C,cp,mf,k, mu, gamma, rho):
+    def __init__(self, name, T, P, C,cp,mf,k, mu, gamma):
         self.name = name
         self.T = T  # Temperature in Kelvin
         self.P = P  # Pressure in Pascals
@@ -457,8 +462,8 @@ class Fluid():
         self.k = k
         self.mu = mu
         self.gamma = gamma
-        self.rho = rho #Density in kg/m³
-        self.vdot = mf / rho  # Volumetric flow rate in m³/s
+        #self.rho = rho #Density in kg/m³
+        #self.vdot = mf / rho  # Volumetric flow rate in m³/s
 
 # ------------------------------ FUNCTIONS -----------------------------------
 
@@ -471,7 +476,7 @@ def size_thermal_management(heat_sources, sinks):
         if remaining_heat <= 0:
             break
         if isinstance(sink, SkinHeatExchanger):
-            sink.set_ambient(T_ambient_K=ambient_conditions['T'], mach=ambient_conditions['Mach'], recovery_factor=recovery_factor)
+            sink.set_ambient(T_ambient_K=ambient_conditions['T'], M=ambient_conditions['M'], recovery_factor=recovery_factor)
         if not isinstance(sink, RamAirHeatExchanger):
             absorbed = sink.absorb_heat(remaining_heat)
             print(f"{sink.name} absorbed {absorbed/1000:.1f} kW")
@@ -548,11 +553,12 @@ if __name__ == "__main__":
     # Sizing
     C_h2 = lh2_tank.absorb_heat(fuel_cell.waste_heat())/(t_fin_fc - t_init)
     print(f"Capacity rate of LH2: {C_h2:.2f})") 
-    fluid_cold = Fluid(name="LH2", T=t_init, P=p_init_fc, C=C_h2, cp = C_h2/h2_mf_fc, k = k_h2, mu = mu_h2, mf = h2_mf_fc)
-    fluid_hot = Fluid(name="FuelCellCoolant", T=t_fin_fc, P=p_fin_fc, C=0, cp = h_cool, mf = 0, k=k_coolant, mu=mu_coolant) 
+    fluid_cold = Fluid(name="LH2", T=t_init, P=p_init_fc, C=C_h2, cp = C_h2/h2_mf_fc, k = k_h2, mu = mu_h2, mf = h2_mf_fc , gamma = 1.4 )
+    fluid_hot = Fluid(name="FuelCellCoolant", T=t_fin_fc, P=p_fin_fc, C=0, cp = h_cool, mf = 10 ,  k=k_coolant, mu=mu_coolant, gamma = 1.4) 
 
     hx = HX(name="FuelCellHX", fluid_cold=fluid_cold, fluid_hot=fluid_hot, Q_req=lh2_tank.absorb_heat(fuel_cell.waste_heat()))
-    hx_cool_flow_mass, hx_area, hx_volume = hx.size()
+    hx_cool_flow_mass, hx_area, hx_volume, iteration = hx.size()
     print(f"Coolant Mass Flow: {hx_cool_flow_mass:.2f} kg/s")
     print(f"Heat Exchanger Area: {hx_area:.2f} m²")
     print(f"Heat Exchanger Volume: {hx_volume:.2f} m³")
+    print("Done after iteration number", iteration)
