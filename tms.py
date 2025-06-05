@@ -398,6 +398,9 @@ class Compressor():
         H2_molar_mass = 2.016  # kg/kmol for hydrogen
         R = 8314 / H2_molar_mass  # Specific gas constant for hydrogen in J/(kg*K)
         T_out = inlet_temperature * (self.pressure_ratio ** ((gamma - 1) / gamma))  # Isentropic relation
+
+        '''SOMEBODY CHANGE PRESSURE OF HYDROGEN FROM AMBIENT TO "BEFORE COMPRESSOR C1" TO GET PROPER cp ''' 
+        
         cp_hydrogen = PropsSI('C', 'T', inlet_temperature, 'P', 101325, 'Hydrogen')  # Specific heat capacity at constant pressure
         # power = (mass_flow_rate * R * inlet_temperature * (T_out - inlet_temperature)) / self.efficiency
         power = mass_flow_rate * cp_hydrogen * (T_out - inlet_temperature) / self.efficiency  # Power in Watts
