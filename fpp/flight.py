@@ -398,8 +398,6 @@ class FlightMission:
         m_dumpy = np.zeros_like(V_arr)
         eta_th_arr    = np.zeros_like(V_arr)
         eta_prop_arr  = np.zeros_like(V_arr)
-
-        TMS_outputs = ["fc_mass", "Qdot_fc", "mdot_fc", "mdot_fc_air_in", "mdot_fc_air_out", "mdot_fc_H20", "mdot_fc_H2_recirculation"]
         
         # Create IDLE, TOGA, CRUISE generalized masks
         mask_idle   = phase_arr == "taxi\\to" | phase_arr == "taxi\\landing"
@@ -439,12 +437,13 @@ class FlightMission:
                 mdot_cc_arr[sl] = mdot_fuel_arr[sl]
                 
                 # Add fuel cell mass flow from threshold power
-                Qdot_fc, mdot_fc_arr[sl][0], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H20, mdot_fc_H2_recirculation = self.ac.fc.get_TMS_values(power=Pa_fc)
-                TMS_outputs.append(self.ac.fc.fc_mass, Qdot_fc, mdot_fc_arr[sl][0], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H20, mdot_fc_H2_recirculation)
-                mdot_fuel_arr[sl][0] += mdot_fc_arr
+                Qdot_fc, mdot_fc_arr[sl], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H2O, mdot_fc_H2_recirculation = self.ac.fc.get_TMS_values(power=Pa_fc)
+  
+                TMS_outputs.append(self.ac.fc.fc_mass, Qdot_fc, mdot_fc_arr[sl], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H2O, mdot_fc_H2_recirculation)
+                mdot_fuel_arr[sl] += mdot_fc_arr
 
-                _, mdot_dumpy, _, _, _, _ = self.ac.fc.get_TMS_values(P_fc_dumpy)
-                m_dumpy[sl] = mdot_dumpy * self.dt  # cumulative fuel dumped _within_ slice
+                mdot_dumpy[sl] = mdot_fc_arr[sl] * P_fc_dumpy / Pa_fc
+                m_dumpy[sl] = mdot_dumpy[sl] * self.dt  # cumulative fuel dumped _within_ slice
                 
                 # Required power
                 Pr_arr[sl] = Pa_arr[sl] * eta_prop_arr[sl]
@@ -500,11 +499,19 @@ class FlightMission:
                     mdot_cc_arr[i] = mdot_fuel
                     
                     # Add fuel cell mass flow from threshold power
-                    Qdot_fc, mdot_fc_arr[i], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H20, mdot_fc_H2_recirculation = self.ac.fc.get_TMS_values(power=Pa_fc)
-                    TMS_outputs.append(self.ac.fc.fc_mass, Qdot_fc, mdot_fc_arr[i], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H20, mdot_fc_H2_recirculation)
+                    Qdot_fc, mdot_fc_arr[i], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H2O, mdot_fc_H2_recirculation = self.ac.fc.get_TMS_values(power=Pa_fc)
+                    # Create the TMS outputs dictionary
+                    TMS_outputs = dict(
+                        Qdot_fc=Qdot_fc,
+                        mdot_fc=mdot_fc_arr,
+                        mdot_fc_air_in=mdot_fc_air_in,
+                        mdot_fc_air_out=mdot_fc_air_out,
+                        mdot_fc_H2O=mdot_fc_H2O)
+                    
+                    TMS_outputs.append(self.ac.fc.fc_mass, Qdot_fc, mdot_fc_arr[i], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H2O, mdot_fc_H2_recirculation)
                     mdot_fuel += mdot_fc_arr[i]
 
-                    _, mdot_dumpy, _, _, _, _ = self.ac.fc.get_TMS_values(P_fc_dumpy)
+                    mdot_dumpy_arr[i] = mdot_fc_arr[i] * P_fc_dumpy / Pa_fc
                     m_dumpy[i+1] = m_dumpy[i] + mdot_dumpy_arr[i] * self.dt
 
                     m_arr[i+1] = m_arr[i] - mdot_fuel*self.dt
