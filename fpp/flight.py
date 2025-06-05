@@ -81,7 +81,8 @@ class FlightMission:
                  total_range_m: Optional[float] = None,
                  cruise_wp_name: str = "cruise",
                  P_fc_max: float = 0.0,
-                 P_fc_min: float = 0.0) -> None:
+                 P_fc_min: float = 0.0,
+                 throttle_cruise: float = 0.1) -> None:
         if len(waypoints) < 2:
             raise ValueError("Need at least two waypoints.")
         self.ac = aircraft
@@ -93,6 +94,7 @@ class FlightMission:
         self.cruise_wp_name = cruise_wp_name.lower()
         self.P_fc_max = P_fc_max # [W] Maximum fuel cell power
         self.P_fc_min = P_fc_min # [W] Minimum fuel cell power (FC IDLE)
+        self.throttle_cruise = throttle_cruise  # Cruise fuel cell throttle setting
         self._profile: Dict[str, np.ndarray] = {}
 
     # ---------------------------------------------------------------------
@@ -396,6 +398,7 @@ class FlightMission:
         mdot_fc_arr  = np.zeros_like(V_arr)
         mdot_cc_arr  = np.zeros_like(V_arr)
         mdot_dumpy_arr = np.zeros_like(V_arr)
+        m_dumpy = np.zeros_like(V_arr)
         eta_th_arr    = np.zeros_like(V_arr)
         eta_prop_arr  = np.zeros_like(V_arr)
 
@@ -403,14 +406,15 @@ class FlightMission:
             if pp.power is not None:
                 # Powerpoint with power
                 Pa_total = pp.power * self.ac.MAXC
+                P_fc_max = self.P_fc_max * throttle[sl][0]
 
-                if Pa_total <= self.P_fc_max:
+                if Pa_total <= P_fc_max:
                     Pa_fc = self.P_fc_min if Pa_total < self.P_fc_min else Pa_total
                     Pa_cc = 0.0
                     P_fc_dumpy = Pa_fc - Pa_total
                 else:
-                    Pa_cc = Pa_total - self.P_fc_max
-                    Pa_fc = self.P_fc_max
+                    Pa_cc = Pa_total - P_fc_max
+                    Pa_fc = P_fc_max
                     P_fc_dumpy = 0.0
                     if Pa_cc < self.ac.P_cc_min:
                         Pa_cc = self.ac.P_cc_min
@@ -425,8 +429,7 @@ class FlightMission:
                 
                 # Fuel mass flow using Torenbeek method (PSFC)
                 mdot_fuel_arr[sl], eta_th_arr[sl], eta_prop_arr[sl], mdot_air_arr[sl] = self.ac.eng.compute(
-                    T_arr[sl], P_arr[sl], rho_arr[sl], V_arr[sl], R_LHV=self.R_LHV, Pa=Pa_cc_arr
-                )
+                    T_arr[sl], P_arr[sl], rho_arr[sl], V_arr[sl], R_LHV=self.R_LHV, Pa=Pa_cc_arr)
                 mdot_cc_arr[sl] = mdot_fuel_arr[sl]
                 
                 # Add fuel cell mass flow from threshold power
@@ -434,6 +437,8 @@ class FlightMission:
                 mdot_fuel_arr[sl] += mdot_fc_arr[sl]
 
                 mdot_dumpy_arr[sl] = self.__mdot_fc(P_fc_dumpy)
+                dumpy_burn = np.cumsum(mdot_dumpy_arr[sl]) * self.dt  # cumulative fuel dumped _within_ slice
+                m_dumpy[sl] = np.concatenate(([0.0], dumpy_burn[:-1]))
                 
                 # Required power
                 Pr_arr[sl] = Pa_arr[sl] * eta_prop_arr[sl]
@@ -465,8 +470,9 @@ class FlightMission:
                     eta_prop = self.ac.eng._eta_prop(M0)
                     
                     Pa_total = Pr / eta_prop
+                    P_fc_max = self.P_fc_max * throttle[i]
                     
-                    if Pa_total < self.P_fc_max:
+                    if Pa_total <= self.P_fc_max:
                         Pa_fc = self.P_fc_min if Pa_total < self.P_fc_min else Pa_total
                         Pa_cc = 0.0
                         P_fc_dumpy = Pa_fc - Pa_total
@@ -492,6 +498,7 @@ class FlightMission:
                     mdot_fuel += mdot_fc_arr[i]
 
                     mdot_dumpy_arr[i] = self.__mdot_fc(P_fc_dumpy)
+                    m_dumpy[i+1] = m_dumpy[i] + mdot_dumpy_arr[i] * self.dt
 
                     m_arr[i+1] = m_arr[i] - mdot_fuel*self.dt
                     
@@ -501,14 +508,14 @@ class FlightMission:
                     mdot_fuel_arr[i] = mdot_fuel
                     mdot_air_arr[i] = mdot_air
                     eta_th_arr[i] = eta_th
-                    eta_prop_arr[i] = eta_prop     
+                    eta_prop_arr[i] = eta_prop
 
         # finally
         self._profile = dict(time=time_arr, V=V_arr, alt=h_arr,
                             T=T_arr, P=P_arr, rho=rho_arr, ROC=roc_arr,
                             phase=phase_arr, Pa=Pa_arr, Pr=Pr_arr,
                             mdot_fuel=mdot_fuel_arr, mdot_air=mdot_air_arr,
-                            mdot_cc=mdot_cc_arr, mdot_fc=mdot_fc_arr, mdot_dumpy=mdot_dumpy_arr,
+                            mdot_cc=mdot_cc_arr, mdot_fc=mdot_fc_arr, mdot_dumpy=mdot_dumpy_arr, m_dumpy=m_dumpy,
                             eta_th=eta_th_arr, eta_prop=eta_prop_arr, mass=m_arr
                             )
 
@@ -561,8 +568,19 @@ class FlightMission:
         fig.tight_layout()
         # plt.show()
 
+    # ---------------------------------------------------------------------
+    #  SAVING OUTPUTS
+    # ---------------------------------------------------------------------
+    def save_minmax_vals(self) -> None:
+        """Save the flight profile critical conditions for each flight phase to a CSV file."""
+        p = self.profile
+
+        phase_conds = []
+        
+
+
     
-def main(fc_split: float=0.0, MTOW: float = 8037.6, CD_HEX: float = 0.0, delta_AP: float = 0.0, dt: float=0.1) -> tuple:
+def main(fc_split: float=0.0, throttle_TOGA: float = 1.0, throttle_cruise: float = 0.1, MTOW: float=8037.6, CD_HEX: float=0.0, delta_AP: float=0.0, dt: float=0.1) -> tuple:
     """Main flight performance function to obtain the fuel mass and shaft power profile.
     Args:
         
@@ -585,14 +603,14 @@ def main(fc_split: float=0.0, MTOW: float = 8037.6, CD_HEX: float = 0.0, delta_A
         Waypoint("taxi\\landing", 0.0, 8.231111, 0.0, hold_time=10 * 60),
     ]
     pws = [
-        Powerpoint("taxi\\TO", 0.1415, until_phase="takeoff"),
+        Powerpoint("taxi\\TO", 0.28285, until_phase="takeoff"),
         Powerpoint("takeoff", 1.04, time=5 * 60),
         Powerpoint("climb", 0.95, until_phase="cruise"),
         Powerpoint("cruise", until_phase="descent1"),  # power filled by placeholder
-        Powerpoint("descent1", 0.30, until_phase="hold"),
+        Powerpoint("descent1", 0.35, until_phase="hold"),
         Powerpoint("hold", until_phase="descent2"),    # power filled by placeholder
-        Powerpoint("final", 0.30, until_phase="taxi\\landing"),
-        Powerpoint("taxi\\landing", 0.1415, time=10 * 60),
+        Powerpoint("final", 0.35, until_phase="taxi\\landing"),
+        Powerpoint("taxi\\landing", 0.28285, time=10 * 60),
     ]
     turboprop_H2 = Turboprop(
         name="PT6A-67D-H2",
@@ -621,15 +639,15 @@ def main(fc_split: float=0.0, MTOW: float = 8037.6, CD_HEX: float = 0.0, delta_A
         prop_diameter=2.78,
         eng=turboprop_H2,
         MTOW=MTOW,
-        P_cc_min=0.1415 * MAXC,  # [W] Minimum combustion chamber power
+        P_cc_min=0.28285 * MAXC,  # [W] Minimum combustion chamber power
         delta_AP=delta_AP  # [W] Thermal Management System power
     )
     # Max fuel cell power (fuel cell always covers the TMS and base APs)
-    P_fc_max = TOGA * fc_split + delta_AP + base_AP
+    P_fc_max = (TOGA * fc_split + delta_AP + base_AP)/throttle_TOGA
 
     P_fc_min = P_fc_max * 0.09 # NOTE: 9% max, taken from literature
     
-    mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=dt, total_range_m=707e3, P_fc_max=P_fc_max, P_fc_min=P_fc_min)
+    mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=dt, total_range_m=707e3, P_fc_max=P_fc_max, P_fc_min=P_fc_min, throttle_cuise=throttle_cruise)
     
     H2_burnt = (mission_H2.profile['mass'][0] - mission_H2.profile['mass'][-1])/(1 - E_SCALE)
     print(f"Total H2 mass burnt: {H2_burnt:.2f} kg")
@@ -637,8 +655,9 @@ def main(fc_split: float=0.0, MTOW: float = 8037.6, CD_HEX: float = 0.0, delta_A
     # Determine the maximum fuel cell power across the three splits
     FC_power = P_fc_max # TODO: ADD REDUNDANCY
     mdot_dumpy = mission_H2.profile['mdot_dumpy']
+    m_dumpy = mission_H2.profile['m_dumpy']
     
-    return H2_burnt, FC_power, mdot_dumpy
+    return H2_burnt, FC_power, mdot_dumpy, m_dumpy
     
     
 if __name__ == "__main__":
@@ -648,13 +667,16 @@ if __name__ == "__main__":
     splits = np.linspace(0.0, 1.0, 101)
     
     mH2 = np.zeros_like(splits)
+    mdot_dumpy = np.zeros_like(splits)
     dumpy = np.zeros_like(splits)
     
     for i, split in enumerate(splits):
         print(f"Split {i+1}/{len(splits)}: {split:.2f}")
-        mH2[i], _, dumpy_i = main(fc_split=split, dt=10)
-        dumpy[i] = dumpy_i[-1]
+        mH2[i], _, mdot_dumpy, _ = main(fc_split=split, dt=1)
+        dumpy[i] = np.sum(mdot_dumpy) * 10
 
+
+    print(dumpy)
     # plt.plot(splits, mH2)
     plt.plot(splits, dumpy)
     plt.show()
