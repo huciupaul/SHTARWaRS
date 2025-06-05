@@ -388,7 +388,20 @@ class HX():
 
         return self.fluid_hot.mf_calculated, area, volume
         
-        
+class Compressor():
+    def __init__(self, comp_efficiency, pressure_ratio):
+        self.efficiency = comp_efficiency
+        self.pressure_ratio = pressure_ratio
+
+    def power(self, mass_flow_rate, inlet_temperature, gamma):
+        # Calculate the power required for the compressor
+        H2_molar_mass = 2.016  # kg/kmol for hydrogen
+        R = 8314 / H2_molar_mass  # Specific gas constant for hydrogen in J/(kg*K)
+        T_out = inlet_temperature * (self.pressure_ratio ** ((gamma - 1) / gamma))  # Isentropic relation
+        cp_hydrogen = PropsSI('C', 'T', inlet_temperature, 'P', 101325, 'Hydrogen')  # Specific heat capacity at constant pressure
+        # power = (mass_flow_rate * R * inlet_temperature * (T_out - inlet_temperature)) / self.efficiency
+        power = mass_flow_rate * cp_hydrogen * (T_out - inlet_temperature) / self.efficiency  # Power in Watts
+        return power
 
 class Fluid():
     def __init__(self, name, T, P, C,cp,mf,k, mu):
