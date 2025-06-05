@@ -54,7 +54,7 @@ ROC, V_climb = 10.16, 73.43
 # Fuel Cell Stack Characteristics
 mass_specific_power = 5000                                  # [W/kg] Specific power of the fuel cell stack (FZO Roadmap-report)
 volume_specific_power = 4000000                             # [W/m^3] Volume specific power of the fuel cell stack (FZO Roadmap-report)
-stoic_ratio_A = 1.05                                       # [-] Stoichiometric ratio of the anode
+stoic_ratio_A = 1                                       # [-] Stoichiometric ratio of the anode
 stoic_ratio_C = 1.8                                       # [-] Stoichiometric ratio of the cathode
 
 
