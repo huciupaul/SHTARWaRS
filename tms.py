@@ -389,25 +389,38 @@ class HX():
         return self.fluid_hot.mf_calculated, area, volume
         
 class Compressor():
-    def __init__(self, comp_efficiency, pressure_ratio):
+    def __init__(self, comp_efficiency, pressure_ratio, fluid):
         self.efficiency = comp_efficiency
         self.pressure_ratio = pressure_ratio
+        self.fluid = fluid  
 
-    def power(self, mass_flow_rate, inlet_temperature, gamma):
-        # Calculate the power required for the compressor
-        H2_molar_mass = 2.016  # kg/kmol for hydrogen
-        R = 8314 / H2_molar_mass  # Specific gas constant for hydrogen in J/(kg*K)
-        T_out = inlet_temperature * (self.pressure_ratio ** ((gamma - 1) / gamma))  # Isentropic relation
+    def power(self, inlet_temperature, gamma):
+        T_out = inlet_temperature * (1 + 1 / self.efficiency * (self.pressure_ratio ** ((gamma - 1) / gamma) - 1))  # Isentropic relation
 
-        '''SOMEBODY CHANGE PRESSURE OF HYDROGEN FROM AMBIENT TO "BEFORE COMPRESSOR C1" TO GET PROPER cp ''' 
+        cp = self.fluid.cp  
+        mdot = self.fluid.mf_given
+        power_req = mdot * cp * (T_out - inlet_temperature) / self.efficiency  # Power in Watts
+        return power_req
+    
+    def mass(self, power):
+        return power * 0.0400683 + 5.17242
+
+
+class Turbine():
+    def __init__(self, turbine_efficiency, fluid):
+        self.efficiency = turbine_efficiency
+        self.fluid = fluid
+
+    def power(self, T_in, T_out):
+        # Calculate the power produced by the turbine
         
-        cp_hydrogen = PropsSI('C', 'T', inlet_temperature, 'P', 101325, 'Hydrogen')  # Specific heat capacity at constant pressure
-        # power = (mass_flow_rate * R * inlet_temperature * (T_out - inlet_temperature)) / self.efficiency
-        power = mass_flow_rate * cp_hydrogen * (T_out - inlet_temperature) / self.efficiency  # Power in Watts
-        return power
+        cp_gas = self.fluid.cp
+        mdot = self.fluid.mf_given
+        power_provide = mdot * cp_gas * (T_in - T_out) / self.efficiency  # Power in Watts\
+        return power_provide
 
 class Fluid():
-    def __init__(self, name, T, P, C,cp,mf,k, mu):
+    def __init__(self, name, T, P, C,cp,mf,k, mu, gamma, rho):
         self.name = name
         self.T = T  # Temperature in Kelvin
         self.P = P  # Pressure in Pascals
@@ -417,6 +430,9 @@ class Fluid():
         self.mf_given = mf
         self.k = k
         self.mu = mu
+        self.gamma = gamma
+        self.rho = rho #Density in kg/m³
+        self.vdot = mf / rho  # Volumetric flow rate in m³/s
 
 # ------------------------------ FUNCTIONS -----------------------------------
 
