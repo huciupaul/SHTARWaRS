@@ -386,19 +386,29 @@ class FlightMission:
         # ------------------------------------------------------------------
         # 5) Compute power profile
         # ------------------------------------------------------------------
-        T_arr, P_arr, rho_arr, a_arr = isa_atmosphere(h_arr)
-        Pr_arr = np.zeros_like(V_arr)
-        Pa_arr = np.zeros_like(V_arr)
-        m_arr  = np.zeros_like(V_arr);   m_arr[0] = self.ac.MTOW
-        mdot_fuel_arr = np.zeros_like(V_arr)
-        mdot_air_arr  = np.zeros_like(V_arr)
-        mdot_fc_arr  = np.zeros_like(V_arr)
-        mdot_cc_arr  = np.zeros_like(V_arr)
-        mdot_dumpy_arr = np.zeros_like(V_arr)
-        m_dumpy = np.zeros_like(V_arr)
-        eta_th_arr    = np.zeros_like(V_arr)
-        eta_prop_arr  = np.zeros_like(V_arr)
+        T_arr, P_arr, rho_arr, a_arr    = isa_atmosphere(h_arr)
+        Pr_arr                          = np.zeros_like(V_arr)
+        Pa_arr                          = np.zeros_like(V_arr)
+        P_cc_arr                        = np.zeros_like(V_arr)
+        P_fc_arr                        = np.zeros_like(V_arr)
+        m_arr                           = np.zeros_like(V_arr); m_arr[0] = self.ac.MTOW
+        mdot_fuel_arr                   = np.zeros_like(V_arr)
+        mdot_air_arr                    = np.zeros_like(V_arr)
+        mdot_fc_arr                     = np.zeros_like(V_arr)
+        mdot_cc_arr                     = np.zeros_like(V_arr)
+        mdot_dumpy_arr                  = np.zeros_like(V_arr)
+        m_dumpy                         = np.zeros_like(V_arr)
+        eta_th_arr                      = np.zeros_like(V_arr)
+        eta_prop_arr                    = np.zeros_like(V_arr)
+        T_cc                            = np.zeros_like(V_arr)
+        p_cc                            = np.zeros_like(V_arr)
+        Qdot_fc                         = np.zeros_like(V_arr)
+        mdot_fc_air_in                  = np.zeros_like(V_arr)
+        mdot_fc_air_out                 = np.zeros_like(V_arr)
+        mdot_fc_H2O                     = np.zeros_like(V_arr)
+        mdot_fc_H2_recirculation        = np.zeros_like(V_arr)
         
+
         # Create IDLE, TOGA, CRUISE generalized masks
         mask_idle   = phase_arr == "taxi\\to" | phase_arr == "taxi\\landing"
         mask_toga   = phase_arr == "takeoff" | phase_arr == "climb1" | phase_arr == "climb2"
@@ -429,17 +439,19 @@ class FlightMission:
                             P_fc_dumpy = (Pa_cc + Pa_fc) - Pa_total
                 
                 Pa_cc_arr = Pa_cc * np.ones_like(V_arr[sl])
-                Pa_arr[sl] = Pa_total        
+                Pa_arr[sl] = Pa_total   
+
+                P_cc_arr[sl] = Pa_cc
+                P_fc_arr[sl] = Pa_fc    
                 
                 # Fuel mass flow using Torenbeek method (PSFC)
-                mdot_fuel_arr[sl], eta_th_arr[sl], eta_prop_arr[sl], mdot_air_arr[sl] = self.ac.eng.compute(
+                mdot_fuel_arr[sl], eta_th_arr[sl], eta_prop_arr[sl], mdot_air_arr[sl], T_cc[sl], p_cc[sl] = self.ac.eng.compute(
                     T_arr[sl], P_arr[sl], rho_arr[sl], V_arr[sl], R_LHV=self.R_LHV, Pa=Pa_cc_arr)
                 mdot_cc_arr[sl] = mdot_fuel_arr[sl]
                 
                 # Add fuel cell mass flow from threshold power
-                Qdot_fc, mdot_fc_arr[sl], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H2O, mdot_fc_H2_recirculation = self.ac.fc.get_TMS_values(power=Pa_fc)
+                Qdot_fc[sl], mdot_fc_arr[sl], mdot_fc_air_in[sl], mdot_fc_air_out[sl], mdot_fc_H2O[sl], mdot_fc_H2_recirculation[sl] = self.ac.fc.get_TMS_values(power=Pa_fc)
   
-                TMS_outputs.append(self.ac.fc.fc_mass, Qdot_fc, mdot_fc_arr[sl], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H2O, mdot_fc_H2_recirculation)
                 mdot_fuel_arr[sl] += mdot_fc_arr
 
                 mdot_dumpy[sl] = mdot_fc_arr[sl] * P_fc_dumpy / Pa_fc
@@ -493,22 +505,14 @@ class FlightMission:
                                 Pa_cc = self.ac.P_cc_min
                                 P_fc_dumpy = (Pa_cc + Pa_fc) - Pa_total
                     
-                    mdot_fuel, eta_th, eta_prop, mdot_air = self.ac.eng.compute(
+                    mdot_fuel, eta_th, eta_prop, mdot_air, T_cc[i], p_cc[i] = self.ac.eng.compute(
                         T_arr[i], P_arr[i], rho_arr[i], V_arr[i], R_LHV=self.R_LHV, Pa=Pa_cc
                     )
                     mdot_cc_arr[i] = mdot_fuel
                     
                     # Add fuel cell mass flow from threshold power
-                    Qdot_fc, mdot_fc_arr[i], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H2O, mdot_fc_H2_recirculation = self.ac.fc.get_TMS_values(power=Pa_fc)
-                    # Create the TMS outputs dictionary
-                    TMS_outputs = dict(
-                        Q_dot_fc=Qdot_fc,
-                        mdot_fc=mdot_fc_arr,
-                        mdot_fc_air_in=mdot_fc_air_in,
-                        mdot_fc_air_out=mdot_fc_air_out,
-                        mdot_fc_H2O=mdot_fc_H2O)
-                    
-                    TMS_outputs.append(self.ac.fc.fc_mass, Qdot_fc, mdot_fc_arr[i], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H2O, mdot_fc_H2_recirculation)
+                    Qdot_fc[i], mdot_fc_arr[i], mdot_fc_air_in[i], mdot_fc_air_out[i], mdot_fc_H2O[i], mdot_fc_H2_recirculation[i] = self.ac.fc.get_TMS_values(power=Pa_fc)
+
                     mdot_fuel += mdot_fc_arr[i]
 
                     mdot_dumpy_arr[i] = mdot_fc_arr[i] * P_fc_dumpy / Pa_fc
@@ -519,20 +523,29 @@ class FlightMission:
                     # 7) Store results @current time step
                     Pr_arr[i] = Pr
                     Pa_arr[i] = Pa_total
+                    P_cc_arr[i] = Pa_cc
+                    P_fc_arr[i] = Pa_fc
                     mdot_fuel_arr[i] = mdot_fuel
                     mdot_air_arr[i] = mdot_air
                     eta_th_arr[i] = eta_th
                     eta_prop_arr[i] = eta_prop
 
         # finally
+        TMS_inputs = dict(Q_dot_fc=Qdot_fc, p_cc=p_cc,
+                           h2_mf_fc=mdot_fc_arr, h2_mf_cc=mdot_cc_arr,
+                           t_cc=T_cc, air_mf_fc=mdot_fc_air_in,
+                           t_amb=T_arr, rho_amb=rho_arr, V_amb=V_arr
+                           )
+        
         self._profile = dict(time=time_arr, V=V_arr, alt=h_arr,
                             T=T_arr, P=P_arr, rho=rho_arr, ROC=roc_arr,
                             phase=phase_arr, Pa=Pa_arr, Pr=Pr_arr,
+                            P_cc=P_cc_arr, P_fc=P_fc_arr,
                             mdot_fuel=mdot_fuel_arr, mdot_air=mdot_air_arr,
                             mdot_cc=mdot_cc_arr, mdot_fc=mdot_fc_arr,
                             mdot_dumpy=mdot_dumpy_arr, m_dumpy=m_dumpy,
                             eta_th=eta_th_arr, eta_prop=eta_prop_arr, mass=m_arr,
-                            TMS_outputs=TMS_outputs
+                            TMS_inputs=TMS_inputs
                             )
 
     # ---------------------------------------------------------------------
@@ -661,12 +674,11 @@ def main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: floa
     print(f"Total H2 mass burnt: {H2_burnt:.2f} kg")
     
     # Determine the maximum fuel cell power across the three splits
-    FC_power = fc_model.power_max_throttle # TODO: ADD REDUNDANCY
-    mdot_dumpy = mission_H2.profile['mdot_dumpy']
-    m_dumpy = mission_H2.profile['m_dumpy']
-    TMS_outputs = mission_H2.profile['TMS_outputs']
+    TMS_inputs = mission_H2.profile['TMS_inputs']
     
-    return H2_burnt, FC_power, mdot_dumpy, m_dumpy, TMS_outputs
+    m_fc = fc_model.fc_mass
+    
+    return TMS_inputs, H2_burnt, m_fc, mission_H2.profile
     
     
 if __name__ == "__main__":
