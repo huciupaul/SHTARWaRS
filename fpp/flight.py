@@ -502,7 +502,7 @@ class FlightMission:
                     Qdot_fc, mdot_fc_arr[i], mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H2O, mdot_fc_H2_recirculation = self.ac.fc.get_TMS_values(power=Pa_fc)
                     # Create the TMS outputs dictionary
                     TMS_outputs = dict(
-                        Qdot_fc=Qdot_fc,
+                        Q_dot_fc=Qdot_fc,
                         mdot_fc=mdot_fc_arr,
                         mdot_fc_air_in=mdot_fc_air_in,
                         mdot_fc_air_out=mdot_fc_air_out,
@@ -639,7 +639,7 @@ def main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: floa
     fc_model = FuelCell(
         name="PEM-HT-FC",
         power_req_max=(TOGA*fc_split + delta_AP + base_AP),
-        TOGA_throttle=throttle_TOGA
+        throttle_TOGA=throttle_TOGA
     )
 
     ac_model_H2 = Aircraft(

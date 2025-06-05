@@ -27,7 +27,7 @@ A class which contains the fuel cell characteristics and calculates the power ou
 '''
 
 class FuelCell:
-    def __init__(self, name, power_req_max, throttle_TOGA = 0.85, throttle_CRUISE = 0.5):
+    def __init__(self, name, power_req_max, throttle_TOGA = 0.85):
         """
         Initialize the FuelCell class with the maximum power required and throttle setting.
         Args:
@@ -35,7 +35,7 @@ class FuelCell:
             TOGA_throttle (float): Throttle setting for Take-Off/Go-Around, default is 0.85 (for initial FPP run).
         """
         self.name = name
-        self.power_max_throttle = power_req_max / np.max(throttle_TOGA, throttle_CRUISE) # [W] Maximum power output of the fuel cell at full throttle setting
+        self.power_max_throttle = power_req_max / throttle_TOGA # [W] Maximum power output of the fuel cell at full throttle setting
         self.power_req_max = power_req_max  # [W] Maximum power required by the fuel cell
         self.power_min = self.power_max_throttle * 0.09 # NOTE: 9% of max, taken from literature
         self.fc_mass = self.power_max_throttle / gc.mass_specific_power  # [kg] Mass of the fuel cell stack
