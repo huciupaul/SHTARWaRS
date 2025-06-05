@@ -15,7 +15,7 @@ from turboprop import Turboprop
 # Global imports
 from DSE_1.global_constants import MAXC, TOGA, base_AP, G_0, E_SCALE, R_AIR, k_air, isa_atmosphere
 import pandas as pd
-# TODO: from fc import FC class
+from DSE_1.fc.fc_for_wrapper import FuelCell
 
 # Dataclass definitions
 @dataclass
@@ -26,6 +26,7 @@ class Aircraft:
     CD0: float
     prop_diameter: float
     eng: Turboprop
+    fc: FuelCell
     MTOW: float
     P_cc_min: float = 0.0
     MAXC: float = MAXC
@@ -80,8 +81,6 @@ class FlightMission:
                  dt: float = 1.0,
                  total_range_m: Optional[float] = None,
                  cruise_wp_name: str = "cruise",
-                 P_fc_max: float = 0.0,
-                 P_fc_min: float = 0.0,
                  throttle_cruise: float = 0.1) -> None:
         if len(waypoints) < 2:
             raise ValueError("Need at least two waypoints.")
@@ -92,8 +91,6 @@ class FlightMission:
         self.dt = dt
         self.total_range = total_range_m
         self.cruise_wp_name = cruise_wp_name.lower()
-        self.P_fc_max = P_fc_max # [W] Maximum fuel cell power
-        self.P_fc_min = P_fc_min # [W] Minimum fuel cell power (FC IDLE)
         self.throttle_cruise = throttle_cruise  # Cruise fuel cell throttle setting
         self._profile: Dict[str, np.ndarray] = {}
 
@@ -401,15 +398,18 @@ class FlightMission:
         m_dumpy = np.zeros_like(V_arr)
         eta_th_arr    = np.zeros_like(V_arr)
         eta_prop_arr  = np.zeros_like(V_arr)
+        
+        # Create IDLE, TOGA, CRUISE generalized masks
+        
 
         for pp, sl in self.__pp_slicer(phase_arr, time_arr):
             if pp.power is not None:
                 # Powerpoint with power
                 Pa_total = pp.power * self.ac.MAXC
-                P_fc_max = self.P_fc_max * throttle[sl][0]
+                P_fc_max = self.ac.fc.power_max_throttle * throttle[sl][0]
 
                 if Pa_total <= P_fc_max:
-                    Pa_fc = self.P_fc_min if Pa_total < self.P_fc_min else Pa_total
+                    Pa_fc = self.ac.fc.power_min if Pa_total < self.ac.fc.power_min else Pa_total
                     Pa_cc = 0.0
                     P_fc_dumpy = Pa_fc - Pa_total
                 else:
@@ -419,8 +419,8 @@ class FlightMission:
                     if Pa_cc < self.ac.P_cc_min:
                         Pa_cc = self.ac.P_cc_min
                         Pa_fc = Pa_total - Pa_cc
-                        if Pa_fc < self.P_fc_min:
-                            Pa_fc = self.P_fc_min
+                        if Pa_fc < self.ac.fc.power_min:
+                            Pa_fc = self.ac.fc.power_min
                             Pa_cc = self.ac.P_cc_min
                             P_fc_dumpy = (Pa_cc + Pa_fc) - Pa_total
                 
@@ -433,12 +433,11 @@ class FlightMission:
                 mdot_cc_arr[sl] = mdot_fuel_arr[sl]
                 
                 # Add fuel cell mass flow from threshold power
-                mdot_fc_arr[sl] = self.__mdot_fc(Pa_fc)
-                mdot_fuel_arr[sl] += mdot_fc_arr[sl]
+                Qdot_fc, mdot_fc, mdot_fc_air_in, mdot_fc_air_out, mdot_fc_H20, mdot_fc_H2_recirculation = self.ac.fc.get_TMS_values(Pa_fc)
+                mdot_fuel_arr[sl] += mdot_fc
 
-                mdot_dumpy_arr[sl] = self.__mdot_fc(P_fc_dumpy)
-                dumpy_burn = np.cumsum(mdot_dumpy_arr[sl]) * self.dt  # cumulative fuel dumped _within_ slice
-                m_dumpy[sl] = np.concatenate(([0.0], dumpy_burn[:-1]))
+                _, mdot_dumpy, _, _, _, _ = self.ac.fc.get_TMS_values(P_fc_dumpy)
+                m_dumpy[sl] = mdot_dumpy * self.dt  # cumulative fuel dumped _within_ slice
                 
                 # Required power
                 Pr_arr[sl] = Pa_arr[sl] * eta_prop_arr[sl]
@@ -470,21 +469,21 @@ class FlightMission:
                     eta_prop = self.ac.eng._eta_prop(M0)
                     
                     Pa_total = Pr / eta_prop
-                    P_fc_max = self.P_fc_max * throttle[i]
+                    P_fc_max = self.ac.fc.power_max_throttle * throttle[i]
                     
-                    if Pa_total <= self.P_fc_max:
-                        Pa_fc = self.P_fc_min if Pa_total < self.P_fc_min else Pa_total
+                    if Pa_total <= P_fc_max:
+                        Pa_fc = self.ac.fc.power_min if Pa_total < self.ac.fc.power_min else Pa_total
                         Pa_cc = 0.0
                         P_fc_dumpy = Pa_fc - Pa_total
                     else:
-                        Pa_cc = Pa_total - self.P_fc_max
-                        Pa_fc = self.P_fc_max
+                        Pa_cc = Pa_total - P_fc_max
+                        Pa_fc = P_fc_max
                         P_fc_dumpy = 0.0
                         if Pa_cc < self.ac.P_cc_min:
                             Pa_cc = self.ac.P_cc_min
                             Pa_fc = Pa_total - Pa_cc
-                            if Pa_fc < self.P_fc_min:
-                                Pa_fc = self.P_fc_min
+                            if Pa_fc < self.ac.fc.power_min:
+                                Pa_fc = self.ac.fc.power_min
                                 Pa_cc = self.ac.P_cc_min
                                 P_fc_dumpy = (Pa_cc + Pa_fc) - Pa_total
                     
@@ -494,6 +493,7 @@ class FlightMission:
                     mdot_cc_arr[i] = mdot_fuel
                     
                     # Add fuel cell mass flow from threshold power
+                    
                     mdot_fc_arr[i] = self.__mdot_fc(Pa_fc)
                     mdot_fuel += mdot_fc_arr[i]
 
@@ -515,7 +515,8 @@ class FlightMission:
                             T=T_arr, P=P_arr, rho=rho_arr, ROC=roc_arr,
                             phase=phase_arr, Pa=Pa_arr, Pr=Pr_arr,
                             mdot_fuel=mdot_fuel_arr, mdot_air=mdot_air_arr,
-                            mdot_cc=mdot_cc_arr, mdot_fc=mdot_fc_arr, mdot_dumpy=mdot_dumpy_arr, m_dumpy=m_dumpy,
+                            mdot_cc=mdot_cc_arr, mdot_fc=mdot_fc_arr,
+                            mdot_dumpy=mdot_dumpy_arr, m_dumpy=m_dumpy,
                             eta_th=eta_th_arr, eta_prop=eta_prop_arr, mass=m_arr
                             )
 
@@ -566,21 +567,10 @@ class FlightMission:
         #     ax.set_xlabel("Time [s]")
         #     ax.grid(alpha=0.3)
         fig.tight_layout()
-        # plt.show()
-
-    # ---------------------------------------------------------------------
-    #  SAVING OUTPUTS
-    # ---------------------------------------------------------------------
-    def save_minmax_vals(self) -> None:
-        """Save the flight profile critical conditions for each flight phase to a CSV file."""
-        p = self.profile
-
-        phase_conds = []
+        plt.show()
         
-
-
     
-def main(fc_split: float=0.0, throttle_TOGA: float = 1.0, throttle_cruise: float = 0.1, MTOW: float=8037.6, CD_HEX: float=0.0, delta_AP: float=0.0, dt: float=0.1) -> tuple:
+def main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: float = 0.1, MTOW: float=8037.6, CD_HEX: float=0.0, delta_AP: float=0.0, dt: float=0.1) -> tuple:
     """Main flight performance function to obtain the fuel mass and shaft power profile.
     Args:
         
@@ -630,30 +620,33 @@ def main(fc_split: float=0.0, throttle_TOGA: float = 1.0, throttle_cruise: float
         c_pg=1157.4,
         k_gas=1.364729742
     )
-    
+
+    fc_model = FuelCell(
+        name="PEM-HT-FC",
+        power_req_max=(TOGA*fc_split + delta_AP + base_AP),
+        TOGA_throttle=throttle_TOGA
+    )
+
     ac_model_H2 = Aircraft(
-        name="Beechcraft 1900D-H2",
+        name="H2-D2",
         wing_area=28.79,
         wing_span=17.64,
         CD0=0.024+CD_HEX,  # Add heat exchanger drag
         prop_diameter=2.78,
         eng=turboprop_H2,
+        fc=fc_model,
         MTOW=MTOW,
         P_cc_min=0.28285 * MAXC,  # [W] Minimum combustion chamber power
         delta_AP=delta_AP  # [W] Thermal Management System power
     )
-    # Max fuel cell power (fuel cell always covers the TMS and base APs)
-    P_fc_max = (TOGA * fc_split + delta_AP + base_AP)/throttle_TOGA
-
-    P_fc_min = P_fc_max * 0.09 # NOTE: 9% max, taken from literature
     
-    mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=dt, total_range_m=707e3, P_fc_max=P_fc_max, P_fc_min=P_fc_min, throttle_cuise=throttle_cruise)
+    mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=dt, total_range_m=707e3, throttle_cruise=throttle_cruise)
     
     H2_burnt = (mission_H2.profile['mass'][0] - mission_H2.profile['mass'][-1])/(1 - E_SCALE)
     print(f"Total H2 mass burnt: {H2_burnt:.2f} kg")
     
     # Determine the maximum fuel cell power across the three splits
-    FC_power = P_fc_max # TODO: ADD REDUNDANCY
+    FC_power = fc_model.power_max_throttle # TODO: ADD REDUNDANCY
     mdot_dumpy = mission_H2.profile['mdot_dumpy']
     m_dumpy = mission_H2.profile['m_dumpy']
     
