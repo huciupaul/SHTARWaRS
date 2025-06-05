@@ -394,16 +394,16 @@ class Compressor():
         self.pressure_ratio = pressure_ratio
         self.fluid = fluid  
 
-    def power(self, inlet_temperature, gamma):
+    def power(self, inlet_temperature):
+        gamma = self.fluid.gamma  
         T_out = inlet_temperature * (1 + 1 / self.efficiency * (self.pressure_ratio ** ((gamma - 1) / gamma) - 1))  # Isentropic relation
-
         cp = self.fluid.cp  
         mdot = self.fluid.mf_given
         power_req = mdot * cp * (T_out - inlet_temperature) / self.efficiency  # Power in Watts
         return power_req
     
     def mass(self, power):
-        return power * 0.0400683 + 5.17242
+        return (power * 0.0400683 + 5.17242)
 
 
 class Turbine():
@@ -418,6 +418,15 @@ class Turbine():
         mdot = self.fluid.mf_given
         power_provide = mdot * cp_gas * (T_in - T_out) / self.efficiency  # Power in Watts\
         return power_provide
+
+class Valve():
+    def __init__(self, valve_efficiency, fluid):
+        self.efficiency = valve_efficiency
+        self.fluid = fluid
+
+    def valve_mass(self):
+        mdot_coolant = self.fluid.mf_given
+        return (0.568 * mdot_coolant ** 0.5541)
 
 class Fluid():
     def __init__(self, name, T, P, C,cp,mf,k, mu, gamma, rho):
