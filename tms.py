@@ -77,14 +77,14 @@ k_in = 0.258 # thermal conductivity of coolant [W/m.K]
 prandtl_in = 0.71 # fluid
 Reynolds = 1e4 # fluid
 f = (0.79 * math.log(Reynolds) - 1.64) ** -2
-nu = ((f/8)*(Reynolds-1000)*prandtl_in)/(1+12.7*(f/8)**0.5 * (prandtl_in**0.66-1)) # Nusselt number [m²/s]
+nu = ((f/8)*(Reynolds-1000)*prandtl_in)/(1+12.7*(f/8)**0.5 * (prandtl_in**0.66-1)) # Nusselt number for turbulent flow in tubes [m²/s]
 dh = 0.01 #tube diameter [m]
 h_in = k_in * nu / dh
 wing_coolant_temp = 320  # K
 
 # Air
 prandtl_air = 0.71
-reynolds_air = 1e7
+reynolds_air = 1e7  # depends on temperature?
 h_ext = ambient_conditions['rho'] * ambient_conditions['V'] * cp_air * 0.185 * (math.log10(reynolds_air))**-2.584 * prandtl_air**-0.66
 recovery_factor = prandtl_air ** 0.33  
 
@@ -195,7 +195,8 @@ class RamAirHeatExchanger(HeatSink):
         self.inlet_area = 0.0       # m² of total open hole area
         self.skin_area = 0.0        # m² of skin needed (porous area)
         self.hole_count = 0         # total number of small holes
-        self.drag_N = 0.0           # N, raw drag before Meredith effect
+        self.TR = 0.0
+        #self.drag_N = 0.0           # N, raw drag before Meredith effect
         self.net_drag_N = 0.0       # N, after Meredith recovery
 
     def absorb_heat(self, heat_w):
@@ -242,16 +243,42 @@ class RamAirHeatExchanger(HeatSink):
             area_per_hole = 0.0
 
         # Base drag
-        drag_N = 0.5 * air_density * (flight_speed_m_s ** 2) * inlet_CD * A_open
+        deltaT_HX0 = np.linspace(0, 50, 100)
+        CD_d_CD_sp = 0.11  # sum of CD_d + CD_sp = 0.11
+        gamma = 1.4
+        R = 287.058
+        M0 = ambient_conditions['M']        # adjust to flight profile !!!!
+        T0 = ambient_conditions['T']        # adjust to flight profile !!!!
+        eta_p07 = 0.92  # plot for different eta_p07
+        
+        comp_ratio = (1.0 + 0.5 * (gamma - 1.0) * M0**2) ** ((gamma - 1.0) / gamma)
+
+        # Denominator inside the “1 − 1/…”
+        D = comp_ratio * eta_p07
+
+        # Main numerator pieces
+        term1 = 2.0 * gamma / (gamma - 1.0) * R
+        term2 = 1.0 - 1.0 / D
+        term3 = T0 * (1.0 + 0.5 * (gamma - 1.0) * M0**2) + deltaT_HX0
+
+        numerator = term1 * term2 * term3
+
+        # Full denominator under the radical
+        denominator = (M0 * math.sqrt(gamma * R * T0) *(1.0 + (CD_d_CD_sp) / 2.0))
+
+        TR = math.sqrt(numerator / denominator) - 1.0
+
+        #drag_N = 0.5 * air_density * (flight_speed_m_s ** 2) * inlet_CD * A_open
 
         # Net drag 
-        net_drag_N = drag_N * (1.0 - meredith_recovery)
+        net_drag_N = TR * (1.0 - meredith_recovery)
 
         # Store results
         self.inlet_area = A_open
         self.skin_area = skin_area
         self.hole_count = hole_count
-        self.drag_N = drag_N
+        #self.drag_N = drag_N
+        self.TR = TR
         self.net_drag_N = net_drag_N
 
         return {
@@ -259,7 +286,8 @@ class RamAirHeatExchanger(HeatSink):
             'A_open': A_open,
             'skin_area': skin_area,
             'hole_count': hole_count,
-            'drag_N': drag_N,
+            #'drag_N': drag_N,
+            'TR': TR,
             'net_drag_N': net_drag_N
         }
 
@@ -305,20 +333,18 @@ class HX():
         self.Q_req = Q_req
 
     def size(self):
-        # Plate propeties
-        plate_thickness = 0.6 * 1e-3 #m
+        # Plate properties
+        plate_thickness = 7.6 * 1e-3 #m 
         plate_thermal_conductivity = 17.5 # W/(m·K), SS
         size_factor = 1.15 #(1.15-1.25)
-        gap_bt_plates = 3e-3
-        N_plates = 8
-
+        gap_bt_plates = 3e-3  # from excel tool
+        N_plates = 8          # from Michelle 
 
         # Pipe Properties
         N_passes = 1
         dh_coolant = 2*gap_bt_plates / size_factor
         dh_h2 = dh_coolant
         
-
 
         #initial guess for mass flow rate of coolant
         self.fluid_hot.mf_calculated = self.Q_req / (self.fluid_hot.cp * (self.fluid_hot.T - self.fluid_cold.T))
