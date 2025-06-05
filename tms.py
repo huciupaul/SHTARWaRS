@@ -414,10 +414,39 @@ class HX():
 
         return self.fluid_hot.mf_calculated, area, volume
         
+class Compressor():
+    def __init__(self, comp_efficiency, pressure_ratio, fluid):
+        self.efficiency = comp_efficiency
+        self.pressure_ratio = pressure_ratio
+        self.fluid = fluid  
+
+    def power(self, inlet_temperature, gamma):
+        T_out = inlet_temperature * (1 + 1 / self.efficiency * (self.pressure_ratio ** ((gamma - 1) / gamma) - 1))  # Isentropic relation
+
+        cp = self.fluid.cp  
+        mdot = self.fluid.mf_given
+        power_req = mdot * cp * (T_out - inlet_temperature) / self.efficiency  # Power in Watts
+        return power_req
+    
+    def mass(self, power):
+        return power * 0.0400683 + 5.17242
+
+
+class Turbine():
+    def __init__(self, turbine_efficiency, fluid):
+        self.efficiency = turbine_efficiency
+        self.fluid = fluid
+
+    def power(self, T_in, T_out):
+        # Calculate the power produced by the turbine
         
+        cp_gas = self.fluid.cp
+        mdot = self.fluid.mf_given
+        power_provide = mdot * cp_gas * (T_in - T_out) / self.efficiency  # Power in Watts\
+        return power_provide
 
 class Fluid():
-    def __init__(self, name, T, P, C,cp,mf,k, mu):
+    def __init__(self, name, T, P, C,cp,mf,k, mu, gamma, rho):
         self.name = name
         self.T = T  # Temperature in Kelvin
         self.P = P  # Pressure in Pascals
@@ -427,6 +456,9 @@ class Fluid():
         self.mf_given = mf
         self.k = k
         self.mu = mu
+        self.gamma = gamma
+        self.rho = rho #Density in kg/m³
+        self.vdot = mf / rho  # Volumetric flow rate in m³/s
 
 # ------------------------------ FUNCTIONS -----------------------------------
 
