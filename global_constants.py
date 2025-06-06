@@ -1,6 +1,9 @@
 import numpy as np
 from typing import Tuple
 
+import pickle
+
+
 """
 This file comprises global constants used throughout the project
 """
@@ -56,12 +59,17 @@ mass_specific_power = 5000                              # [W/kg] Specific power 
 volume_specific_power = 4000000                         # [W/m^3] Volume specific power of the fuel cell stack (FZO Roadmap-report)
 stoic_ratio_A = 1.1                                     # [-] Stoichiometric ratio of the anode
 stoic_ratio_C = 1.8                                     # [-] Stoichiometric ratio of the cathode
+pickle_path = 'fc/spline_eta_of_P.pkl'                     # Path to the efficiency function file
+# Load efficiency function from file
+with open(pickle_path, 'rb') as f:
+    efficiency_per_throttle = pickle.load(f)
+
+P_A=1.6 * 101325 + 0.06 * 1e5,                          # [Pa] Anode Pressure
+P_C=1.6 * 101325,                                       # [Pa] Cathode Pressure
+T_FC = 273.15 + 160,                                    # [K] Fuel Cell Temperature
 
 
 ### FOR CODE CHECKING PURPOSES ONLY ###
-P_A=1.8 * 101325 + 0.06 * 1e5,                          # [Pa] Anode Pressure
-P_C=1.8 * 101325,                                       # [Pa] Cathode Pressure
-T_FC = 273.15 + 160,                                    # [K] Fuel Cell Temperature
 #50% power split
 m_H2_FC = 0.01757833343024256                           # [kg/s] Mass flow rate of hydrogen in the fuel cell
 P_FC_stack = 1476580.0081403746                         # [W] Power of the Fuel Cell Stack
@@ -129,3 +137,16 @@ mli_ss_co2 = 3                                          #kg/kg (for SS)
 mli_ss_ee = 42.74                                       #MJ/kg (Embodied Energy for SS)
 mli_layers = 40
 mli_thickness = 0.03 *1e-3 * mli_layers                 #https://www.sciencedirect.com/science/article/pii/S135943112200391X
+
+####################
+# From integration #
+####################
+M_PAX = 84
+X_cargo_fwd = 3.87
+X_first_seat = 4.84
+seat_pitch = 0.75
+
+V_cargo_fwd = 1.01371425
+V_cargo_aft = 4.8106
+V_cargo = V_cargo_fwd + V_cargo_aft
+
