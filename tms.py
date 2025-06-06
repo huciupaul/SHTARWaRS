@@ -2,14 +2,15 @@ import math
 import abc
 import numpy as np
 from CoolProp.CoolProp import PropsSI
+import matplotlib.pyplot as plt
 
 # ------------------------------ PARAMETERS -----------------------------------
 
 # Ambient Conditions --------------------------------
 ambient_conditions= {
-    'T': 283.5,  # Ambient temperature in Kelvin
+    'T': 238.651,  # Ambient temperature in Kelvin
     'M': 0.4,  # Flight Mach number
-    'V': 100,  # Flight speed in m/s
+    'V': 123.8644,  # Flight speed in m/s
     'rho': 1.225  # Air density at sea level in kg/m^3
 }
 
@@ -40,13 +41,13 @@ t_init = 20 # K
 h2_mf_fc = 0.029  # kg/s per MW
 p_init_fc = 6e5 
 p_fin_fc = 3e5
-t_fin_fc = 180+273.15 # K
+t_fin_fc = 180 + 273.15 # K
 
 # CC Loop
 h2_mf_cc = 0.0294  # kg/s 
 p_init_cc = 6e5
 p_fin_cc = 12.1e5
-t_fin_cc = 180+273.15 # K
+t_fin_cc = 180 + 273.15 # K
 
 # Ram Air HX -------------------------------
 # Air properties
@@ -73,7 +74,7 @@ delta_pressure = 1000  # Pa, pressure drop across the fan
 
 
 #Skin HX -----------------------------------------------	
-area_wing = 4.6
+area_wing = 4.6  # only wing area for SHX
 
 #Coolant
 k_in = 0.258 # thermal conductivity of coolant [W/m.K]
@@ -173,7 +174,7 @@ class SkinHeatExchanger(HeatSink):
         self.coolant_temp = coolant_temp_K
         self.ambient_temp = None          # to be set based on flight condition
 
-    def set_ambient(self, T_ambient_K, recovery_factor=0.9, mach=0.3):
+    def set_ambient(self, T_ambient_K, recovery_factor=0.9, mach=0.4):
         # Set effective ambient (adiabatic wall) temperature for convection calculations
         T_aw = T_ambient_K * (1 + recovery_factor*0.5*(1.4-1)*mach**2)
         self.ambient_temp = T_aw 
@@ -244,32 +245,9 @@ class RamAirHeatExchanger(HeatSink):
             d_m = 0.0
             area_per_hole = 0.0
 
-        # Base drag
-        #deltaT_HX0 = np.linspace(0, 50, 100)
-        deltaT_HX0 = 50
-        CD_d_CD_sp = 0.11  # sum of CD_d + CD_sp = 0.11
-        gamma = 1.4
-        R = 287.058
-        M0 = ambient_conditions['M']        # adjust to flight profile !!!!
-        T0 = ambient_conditions['T']        # adjust to flight profile !!!!
-        eta_p07 = 0.92  # plot for different eta_p07
-        
-        comp_ratio = (1.0 + 0.5 * (gamma - 1.0) * M0**2) ** ((gamma - 1.0) / gamma)
-
-        # Denominator inside the “1 − 1/…”
-        D = comp_ratio * eta_p07
-
-        # Main numerator pieces
-        term1 = 2.0 * gamma / (gamma - 1.0) * R
-        term2 = 1.0 - 1.0 / D
-        term3 = T0 * (1.0 + 0.5 * (gamma - 1.0) * M0**2) + deltaT_HX0
-
-        numerator = term1 * term2 * term3
-
-        # Full denominator under the radical
-        denominator = (M0 * math.sqrt(gamma * R * T0) *(1.0 + (CD_d_CD_sp) / 2.0))
-
-        #TR = math.sqrt(numerator / denominator) - 1.0
+        # Total gross drag
+        mdot_air = ambient_conditions['rho'] * ambient_conditions['V'] * A_open
+        D_g = mdot_air * ambient_conditions['V']
 
         #drag_N = 0.5 * air_density * (flight_speed_m_s ** 2) * inlet_CD * A_open
 
@@ -280,8 +258,8 @@ class RamAirHeatExchanger(HeatSink):
         self.inlet_area = A_open
         self.skin_area = skin_area
         self.hole_count = hole_count
+        self.D_g = D_g
         #self.drag_N = drag_N
-        #self.TR = TR
         #self.net_drag_N = net_drag_N
 
         return {
@@ -290,9 +268,90 @@ class RamAirHeatExchanger(HeatSink):
             'skin_area': skin_area,
             'hole_count': hole_count
             #'drag_N': drag_N,
-            #'TR': TR,
             #'net_drag_N': net_drag_N
         }
+
+    
+
+
+    # THRUST RECOVERY
+    def thrust_ratio(
+        deltaT_HX0,                 # can be a scalar or a NumPy array
+        gamma: float,
+        R: float,
+        M0: float,
+        T0: float,
+        eta_p07: float ,
+        CD_d_CD_sp: float
+    ) -> np.ndarray:
+        """
+        Vectorised thrust-ratio calculation.
+
+        Parameters
+        ----------
+        deltaT_HX0 : float or array-like
+            Heat-exchanger temperature rise(s) [K].
+        gamma      : float
+            Ratio of specific heats.
+        R          : float
+            Gas constant [J kg⁻¹ K⁻¹].
+        M0         : float
+            Flight Mach number.
+        T0         : float
+            Ambient static temperature [K].
+        eta_p07    : float
+            Propulsive efficiency term.
+        CD_d_CD_sp : float
+            Sum (C_D,d + C_D,sp).
+
+        Returns
+        -------
+        TR : ndarray
+            Thrust ratio(s) corresponding to `deltaT_HX0`.
+        """
+        deltaT_HX0 = np.asarray(deltaT_HX0, dtype=float)
+
+        comp_ratio = (1.0 + 0.5 * (gamma - 1.0) * M0**2) * eta_p07 ** ((gamma - 1.0) / gamma)
+
+        # Guard against unphysical D <= 1
+        term2 = 1.0 - 1.0 / comp_ratio
+
+        numerator = (2.0 * gamma / (gamma - 1.0) * R) * term2 * ( T0 * (1.0 + 0.5 * (gamma - 1.0) * M0**2) + deltaT_HX0)
+
+        denominator = M0 * np.sqrt(gamma * R * T0) * (1.0 + CD_d_CD_sp / 2.0)
+
+
+        TR = np.sqrt(numerator) / denominator - 1.0
+        #TR = np.where(value > 0, np.sqrt(value) - 1.0, np.nan)  # nan for impossible points
+        return TR
+    
+
+    # -- sweep ΔT_HX0 from 0 to 110 K --------------------------------------
+    deltaT = np.linspace(0, 100, 100)
+    eta_values = [0.995, 0.92, 0.90, 0.85]
+
+    for eta in eta_values:
+        TR = thrust_ratio(
+            deltaT,
+            gamma = 1.4,
+            R     = 287.058,
+            M0    = ambient_conditions["M"],
+            T0    = ambient_conditions["T"],
+            eta_p07       = eta,   # optional override
+            CD_d_CD_sp    = 0.11    # optional override
+        )
+        plt.plot(deltaT, TR, label=f"ηₚ,07 = {eta:.3f}")
+
+    print(TR[-1])
+    # -- plot ---------------------------------------------------------------
+    #plt.plot(deltaT, TR, marker="o")
+    plt.xlabel("ΔT_HX⁰ (K)")
+    plt.ylabel("Thrust Ratio (TR)")
+    plt.title("Temperature difference of Radiator vs TR (for different pressure ratios)")
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
 
 class ThermoElectricGenerator(HeatSink):
     def __init__(self, hot_temp_K, cold_temp_K, efficiency):
@@ -352,10 +411,11 @@ class HX():
         #initial guess for mass flow rate of coolant
         self.fluid_hot.mf_calculated = 10 # self.Q_req / (self.fluid_hot.cp * (self.fluid_hot.T - self.fluid_cold.T))
         
-        L_h2 = 447000
+        L_h2 = 447000 # J/kg
         area = 1.3 # assumed area of heat exchanger plate in m² (total)
         H_hx = 500 # Overall heat exchange coefficient for HX [W/m².K]
         self.fluid_cold.cp = 9384
+
         # Calculation
         Q = 1000
         iteration = 0
