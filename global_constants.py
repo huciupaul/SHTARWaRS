@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Tuple
 
+
 import pickle
 
 
@@ -141,11 +142,35 @@ mli_thickness = 0.03 *1e-3 * mli_layers                 #https://www.sciencedire
 # From integration #
 ####################
 M_PAX = 84
-X_cargo_fwd = 3.87
 X_first_seat = 4.84
 seat_pitch = 0.75
+rho_cargo = 161
 
-V_cargo_fwd = 1.01371425
-V_cargo_aft = 4.8106
-V_cargo = V_cargo_fwd + V_cargo_aft
+Beechcraft_1900D = dict(
+    MTOW        = 7766,
+    M_fuel      = 337,
+    OEW         = 4894,
+    M_cargo_aft = 4.8106*rho_cargo,
+    M_cargo_fwd = 1.01371425*rho_cargo,
+    num_PAX     = 19,
 
+    X_MTOW_fwd  = 7.51,
+    X_MTOW_aft  = 6.79,
+    X_fuel      = 7.29,
+    X_cargo_fwd = 3.87,
+    X_cargo_aft = 12.64,    
+    X_PAX       = 7.74,
+
+    V_cargo_fwd = 1.01371425,
+    V_cargo_aft = 4.8106,
+    V_cargo     = 1.01371425+4.8106,
+    V_wing      = 1.144,
+
+    d_aft_min   = 1.0452,
+    d_aft_max   = 1.46328,
+    l_aft_cone  = 1.46328,
+    l_aft_cuboid  = 1.46328,
+    h_aft_cuboid  = 2.0904
+    # X_d_aft_min =
+    # X_d_aft_max =
+    )

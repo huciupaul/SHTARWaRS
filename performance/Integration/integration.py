@@ -3,11 +3,10 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 import matplotlib.pyplot as plt
 
-from DSE_1.global_constants import M_PAX, X_cargo_fwd, V_cargo_fwd, V_cargo_aft, V_cargo, X_first_seat,  seat_pitch
-
+from DSE_1.global_constants import M_PAX, X_first_seat, seat_pitch, rho_cargo, Beechcraft_1900D
 
 @dataclass
-class Aircraft_data:
+class Original_aircraft:
     MTOW: float
     X_MTOW: float
     M_fuel: float
@@ -19,33 +18,43 @@ class Aircraft_data:
     M_EPS: float
     X_EPS: float
 
-    M_FC: float=None
-    X_FC: float=None
-    M_storage: float=None
-    X_storage: float=None
-    M_TMS: float=None
-    X_TMS: float=None
-
-
     @property
     def X_PAX(self) -> float:
         return ((self.num_PAX-3)*M_PAX * (X_first_seat + (self.num_PAX-5)/2 * seat_pitch / 2) + 3*M_PAX * (X_first_seat + (self.num_PAX-3)/2 * seat_pitch)) / (self.num_PAX*M_PAX)
 
     @property
     def M_cargo(self, V_cargo_specific) -> float:
-        return 939 * V_cargo_specific/V_cargo
+        return 939 * V_cargo_specific/Beechcraft_1900D['V_cargo']
     
     @property
     def X_OEW(self) -> float:
-        M_cargo_tot = self.M_cargo(V_cargo_fwd) + self.M_cargo(V_cargo_aft)
+        M_cargo_tot = self.M_cargo(Beechcraft_1900D['V_cargo_fwd']) + self.M_cargo(Beechcraft_1900D['V_cargo_aft'])
         M_payload = self.num_PAX*M_PAX + M_cargo_tot
 
-        X_cargo_tot = (self.M_cargo(V_cargo_fwd)*self.X_cargo_fwd + self.M_cargo(V_cargo_aft)*self.X_cargo_aft) / M_cargo_tot
+        X_cargo_tot = (self.M_cargo(Beechcraft_1900D['V_cargo_fwd'])*self.X_cargo_fwd + self.M_cargo(Beechcraft_1900D['V_cargo_aft'])*self.X_cargo_aft) / M_cargo_tot
         X_payload = (self.num_PAX*M_PAX*self.X_PAX + M_cargo_tot*X_cargo_tot) / M_payload
 
         return (self.MTOW*self.X_MTOW - self.M_fuel*self.X_fuel - M_payload*X_payload) / self.OEW
 
+@dataclass
+class Retrofitted_aircraft:
+    MTOW: float
+    X_MTOW: float
+    M_fuel: float
+    X_fuel: float
+    X_cargo_fwd: float
+    X_cargo_aft: float
+    num_PAX: float
+    OEW: float
+    M_EPS: float
+    X_EPS: float
 
+    M_FC: float
+    X_FC: float
+    M_storage: float
+    X_storage: float
+    M_TMS: float
+    X_TMS: float
 
 class CG_calculation:
     def __init__(self,
