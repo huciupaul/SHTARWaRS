@@ -288,4 +288,4 @@ class Turboprop:
                                self.c_pg,
                                self.k_gas)
         
-        return mdot_fuel, eta_th, eta_prop, mdot_air
+        return mdot_fuel, eta_th, eta_prop, mdot_air, T03, P03
