@@ -251,7 +251,7 @@ def main_storage(m_h2):
         Vt, L_out, R_out = tankh2.total_volume(L_cyl, dv, t1, t2, t_mli)
         mass_inner, mass_outer, mass_mli = tankh2.total_mass(L_in, dv, t1, t2, t_mli, dens_mli)
         Mt = mass_inner + mass_outer + mass_mli + mass_h2 + str_mass
-        return Mt, Vt, t1, dv, t2, L_out
+        return Mt, Vt, t1, dv, t2, L_out, R_out
 
     # --- Main ---
     V_in, fill_ratio = fA(mass_h2, P_vent)
@@ -264,5 +264,5 @@ def main_storage(m_h2):
     str_mass = estimated_mass * ratio
     Q_str = Q_og_str
     Qmax = 100  # Use a fixed Qmax for speed, or precompute if needed
-    Mt, Vt, t1, dv, t2, L_out = compute_tank(material, material2, mat_property, MAWP, mass_h2, Q_str, mat2_property, str_mass, fill_ratio, V_in, P_vent, Qmax)
-    return Mt, Vt, t1, dv, t2, L_out
+    Mt, Vt, t1, dv, t2, L_out, R_out = compute_tank(material, material2, mat_property, MAWP, mass_h2, Q_str, mat2_property, str_mass, fill_ratio, V_in, P_vent, Qmax)
+    return Mt, Vt, t1, dv, t2, L_out, R_out
