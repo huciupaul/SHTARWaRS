@@ -129,3 +129,16 @@ mli_ss_co2 = 3                                          #kg/kg (for SS)
 mli_ss_ee = 42.74                                       #MJ/kg (Embodied Energy for SS)
 mli_layers = 40
 mli_thickness = 0.03 *1e-3 * mli_layers                 #https://www.sciencedirect.com/science/article/pii/S135943112200391X
+
+####################
+# From integration #
+####################
+M_PAX = 84
+X_cargo_fwd = 3.87
+X_first_seat = 4.84
+seat_pitch = 0.75
+
+V_cargo_fwd = 1.01371425
+V_cargo_aft = 4.8106
+V_cargo = V_cargo_fwd + V_cargo_aft
+

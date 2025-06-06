@@ -65,7 +65,8 @@ class Powerpoint:
     until_phase: str=None   # e.g. "cruise"
     
 class FlightMission:
-    """Time-resolved kinematic + power mission profile.
+    """
+    Time-resolved kinematic + power mission profile.
 
     If *total_range_m* is provided the cruise leg is auto-sized to achieve the
     specified ground range. Cruise and hold power settings are left `None` and
@@ -140,26 +141,15 @@ class FlightMission:
     
     @staticmethod
     def __mdot_fc(Pa: float):
-        """Compute mass flow rate of fuel from the fuel cell available power.
+        """
+        Compute mass flow rate of fuel from the fuel cell available power.
         Args:
             Pa: Available power [W]
         Returns:
             mdot_fc: Mass flow rate of fuel [kg/s]
         """
         return 0.01560072557 * Pa/1e6  # 0.01560072557 kg/s per MW
-    '''
-    @staticmethod
-    def __mdot_fc(fc_split: float, fc_setting:float):
-        """Compute mass flow rate of fuel from the fuel cell power split and power setting.
-        Args:
-            fc_split: Fuel cell power split (0.0 to 1.0)
-            fc_setting: Fuel cell power setting [W]
-        Returns:
-            mdot_fc: Mass flow rate of fuel [kg/s]
-        """
-        mdot_fc = FC_function(fc_split, fc_setting)  # TODO: Placeholder for actual FC function
-        return mdot_fc
-    '''
+     
     # ---------------------------------------------------------------------
     #  CORE MISSION BUILDER
     # ---------------------------------------------------------------------
@@ -531,7 +521,7 @@ class FlightMission:
                     eta_prop_arr[i] = eta_prop
 
         # finally
-        TMS_inputs = dict(Q_dot_fc=Qdot_fc, p_cc=p_cc,
+        self.TMS_inputs = dict(Q_dot_fc=Qdot_fc, p_cc=p_cc,
                            h2_mf_fc=mdot_fc_arr, h2_mf_cc=mdot_cc_arr,
                            t_cc=T_cc, air_mf_fc=mdot_fc_air_in,
                            t_amb=T_arr, rho_amb=rho_arr, V_amb=V_arr
@@ -544,8 +534,7 @@ class FlightMission:
                             mdot_fuel=mdot_fuel_arr, mdot_air=mdot_air_arr,
                             mdot_cc=mdot_cc_arr, mdot_fc=mdot_fc_arr,
                             mdot_dumpy=mdot_dumpy_arr, m_dumpy=m_dumpy,
-                            eta_th=eta_th_arr, eta_prop=eta_prop_arr, mass=m_arr,
-                            TMS_inputs=TMS_inputs
+                            eta_th=eta_th_arr, eta_prop=eta_prop_arr, mass=m_arr
                             )
 
     # ---------------------------------------------------------------------
@@ -553,22 +542,6 @@ class FlightMission:
     # ---------------------------------------------------------------------
     def quicklook(self) -> None:
         p = self.profile
-
-        '''
-        # Save the profile phase begining and end conditions as a CSV file in the fpp folder
-        phase_conds = []
-        for waypoint in self.wps:
-            # Find indices where the phase matches the waypoint name
-            indices = np.where(p["phase"] == waypoint.name)[0]
-            # Append first occurrence
-            row_first = {k: v[indices[0]] for k, v in p.items()}
-            phase_conds.append(row_first)
-            # Append last occurrence
-            row_last = {k: v[indices[-1]] for k, v in p.items()}
-            phase_conds.append(row_last)
-        phase_conds = pd.DataFrame(phase_conds)
-        phase_conds.to_csv("fpp/flight_profile.csv", index=False)
-        '''
 
         fig, axs = plt.subplots(3, 4, figsize=(18, 4))
         axs[0, 0].plot(p["time"], p["alt"])
@@ -599,10 +572,11 @@ class FlightMission:
         
     
 def main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: float = 0.1, MTOW: float=8037.6, CD_HEX: float=0.0, delta_AP: float=0.0, dt: float=0.1) -> tuple:
-    """Main flight performance function to obtain the fuel mass and shaft power profile.
+    """
+    Main flight performance function to obtain the fuel mass and shaft power profile.
     Args:
         
-        MTOW: Maximum Take-Off Weight in kg.
+        MTOW: Maximuam Take-Off Weight in kg.
         CD_HEX: Coefficient of drag for the heat exchangers fuselage.
         
     Returns:
@@ -674,11 +648,11 @@ def main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: floa
     print(f"Total H2 mass burnt: {H2_burnt:.2f} kg")
     
     # Determine the maximum fuel cell power across the three splits
-    TMS_inputs = mission_H2.profile['TMS_inputs']
-    
-    m_fc = fc_model.fc_mass
-    
-    return TMS_inputs, H2_burnt, m_fc, mission_H2.profile
+    TMS_inputs = mission_H2.TMS_inputs
+    FC_outputs = dict(m_fc=fc_model.fc_mass,
+                      V_fc=fc_model.fc_volume)
+        
+    return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile
     
     
 if __name__ == "__main__":
