@@ -251,7 +251,33 @@ def main_storage(m_h2):
         Vt, L_out, R_out = tankh2.total_volume(L_cyl, dv, t1, t2, t_mli)
         mass_inner, mass_outer, mass_mli = tankh2.total_mass(L_in, dv, t1, t2, t_mli, dens_mli)
         Mt = mass_inner + mass_outer + mass_mli + mass_h2 + str_mass
-        return Mt, Vt, t1, dv, t2, L_out
+
+        V_init = Vt
+        L_init = L_out
+        R_init = R_out
+        t2 = t2
+
+        # Torispherical head size
+        d0 = 2 * R_init  # Diameter of the torispherical head
+        CR = d0 # Crown radius
+        KR = 0.1 * d0  # Knuckle radius
+        DH = 0.1935 * d0 - 0.455 * t2
+
+        # Torispherical head volume
+        R = CR
+        a = KR
+        c = d0 / 2 - a
+        h = R - np.sqrt((R - a) ** 2 - c ** 2)
+        c = np.sqrt((R - a) ** 2 - (R - h) ** 2)
+        V_tor = np.pi / 3 * (2 * h * R ** 2 - (2 * a ** 2 + c ** 2 + 2 * a * R) * (R - h) + 3 * a ** 2 * c * np.arcsin((R - h) / (R - a)))
+
+        V_cyl = V_init - 2 * V_tor
+        A_cyl = np.pi * R_init ** 2
+        L_cyl = V_cyl / A_cyl
+
+        L_out = L_cyl + 2 * h
+        
+        return Mt, Vt, t1, dv, t2, L_out, R_out
 
     # --- Main ---
     V_in, fill_ratio = fA(mass_h2, P_vent)
@@ -264,5 +290,6 @@ def main_storage(m_h2):
     str_mass = estimated_mass * ratio
     Q_str = Q_og_str
     Qmax = 100  # Use a fixed Qmax for speed, or precompute if needed
-    Mt, Vt, t1, dv, t2, L_out = compute_tank(material, material2, mat_property, MAWP, mass_h2, Q_str, mat2_property, str_mass, fill_ratio, V_in, P_vent, Qmax)
-    return Mt, Vt, t1, dv, t2, L_out
+    Mt, Vt, t1, dv, t2, L_out, R_out = compute_tank(material, material2, mat_property, MAWP, mass_h2, Q_str, mat2_property, str_mass, fill_ratio, V_in, P_vent, Qmax)
+    Mt = Mt - mass_h2
+    return Mt, Vt, t1, dv, t2, L_out, R_out
