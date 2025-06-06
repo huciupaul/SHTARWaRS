@@ -64,11 +64,12 @@ pickle_path = 'fc/spline_eta_of_P.pkl'                     # Path to the efficie
 with open(pickle_path, 'rb') as f:
     efficiency_per_throttle = pickle.load(f)
 
-
-### FOR CODE CHECKING PURPOSES ONLY ###
 P_A=1.6 * 101325 + 0.06 * 1e5,                          # [Pa] Anode Pressure
 P_C=1.6 * 101325,                                       # [Pa] Cathode Pressure
 T_FC = 273.15 + 160,                                    # [K] Fuel Cell Temperature
+
+
+### FOR CODE CHECKING PURPOSES ONLY ###
 #50% power split
 m_H2_FC = 0.01757833343024256                           # [kg/s] Mass flow rate of hydrogen in the fuel cell
 P_FC_stack = 1476580.0081403746                         # [W] Power of the Fuel Cell Stack
