@@ -474,6 +474,107 @@ class Fluid():
         #self.rho = rho #Density in kg/m³
         #self.vdot = mf / rho  # Volumetric flow rate in m³/s
 
+
+
+
+class PipeAnalyzer:
+    def __init__(self):
+        """Initialize the Heat Pipe Analyzer"""
+
+    def analyze_heat_pipe(self, length, d_in, d_out, d_is, temp_fluid, temp_air,
+                          therm_conduc_fluid, prandtl_number, mass_flow, spec_heat,
+                          heat_trans_air, therm_conduc_pipe, therm_conduc_insulation,
+                          density_fluid, kinematic_visc, material_roughness):
+        """
+        Combined analysis of heat pipe: calculate both pressure drop and temperature distribution
+
+        Parameters:
+        length: pipe length
+        d_in: inner diameter
+        d_out: outer diameter
+        d_is: insulation outer diameter
+        temp_fluid: initial fluid temperature
+        temp_air: ambient air temperature
+        therm_conduc_fluid: thermal conductivity of fluid
+        prandtl_number: Prandtl number
+        mass_flow: mass flow rate
+        spec_heat: specific heat of fluid
+        heat_trans_air: heat transfer coefficient air
+        therm_conduc_pipe: thermal conductivity of pipe material
+        therm_conduc_insulation: thermal conductivity of insulation material
+        density_fluid: fluid density
+        kinematic_visc: kinematic viscosity of fluid
+        material_roughness: absolute roughness of pipe material
+
+        Returns:
+        dict: {'pressure_drop': float, 'temperature_profile': np.array, 'reynolds': float}
+        """
+        # Calculate fluid velocity
+        velocity_fluid = mass_flow / (density_fluid * ((d_in / 2) ** 2) * np.pi)
+
+        # Calculate Reynolds number
+        reynolds = velocity_fluid * d_in / kinematic_visc
+
+        # ==================== PRESSURE DROP CALCULATION ====================
+        # Check for laminar or turbulent flow and calculate Darcy-Weisbach coefficient
+        if reynolds < 2300:
+            darcy_weisbach = 64 / reynolds
+        else:
+            x_darcy = (-2.457 * np.log((7 / reynolds) ** 0.9 + 0.27 * material_roughness / d_in)) ** 16
+            y_darcy = (37530 / reynolds) ** 16
+            darcy_weisbach = 8 * ((8 / reynolds) ** 12 + (x_darcy + y_darcy) ** -1.5) ** (1 / 12)
+
+        # Calculate pressure drop at the end of the pipe
+        pressure_drop = length * (darcy_weisbach * density_fluid * velocity_fluid ** 2) / (d_in * 2)
+
+        # ==================== TEMPERATURE PROFILE CALCULATION ====================
+        # Initialize temperature array
+        temperature = [temp_fluid]
+        energies = 0
+        steps = 100
+
+        # Calculate heat transfer coefficient
+        nu_turb = 0.0223 * (reynolds ** 0.8) * prandtl_number ** 0.4
+        heat_trans_co = nu_turb * therm_conduc_fluid / d_in
+
+        # Calculate surface areas
+        surface_in = np.pi * d_in * (length)
+        surface_out = np.pi * d_is * (length / steps)
+
+        # Calculate thermal resistances
+        r_fluid = (1 / (mass_flow * spec_heat * (1 - np.exp(-1 * heat_trans_co * surface_in / (mass_flow * spec_heat))))) * steps
+        r_air = 1 / (heat_trans_air * surface_out)
+        r_wall = np.log(d_out / d_in) / (2 * np.pi * therm_conduc_pipe * (length / steps))
+        r_insulation = np.log(d_is / d_out) / (2 * np.pi * therm_conduc_insulation * (length / steps))
+        r_tot = r_fluid + r_air + r_wall + r_insulation
+
+
+        # Calculate time in pipe
+        time_in_pipe = length / velocity_fluid
+
+
+        temps_fluid = temp_fluid
+        mass_section = (length / steps) * (d_in / 2) ** 2 * np.pi * density_fluid
+
+        # Calculate temperature at each step
+        for i in range(steps):
+            delta_q = (temps_fluid - temp_air) / r_tot
+            delta_t = time_in_pipe * delta_q / (mass_section * spec_heat) / steps
+            temps_fluid = temps_fluid - delta_t
+            temperature.append(temps_fluid)
+            energies = energies + delta_q
+
+        energy_lost = energies
+
+        return {
+            'pressure_drop': pressure_drop,
+            'temperature_profile': np.array(temperature),
+            'Energy_lost' : energy_lost,
+            'reynolds': reynolds,
+            'velocity': velocity_fluid,
+            'darcy_weisbach': darcy_weisbach
+        }
+
 # ------------------------------ FUNCTIONS -----------------------------------
 
 def size_thermal_management(heat_sources, sinks):
