@@ -34,26 +34,21 @@ def efficiency(j_0):
     D = 1e-4 # [cm^2/s] Diffusion coefficient of the CCL (range 1e-4 to 3e-4 cm^2/s)
     R_om = 0.0801 # [ohm cm^2] Area specific resistance (range 0.045 to 0.2 ohm cm^2)
 
-
-
     # i_star = F * S_0 * l * k_star * c_O2
 
-    j_star = sig_t * b / l_t
-    
-
-    j_sig = np.sqrt(2 * j_star * sig_t * b)
+    i_star = sig_t * b / l_t
+    j_sig = np.sqrt(2 * i_star * sig_t * b)
     j_lim = 4 * F * D_b * c_h / l_b
 
-    print(f"j_star: {j_star}, j_sig: {j_sig}, j_lim: {j_lim}")
+    print(f"j_star: {i_star}, j_sig: {j_sig}, j_lim: {j_lim}")
 
     beta = (np.sqrt(2 * j_0 / j_star)/ (1 + np.sqrt(1.12 * j_0 / j_star) * np.exp(np.sqrt(2 * j_0 / j_star))) 
-            + np.pi * (j_0 / j_star) * (2 + j_0 / j_star))
+            + np.pi * (j_0 / j_star) / (2 + (j_0 / j_star)))
 
 
-    eta_0 = (np.arcsinh( (j_0/j_sig)**2) / (2 * (c_h/c_ref)*(1-np.exp(j_0/(2*j_star)))) 
-             + sig_t * b**2 / (4 * F * D * c_h) * (j_0 / j_star - np.log(1 + (j_0 / (j_star*beta))**2 )) /
-             (1 - j_0/(j_lim * c_h / c_ref)) - b * np.log(1 - j_0 /(j_lim * c_h / c_ref)))
-    
+    eta_0 = np.arcsinh((j_0 / j_sig)**2 / (2 * (c_h / c_ref) * (1 - np.exp(j_0 / (2 * j_star))))) + (sig_t * b**2) / (4 * F * D * c_h) * np.log((j_0 / j_star - 1) + (j_0**2 / (j_star**2 * beta**2)) * (1 - j_0 / (j_lim * (c_h / c_ref)))**-1) - b * np.log(1 - j_0 / (j_lim * (c_h / c_ref)))
+    print(eta_0)
+
     V_cell = V_oc - R_om * j_0 - eta_0
 
     P = j_0 * V_cell  # [W/cm**2] Specific power output of the fuel cell 
@@ -61,19 +56,16 @@ def efficiency(j_0):
     m_H2 = stoic_ratio_A * j_0 / (2 * F) * cp('M', 'Hydrogen')   # Mass flow rate of hydrogen in kg/s
 
     # Efficiency calculation
-
     eta_cell = P / (m_H2 * LHV_H2)  # Efficiency of the fuel cell
-
     
-
     return eta_cell
 
 
 
 if __name__ == "__main__":
     # Example usage
-    j_0 = np.linspace(0, 0.0016, 50)  # Example exchange current density in A/m^2
-    V_cell = efficiency(j_0)
-    print(f"Cell voltage: {V_cell}")
-    plt.plot(j_0, V_cell)
+    j_0 = np.linspace(0.01, 2.0, 1000)  # Example exchange current density in A/cm^2
+    eta_cell = efficiency(j_0)
+    #print(f"Cell efficiancy: {eta_cell}")
+    plt.plot(j_0, eta_cell)
     plt.show()
