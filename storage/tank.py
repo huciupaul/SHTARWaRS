@@ -150,8 +150,8 @@ def main_storage(m_h2):
             def equation(dv):
                 return total_heat_influx(dv) - Q_in_max
 
-            dv_solution = fsolve(equation, 0.1)
-            dv = dv_solution[0]
+            dv_solution = fsolve(equation, 0.01)
+            dv = max(dv_solution[0], 0)
             t2_min = 1000
             P_test = (P_amb) * 1.5
             alpha = 0
