@@ -150,8 +150,8 @@ def main_storage(m_h2):
             def equation(dv):
                 return total_heat_influx(dv) - Q_in_max
 
-            dv_solution = fsolve(equation, 0.1)
-            dv = dv_solution[0]
+            dv_solution = fsolve(equation, 0.01)
+            dv = max(dv_solution[0], 0)
             t2_min = 1000
             P_test = (P_amb) * 1.5
             alpha = 0
@@ -295,6 +295,7 @@ def main_storage(m_h2):
     return Mt, Vt, t1, dv, t2, L_out, R_out
 
 
-for mass_h2 in range(100, 340, 50):  # Example mass inputs
+for mass_h2 in range(130, 350, 1):  # Example mass inputs
     mass, volume, t1, dv, t2, L_out, R_out = main_storage(mass_h2)  # Example mass input
     print(f"Mass: {mass:.2f} kg, Volume: {volume:.2f} m^3, t1: {t1:.4f} m, dv: {dv:.4f} m, t2: {t2:.4f} m, L_out: {L_out:.4f} m, R_out: {R_out:.4f} m")
+    #print(f"R_out: {R_out:.4f} m")

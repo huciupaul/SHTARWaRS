@@ -315,15 +315,13 @@ class Tank:
 materials = ['Al-7075-T6','S-Glass Fiber','SS-304','Carbon Fiber','SS-316'] #From Granta and Engineering Toolbox
 SF = 1/1.5 #NASA s safety factor for the materials
 #density in kg/m^3, yield strength in Pa, thermal conductivity in W/mK, emissivity in [-], CO2 [kg/kg], Embodied Energy in MJ/kg, Fibre Ratio
-mat_properties = [[2800,495*1e6*SF,134,0.11,7.795,106,0], 
-                  [1905,1730*1e6*SF,0.745,0.95,7.22,116.5,0.675],
-                  [7955,257.5*1e6*SF,15.5,0.35,3,42.75,0],
-                  [1565,1955*1e6*SF,5.25,0.77,50.9,728.5,0.675],
-                  [7970,257.5*1e6*SF,15,0.35,4.265,49.75,0]]
+mat_properties = [ 
+                  [1905,1730*1e6*SF,0.745,0.95,7.22,116.5,0.675]
+                  ]
 #MAWPS = [600000,650000,800000,1000000,1200000,1280000] #bar to Pa
 MAWP = 600000
-P_vents = [300000, 400000, 500000, 600000]
-n_mats = 5
+P_vents = [600000]
+n_mats = 1
 n_vent = len(P_vents)
 materials = materials[:n_mats]
 mat_properties = mat_properties[:n_mats]
@@ -340,7 +338,7 @@ co2_kevlar = 13.1 #kg/kg (Kevlar 149)
 kevlar_ee = 257 #MJ/kg (Embodied Energy for Kevlar 149)
 
 #Our values
-mass_h2 = 278.9577  #kg
+mass_h2 = 202  #kg
 estimated_mass = mass_h2/grav_idx - mass_h2
 t_limit = 0.001 #m (minimum thickness of the tank wall)
 
