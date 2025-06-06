@@ -107,7 +107,7 @@ MAWP_global = 600000                                    #[Pa]
 p_vent_global = 600000                                  #[Pa]
 p_sl = 101325                                           #[Pa]
 
-r_in = 0.75                                             #[m]
+r_in = 0.74                                             #[m]
 
 Q_leak_min = 10                                         #W (determined from Nicolas's thesis)
 Q_leak_max = 1000                                       #W (determined from Nicolas's thesis)
