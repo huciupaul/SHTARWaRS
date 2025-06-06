@@ -153,14 +153,14 @@ class ElectricMotor(HeatSource):
 # Main Subclasses for Heat Sinks (TMS) -------------------------------
     
 class LH2Tank(HeatSink):
-    def __init__(self, mass_flow_kg_s, T_final_K=273+180, P_final=3e5, P_init = 600000):
+    def __init__(self, mass_flow_kg_s, T_final_K=273+180, P_final=6e5, P_init = 600000):
         super().__init__("LH2Tank")
         self.m_dot = mass_flow_kg_s  
         self.T_final = T_final_K         # K (before fuel cell)
         self.P_final = P_final
         self.P_init = P_init
     def absorb_heat(self,heat_w):
-        H_fin = PropsSI('H', 'Q', 1, 'P', self.P_final, 'ParaHydrogen')  # Final enthalpy
+        H_fin = PropsSI('H', 'T', self.T_final, 'P', self.P_final, 'ParaHydrogen')  # Final enthalpy
         H_init = PropsSI('H', 'P', self.P_init, 'Q', 0, 'ParaHydrogen')  # Initial enthalpy
         Q_absorbed = self.m_dot * (H_fin - H_init)  # Heat absorbed in Joules
         return Q_absorbed
@@ -173,9 +173,9 @@ class SkinHeatExchanger(HeatSink):
         self.coolant_temp = coolant_temp_K
         self.ambient_temp = None          # to be set based on flight condition
 
-    def set_ambient(self, T_ambient_K, recovery_factor=0.9, M=0.3):
+    def set_ambient(self, T_ambient_K, recovery_factor=0.9, mach=0.3):
         # Set effective ambient (adiabatic wall) temperature for convection calculations
-        T_aw = T_ambient_K * (1 + recovery_factor*0.5*(1.4-1)*M**2)
+        T_aw = T_ambient_K * (1 + recovery_factor*0.5*(1.4-1)*mach**2)
         self.ambient_temp = T_aw 
     def absorb_heat(self, heat_w):
         if self.ambient_temp is None:
@@ -227,8 +227,7 @@ class RamAirHeatExchanger(HeatSink):
                                    hole_diameter_mm=1.0,
                                    inlet_CD=0.02,
                                    cp_air=1005.0,
-                                   meredith_recovery=0.50):
-        
+                                   meredith_recovery=0.50):        
         delta_T_air = T_air_out_K - T_air_in_K
         if delta_T_air <= 0:
             raise ValueError("T_air_out must exceed T_air_in to carry heat away.")
@@ -246,7 +245,8 @@ class RamAirHeatExchanger(HeatSink):
             area_per_hole = 0.0
 
         # Base drag
-        deltaT_HX0 = np.linspace(0, 50, 100)
+        #deltaT_HX0 = np.linspace(0, 50, 100)
+        deltaT_HX0 = 50
         CD_d_CD_sp = 0.11  # sum of CD_d + CD_sp = 0.11
         gamma = 1.4
         R = 287.058
@@ -254,44 +254,44 @@ class RamAirHeatExchanger(HeatSink):
         T0 = ambient_conditions['T']        # adjust to flight profile !!!!
         eta_p07 = 0.92  # plot for different eta_p07
         
-        comp_ratio = (1.0 + 0.5 * (self.gamma - 1.0) * M0**2) ** ((self.gamma - 1.0) / self.gamma)
+        comp_ratio = (1.0 + 0.5 * (gamma - 1.0) * M0**2) ** ((gamma - 1.0) / gamma)
 
         # Denominator inside the “1 − 1/…”
         D = comp_ratio * eta_p07
 
         # Main numerator pieces
-        term1 = 2.0 * self.gamma / (self.gamma - 1.0) * R
+        term1 = 2.0 * gamma / (gamma - 1.0) * R
         term2 = 1.0 - 1.0 / D
-        term3 = T0 * (1.0 + 0.5 * (self.gamma - 1.0) * M0**2) + deltaT_HX0
+        term3 = T0 * (1.0 + 0.5 * (gamma - 1.0) * M0**2) + deltaT_HX0
 
         numerator = term1 * term2 * term3
 
         # Full denominator under the radical
-        denominator = (M0 * math.sqrt(self.gamma * R * T0) *(1.0 + (CD_d_CD_sp) / 2.0))
+        denominator = (M0 * math.sqrt(gamma * R * T0) *(1.0 + (CD_d_CD_sp) / 2.0))
 
-        TR = math.sqrt(numerator / denominator) - 1.0
+        #TR = math.sqrt(numerator / denominator) - 1.0
 
         #drag_N = 0.5 * air_density * (flight_speed_m_s ** 2) * inlet_CD * A_open
 
         # Net drag 
-        net_drag_N = TR * (1.0 - meredith_recovery)
+        #net_drag_N = TR * (1.0 - meredith_recovery)
 
         # Store results
         self.inlet_area = A_open
         self.skin_area = skin_area
         self.hole_count = hole_count
         #self.drag_N = drag_N
-        self.TR = TR
-        self.net_drag_N = net_drag_N
+        #self.TR = TR
+        #self.net_drag_N = net_drag_N
 
         return {
             'm_dot_air': m_dot_air,
             'A_open': A_open,
             'skin_area': skin_area,
-            'hole_count': hole_count,
+            'hole_count': hole_count
             #'drag_N': drag_N,
-            'TR': TR,
-            'net_drag_N': net_drag_N
+            #'TR': TR,
+            #'net_drag_N': net_drag_N
         }
 
 class ThermoElectricGenerator(HeatSink):
@@ -337,11 +337,11 @@ class HX():
 
     def size(self):
         # Plate properties
-        plate_thickness = 7.6 * 1e-3 #m 
+        plate_thickness = 3.6 * 1e-3 #m 
         plate_thermal_conductivity = 17.5 # W/(m·K), SS
         size_factor = 1.15 #(1.15-1.25)
         gap_bt_plates = 3e-3  # from excel tool
-        N_plates = 8          # from Michelle 
+        N_plates = 10          # from Michelle 
 
         # Pipe Properties
         N_passes = 1
@@ -350,10 +350,10 @@ class HX():
         
 
         #initial guess for mass flow rate of coolant
-        self.fluid_hot.mf_calculated = self.fluid_hot.mf_given # elf.Q_req / (self.fluid_hot.cp * (self.fluid_hot.T - self.fluid_cold.T))
+        self.fluid_hot.mf_calculated = 10 # self.Q_req / (self.fluid_hot.cp * (self.fluid_hot.T - self.fluid_cold.T))
         
         L_h2 = 447000
-        area = 2.3 # assumed area of heat exchanger plate in m² (total)
+        area = 1.3 # assumed area of heat exchanger plate in m² (total)
         H_hx = 500 # Overall heat exchange coefficient for HX [W/m².K]
         self.fluid_cold.cp = 9384
         # Calculation
@@ -408,7 +408,7 @@ class HX():
             print("Try Q:{H_hx*}")
             factor = self.Q_req / Q 
             print(f"Iteration: Q = {Q:.2f} W, Required Q = {self.Q_req:.2f} W, Factor = {factor:.2f}")
-            print(f"Iterarion: Area = {area:.2f} m², Volume = {volume:.2f} m³, N_plates = {N_plates}, n_channels = {n_channels}")
+            print(f"Iteration: Area = {area:.2f} m², Volume = {volume:.2f} m³, N_plates = {N_plates}, n_channels = {n_channels}")
             hole_area = math.pi * (dh_coolant/2)**2
             ratio =  hole_area / area
             print(f"Pipe diameter: {dh_coolant:.3f} m")
@@ -426,16 +426,16 @@ class Compressor():
         self.pressure_ratio = pressure_ratio
         self.fluid = fluid  
 
-    def power(self, inlet_temperature):
-        gamma = self.fluid.gamma  
+    def power(self, inlet_temperature, gamma):
         T_out = inlet_temperature * (1 + 1 / self.efficiency * (self.pressure_ratio ** ((gamma - 1) / gamma) - 1))  # Isentropic relation
+
         cp = self.fluid.cp  
         mdot = self.fluid.mf_given
         power_req = mdot * cp * (T_out - inlet_temperature) / self.efficiency  # Power in Watts
         return power_req
     
     def mass(self, power):
-        return (power * 0.0400683 + 5.17242)
+        return power * 0.0400683 + 5.17242
 
 
 class Turbine():
@@ -449,15 +449,6 @@ class Turbine():
         mdot = self.fluid.mf_given
         power_provide = mdot * cp_gas * (T_in - T_out) / self.efficiency  # Power in Watts\
         return power_provide
-
-class Valve():
-    def __init__(self, valve_efficiency, fluid):
-        self.efficiency = valve_efficiency
-        self.fluid = fluid
-
-    def valve_mass(self):
-        mdot_coolant = self.fluid.mf_given
-        return (0.568 * mdot_coolant ** 0.5541)
 
 class Fluid():
     def __init__(self, name, T, P, C,cp,mf,k, mu, gamma):
@@ -485,7 +476,7 @@ def size_thermal_management(heat_sources, sinks):
         if remaining_heat <= 0:
             break
         if isinstance(sink, SkinHeatExchanger):
-            sink.set_ambient(T_ambient_K=ambient_conditions['T'], M=ambient_conditions['M'], recovery_factor=recovery_factor)
+            sink.set_ambient(T_ambient_K=ambient_conditions['T'], mach=ambient_conditions['M'], recovery_factor=recovery_factor)
         if not isinstance(sink, RamAirHeatExchanger):
             absorbed = sink.absorb_heat(remaining_heat)
             print(f"{sink.name} absorbed {absorbed/1000:.1f} kW")
@@ -514,8 +505,8 @@ def size_thermal_management(heat_sources, sinks):
                 print(f"Total open hole area: {sizing['A_open']:.3f} m²")
                 print(f"Total skin area (10% porosity): {sizing['skin_area']:.2f} m²")
                 print(f"Number of {hole_diameter_mm:.1f} mm holes: {sizing['hole_count']}")
-                print(f"Raw inlet drag: {sizing['drag_N']:.1f} N")
-                print(f"Net drag after Meredith (50% recovery): {sizing['net_drag_N']:.1f} N")
+                #print(f"Raw inlet drag: {sizing['drag_N']:.1f} N")
+                #print(f"Net drag after Meredith (50% recovery): {sizing['net_drag_N']:.1f} N")
 
                 fan = Fan(
                     fan_eff=fan_eff,
@@ -557,17 +548,18 @@ sinks = [lh2_tank, lh2_tank_1,teg, skin_hx, ram_air_hx]
 if __name__ == "__main__":
     size_thermal_management(heat_sources, sinks)
 
-
-
     # Sizing
     C_h2 = lh2_tank.absorb_heat(fuel_cell.waste_heat())/(t_fin_fc - t_init)
     print(f"Capacity rate of LH2: {C_h2:.2f})") 
     fluid_cold = Fluid(name="LH2", T=t_init, P=p_init_fc, C=C_h2, cp = C_h2/h2_mf_fc, k = k_h2, mu = mu_h2, mf = h2_mf_fc , gamma = 1.4 )
-    fluid_hot = Fluid(name="FuelCellCoolant", T=t_fin_fc, P=p_fin_fc, C=0, cp = h_cool, mf = 10 ,  k=k_coolant, mu=mu_coolant, gamma = 1.4) 
+    fluid_hot = Fluid(name="FuelCellCoolant", T=t_fin_fc, P=p_fin_fc, C=0, cp = h_cool, mf = 10 ,  k=k_coolant, mu=mu_coolant, gamma= 1.4) 
 
     hx = HX(name="FuelCellHX", fluid_cold=fluid_cold, fluid_hot=fluid_hot, Q_req=lh2_tank.absorb_heat(fuel_cell.waste_heat()))
     hx_cool_flow_mass, hx_area, hx_volume, iteration = hx.size()
     print(f"Coolant Mass Flow: {hx_cool_flow_mass:.2f} kg/s")
-    print(f"Heat Exchanger Area: {hx_area:.2f} m²")
-    print(f"Heat Exchanger Volume: {hx_volume:.2f} m³")
+    print(f"Heat Exchanger Area: {hx_area:.4f} m²")
+    print(f"Heat Exchanger Volume: {hx_volume:.4f} m³")
     print("Done after iteration number", iteration)
+
+
+
