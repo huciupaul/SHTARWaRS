@@ -450,6 +450,15 @@ class Turbine():
         power_provide = mdot * cp_gas * (T_in - T_out) / self.efficiency  # Power in Watts\
         return power_provide
 
+class Valve():
+    def __init__(self, valve_efficiency, fluid):
+        self.efficiency = valve_efficiency
+        self.fluid = fluid
+
+    def valve_mass(self):
+        mdot_coolant = self.fluid.mf_given
+        return (0.568 * mdot_coolant ** 0.5541)
+
 class Fluid():
     def __init__(self, name, T, P, C,cp,mf,k, mu, gamma):
         self.name = name
