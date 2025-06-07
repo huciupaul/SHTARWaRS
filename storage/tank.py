@@ -27,7 +27,6 @@ from functools import lru_cache
 
 
 def main_storage(m_h2):
-    from functools import lru_cache
 
     # --- Caching CoolProp calls for speed ---
     @lru_cache(maxsize=128)
