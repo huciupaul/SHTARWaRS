@@ -6,16 +6,12 @@ from scipy.optimize import fsolve
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 import matplotlib.pyplot as plt
+import pandas as pd
 
 # Local imports
-# from common.constants import MAXC, G_0, E_SCALE, R_AIR, k_air
-# from common.atmosphere import isa_atmosphere
 from turboprop import Turboprop
-
-# Global imports
-from DSE_1.global_constants import MAXC, TOGA, base_AP, G_0, E_SCALE, R_AIR, k_air, isa_atmosphere
-import pandas as pd
-from DSE_1.fc.fc_for_wrapper import FuelCell
+from SHTARWaRS.global_constants import MAXC, TOGA, base_AP, G_0, E_SCALE, R_AIR, k_air, isa_atmosphere
+from SHTARWaRS.fc.fc_for_wrapper import FuelCell
 
 # Dataclass definitions
 @dataclass
@@ -400,11 +396,11 @@ class FlightMission:
         
 
         # Create IDLE, TOGA, CRUISE generalized masks
-        mask_idle   = phase_arr == "taxi\\to" | phase_arr == "taxi\\landing"
-        mask_toga   = phase_arr == "takeoff" | phase_arr == "climb1" | phase_arr == "climb2"
+        mask_idle   = (phase_arr == "taxi\\to") | (phase_arr == "taxi\\landing")
+        mask_toga   = (phase_arr == "takeoff") | (phase_arr == "climb1") | (phase_arr == "climb2")
         mask_cruise = ~(mask_idle | mask_toga)
         
-        throttle = mask_toga * self.ac.fc.TOGA_throttle + ~mask_toga * self.throttle_cruise
+        throttle = mask_toga * self.ac.fc.throttle_TOGA + ~mask_toga * self.throttle_cruise
         
         for pp, sl in self.__pp_slicer(phase_arr, time_arr):
             if pp.power is not None:
@@ -442,10 +438,10 @@ class FlightMission:
                 # Add fuel cell mass flow from threshold power
                 Qdot_fc[sl], mdot_fc_arr[sl], mdot_fc_air_in[sl], mdot_fc_air_out[sl], mdot_fc_H2O[sl], mdot_fc_H2_recirculation[sl] = self.ac.fc.get_TMS_values(power=Pa_fc)
   
-                mdot_fuel_arr[sl] += mdot_fc_arr
+                mdot_fuel_arr[sl] += mdot_fc_arr[sl]
 
-                mdot_dumpy[sl] = mdot_fc_arr[sl] * P_fc_dumpy / Pa_fc
-                m_dumpy[sl] = mdot_dumpy[sl] * self.dt  # cumulative fuel dumped _within_ slice
+                mdot_dumpy_arr[sl] = mdot_fc_arr[sl] * P_fc_dumpy / Pa_fc
+                m_dumpy[sl] = mdot_dumpy_arr[sl] * self.dt  # cumulative fuel dumped _within_ slice
                 
                 # Required power
                 Pr_arr[sl] = Pa_arr[sl] * eta_prop_arr[sl]
@@ -564,9 +560,9 @@ class FlightMission:
         axs[2, 0].set_ylabel("Mass [kg]")
         axs[2, 1].plot(p["time"], p["mdot_air"])
         axs[2, 1].set_ylabel("Air mass flow [kg/s]")
-        # for ax in axs:
-        #     ax.set_xlabel("Time [s]")
-        #     ax.grid(alpha=0.3)
+        for ax in axs:
+            ax.set_xlabel("Time [s]")
+            ax.grid(alpha=0.3)
         fig.tight_layout()
         plt.show()
         
@@ -623,11 +619,27 @@ def main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: floa
         k_gas=1.364729742
     )
 
-    fc_model = FuelCell(
-        name="PEM-HT-FC",
-        power_req_max=(TOGA*fc_split + delta_AP + base_AP),
-        throttle_TOGA=throttle_TOGA
-    )
+    # if fc_split==0, substitute a “zero” fuel‐cell
+    if fc_split == 0.0:
+        class ZeroFuelCell:
+            name = "none"
+            power_req_max = 0.0
+            throttle_TOGA = 0.0
+            power_max_throttle = 0.0
+            power_min = 0.0
+            fc_mass = 0.0
+            fc_volume = 0.0
+            def get_TMS_values(self, power):
+                # Qdot_fc, mdot_fc, mdot_air_in, mdot_air_out, mdot_H2O, mdot_recirculation
+                return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+
+        fc_model = ZeroFuelCell()
+    else:
+        fc_model = FuelCell(
+            name="PEM-HT-FC",
+            power_req_max=(TOGA*fc_split + delta_AP + base_AP),
+            throttle_TOGA=throttle_TOGA
+        )
 
     ac_model_H2 = Aircraft(
         name="H2-D2",
@@ -645,7 +657,7 @@ def main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: floa
     mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=dt, total_range_m=707e3, throttle_cruise=throttle_cruise)
     
     H2_burnt = (mission_H2.profile['mass'][0] - mission_H2.profile['mass'][-1])/(1 - E_SCALE)
-    print(f"Total H2 mass burnt: {H2_burnt:.2f} kg")
+    # print(f"Total H2 mass burnt: {H2_burnt:.2f} kg")
     
     # Determine the maximum fuel cell power across the three splits
     TMS_inputs = mission_H2.TMS_inputs
@@ -653,26 +665,90 @@ def main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: floa
                       V_fc=fc_model.fc_volume)
         
     return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile
-    
-    
+
 if __name__ == "__main__":
-    # _, _ = main(fc_split=0.8, dt=10)
+    from mpl_toolkits.mplot3d import Axes3D
+    from matplotlib.animation import FuncAnimation, FFMpegWriter
+
+    TOGA_vals   = np.linspace(0.1, 1.0, 51)
+    cruise_vals = np.linspace(0.1, 1.0, 51)
+    Tg, Cg      = np.meshgrid(TOGA_vals, cruise_vals)
+    mH2_grid    = np.zeros_like(Tg)
+
+    splits = np.linspace(0.0, 1.0, 51)
+
+    fig = plt.figure(figsize=(8,6))
+    ax  = fig.add_subplot(111, projection='3d')
+    ax.set_xlabel('TOGA throttle')
+    ax.set_ylabel('Cruise throttle')
+    ax.set_zlabel(r'H$_2$ mass [kg]')
+    
+    ax.set_zlim(0, 400)
+    
+    ax.view_init(elev=30, azim=135)   # elevation=30deg, azimuth=135deg
+
+    def update(frame):
+        s = splits[frame]
+        # recompute mH2 for each (TOGA, cruise) at this split
+        for i in range(Tg.shape[0]):
+            for j in range(Tg.shape[1]):
+                _, mH2_grid[i,j], _, _ = main(
+                    fc_split=s,
+                    throttle_TOGA=Tg[i,j],
+                    throttle_cruise=Cg[i,j],
+                    MTOW=8037.6,
+                    CD_HEX=0.0,
+                    delta_AP=0.0,
+                    dt=10
+                )
+        ax.clear()
+        ax.plot_surface(Tg, Cg, mH2_grid, cmap='viridis', edgecolor='none')
+        ax.set_title(f"Power split = {s:.2f}")
+        ax.set_xlabel('TOGA throttle')
+        ax.set_ylabel('Cruise throttle')
+        ax.set_zlabel(r'H$_2$ mass [kg]')
+        ax.set_zlim(0, 400)
+        return []
+
+    ani = FuncAnimation(
+        fig, update,
+        frames=len(splits),
+        interval=100,
+        blit=False,
+    )
+    
+    writer = FFMpegWriter(fps=10, bitrate=1800)
+    ani.save('figs/mh2_vs_split.mp4', writer=writer)
+
+    # plt.tight_layout()
+    # plt.show()
+    
+    
+# if __name__ == "__main__":
+#     # _, _ = main(fc_split=0.8, dt=10)
 
     
-    splits = np.linspace(0.0, 1.0, 101)
+#     splits = np.linspace(0.0, 1.0, 101)
     
-    mH2 = np.zeros_like(splits)
-    mdot_dumpy = np.zeros_like(splits)
-    dumpy = np.zeros_like(splits)
+#     mH2 = np.zeros_like(splits)
+#     mdot_dumpy = np.zeros_like(splits)
+#     dumpy = np.zeros_like(splits)
     
-    for i, split in enumerate(splits):
-        print(f"Split {i+1}/{len(splits)}: {split:.2f}")
-        mH2[i], _, mdot_dumpy, _ = main(fc_split=split, dt=1)
-        dumpy[i] = np.sum(mdot_dumpy) * 10
+#     throttle_TOGA = 0.9  # Throttle setting for TOGA phase
+#     throttle_cruise = 0.4  # Throttle setting for cruise phase
+    
+#     for i, split in enumerate(splits):
+#         print(f"Split {i+1}/{len(splits)}: {split:.2f}")
+#         _, mH2[i], _, _ = main(fc_split=split, throttle_TOGA=throttle_TOGA, throttle_cruise=throttle_cruise, MTOW=8037.6, CD_HEX=0.0, delta_AP=0.0, dt=1)
+#         # mH2[i], _, mdot_dumpy, _ = main(fc_split=split, dt=1)
+#         # dumpy[i] = np.sum(mdot_dumpy) * 10
+#         # print(f"mH2: {mH2:.2f} kg")
 
-
-    print(dumpy)
-    # plt.plot(splits, mH2)
-    plt.plot(splits, dumpy)
-    plt.show()
+#     # plt.plot(splits, mH2)
+#     plt.plot(splits, mH2)
+#     plt.xlabel("Power Split [%]")
+#     plt.ylabel("Mass of H2 Required [kg]")
+#     plt.title(f"H2 Mass vs Power Split @ TOGA Throttle = {throttle_TOGA}, Cruise Throttle = {throttle_cruise}")
+#     plt.tight_layout()
+#     plt.show()
     
