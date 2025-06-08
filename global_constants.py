@@ -143,7 +143,8 @@ mli_thickness = 0.03 *1e-3 * mli_layers                 #https://www.sciencedire
 # From integration #
 ####################
 M_PAX = 84
-X_first_seat = 4.84
+X_first_seat = 4.70
+X_front_of_first_seat = 4.38
 seat_pitch = 0.75
 rho_cargo = 161
 
@@ -163,15 +164,17 @@ Beechcraft_1900D = dict(
     X_PAX       = 7.74,
 
     V_cargo_fwd = 1.01371425,
-    V_cargo_aft = 4.8106,
-    V_cargo     = 1.01371425+4.8106,
     V_wing      = 1.144,
+    
+    l_aft_cyl  = 1.50,
+    w_aft_cyl  = 1.60,
+    h_aft_cyl_ave  = 1.92,
 
-    d_aft_min   = 1.0452,
-    d_aft_max   = 1.46328,
-    l_aft_cone  = 1.46328,
-    l_aft_cuboid  = 1.46328,
-    h_aft_cuboid  = 2.0904
-    # X_d_aft_min =
-    # X_d_aft_max =
+    d_aft_cone_beg   = 1.60,
+    d_aft_cone_end   = 1.18,
+    l_aft_cone  = 1.18,
+
+    X_aft_cyl_beg = 11.22,
+    X_aft_cone_beg = 12.61,
+    X_aft_cone_end = 13.78
     )
