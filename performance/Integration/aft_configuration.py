@@ -1,4 +1,6 @@
-import numpy as np
+import sys
+sys.path.append("..")  # Add parent directory to path
+
 import math as m
 from typing import Tuple
 
@@ -79,10 +81,10 @@ def main(L_tank: float, d_tank: float):
     X_aft_cyl_beg, num_PAX = check_for_seating_interference(X_tank_front)
     
     # Move tank forward if possible
-    X_tank_front, X_tank_back = shift_tank_fwd(X_tank_front, X_tank_back, X_aft_cyl_beg, L_tank)
+    X_tank_front, X_tank_back, d_tank_TMS = shift_tank_fwd(X_tank_front, X_tank_back, X_aft_cyl_beg, L_tank, d_tank)
 
     # Caluclate tank+TMS volume and cg position
-    L_tank_cone, d_tank_TMS, V_tank_TMS, X_tank_TMS = tank_and_TMS_positioning_specs(L_tank, d_tank)
+    L_tank_cone, d_tank_TMS, V_tank_TMS, X_tank_TMS = tank_and_TMS_positioning_specs(L_tank, d_tank_TMS)
     
     # Calculate cargo volume, mass and cg position
     V_aft_cargo, M_aft_cargo, X_aft_cargo = calculate_cargo_specs(L_tank_cone, d_tank_TMS)
