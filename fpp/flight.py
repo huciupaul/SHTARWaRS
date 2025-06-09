@@ -669,6 +669,8 @@ def main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: floa
 if __name__ == "__main__":
     from mpl_toolkits.mplot3d import Axes3D
     from matplotlib.animation import FuncAnimation, FFMpegWriter
+    
+    from storage import tank
 
     TOGA_vals   = np.linspace(0.1, 1.0, 51)
     cruise_vals = np.linspace(0.1, 1.0, 51)
@@ -681,9 +683,9 @@ if __name__ == "__main__":
     ax  = fig.add_subplot(111, projection='3d')
     ax.set_xlabel('TOGA throttle')
     ax.set_ylabel('Cruise throttle')
-    ax.set_zlabel(r'H$_2$ mass [kg]')
+    ax.set_zlabel(r'H$_2$ \+ Tank \+ FC mass [kg]')
     
-    ax.set_zlim(0, 400)
+    # ax.set_zlim(0, 1000)
     
     ax.view_init(elev=30, azim=135)   # elevation=30deg, azimuth=135deg
 
@@ -692,7 +694,7 @@ if __name__ == "__main__":
         # recompute mH2 for each (TOGA, cruise) at this split
         for i in range(Tg.shape[0]):
             for j in range(Tg.shape[1]):
-                _, mH2_grid[i,j], _, _ = main(
+                _, mH2, mFC, _ = main(
                     fc_split=s,
                     throttle_TOGA=Tg[i,j],
                     throttle_cruise=Cg[i,j],
@@ -701,13 +703,16 @@ if __name__ == "__main__":
                     delta_AP=0.0,
                     dt=10
                 )
+                Mt, _, _, _, _, _, _ = tank.main_storage(mH2)
+                mH2_grid[i, j] = mH2 + mFC['m_fc'] + Mt # Total mass of H2 + FC + tank mass
         ax.clear()
         ax.plot_surface(Tg, Cg, mH2_grid, cmap='viridis', edgecolor='none')
         ax.set_title(f"Power split = {s:.2f}")
         ax.set_xlabel('TOGA throttle')
         ax.set_ylabel('Cruise throttle')
-        ax.set_zlabel(r'H$_2$ mass [kg]')
-        ax.set_zlim(0, 400)
+        ax.set_zlabel(r'H$_2$ \+ Tank \+ FC mass [kg]')
+        # ax.set_zlim(0, 1000)
+
         return []
 
     ani = FuncAnimation(
@@ -751,4 +756,3 @@ if __name__ == "__main__":
 #     plt.title(f"H2 Mass vs Power Split @ TOGA Throttle = {throttle_TOGA}, Cruise Throttle = {throttle_cruise}")
 #     plt.tight_layout()
 #     plt.show()
-    

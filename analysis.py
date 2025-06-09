@@ -5,9 +5,14 @@
 import numpy as np
 import pickle
 import copy
+from typing import Tuple
 
 # Local imports
-# from SHTARWaRS.performance import *
+from SHTARWaRS.global_constants import Beechcraft_1900D
+from SHTARWaRS.performance.MTOW import mtow
+
+# Cached constants
+M_CARGO_AFT = Beechcraft_1900D["M_cargo_aft"]  # [kg] Cargo mass in the aft compartment
 
 def load_tensor(file_path: str) -> np.ndarray:
     """
@@ -23,7 +28,7 @@ def load_tensor(file_path: str) -> np.ndarray:
         tensor = pickle.load(f)
     return tensor
 
-def integration(design: np.ndarray) -> np.ndarray:
+def integration(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Evaluate design integration into existing aircraft, score the results and normalize.
 
     Args:
@@ -32,14 +37,68 @@ def integration(design: np.ndarray) -> np.ndarray:
             M: FC TOGA throttle setting
             P: FC cruise throttle setting
             Q: Design variables: 
-                < m_EPS, m_FC, m_H2, m_storage, m_TMS, V_FC, V_storage, V_ELMO, MTOW, A_radiator, L_storage, m_cargo >
+                < m_EPS, m_FC, m_H2, m_storage, m_TMS, V_FC, V_storage, V_ELMO, MTOW, L_storage, D_storage >
 
     Returns:
-        np.ndarray: Vector of integration scores
+        np.ndarray: Vector of integration scores, N_PAX, m_cargo
     """
     # Create np.array of relevant design variables
     var_idx = np.array([0, 1, 2, 3, 4])
     m_EPS, m_FC, m_H2, m_storage, m_TMS = design[:, :, :, var_idx]
+    
+    # TODO: REPLACE PLACEHOLDERS WITH ACTUAL INTEGRATION SCORING LOGIC
+    scores = None
+    N_PAX = None
+    m_cargo = None
+    
+    return scores, N_PAX, m_cargo
+    
+def mtow(design: np.ndarray) -> np.ndarray:
+    """Evaluate design MTOW against original aircraft constraints and score the results.
+
+    Args:
+        design (np.ndarray): design tensor with shape (N, M, P, Q) where:
+            N: Power splits (FC use vs Turboprop use)
+            M: FC TOGA throttle setting
+            P: FC cruise throttle setting
+            Q: Design variables: 
+                < m_EPS, m_FC, m_H2, m_storage, m_TMS, V_FC, V_storage, V_ELMO, MTOW, L_storage, D_storage >
+
+    Returns:
+        np.ndarray: Vector of MTOW scores
+    """
+    # Create np.array of relevant design variables
+    var_idx = np.array([8])  # MTOW index
+    mtow_values = design[:, :, :, var_idx]
+    
+    # Calculate MTOW scores using the mtow_score function (automatically bounded between 0 and 1)
+    scores = mtow.mtow_score(mtow_values)    
+    
+    return scores
+
+def n_pax(N_PAX: np.ndarray, K: float=14) -> np.ndarray:
+    """Evaluate the number of passengers against original design and score the results.
+    
+    Args:
+        N_PAX (np.ndarray): 1D array of number of passengers for each design configuration.
+        K (float, optional): Scaling factor for the sigmoid function. Defaults to 14.
+        
+    Returns:
+        np.ndarray: Vector of passenger scores, bounded between 0 and 1.
+    """
+    return 1/(1 + np.exp(-K * ((N_PAX - 15) / 4) - 0.5))
+
+def cargo(m_cargo: np.ndarray) -> np.ndarray:
+    """Evaluate the cargo mass against original design and score the results.
+    
+    Args:
+        m_cargo (np.ndarray): 1D array of cargo mass for each design configuration.
+        
+    Returns:
+        np.ndarray: Vector of cargo scores, bounded between 0 and 1.
+    """
+    return np.clip(m_cargo / M_CARGO_AFT, 0, 1)
+    
      
 
 def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
@@ -66,6 +125,11 @@ def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
     except FileNotFoundError:
         raise FileNotFoundError(f"File not found: {fpath}")
     
+    # Create axes for the tensor dimensions
+    N, M, P, Q = tensor.shape
+    splits = np.linspace(dim_bounds[0, 0], dim_bounds[0, 1], N)
+    toga_throttle = np.linspace(dim_bounds[1, 0], dim_bounds[1, 1], M)
+    cruise_throttle = np.linspace(dim_bounds[2, 0], dim_bounds[2, 1], P)
         
     ### TENSOR SHAPE DESCRIPTION ###
     # The tensor is expected to have the shape (N, M, P, Q) where:
@@ -73,11 +137,36 @@ def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
     # M: FC TOGA throttle setting
     # P: FC cruise throttle setting
     # Q: Design variables: 
-    #   < m_EPS, m_FC, m_H2, m_storage, m_TMS, V_FC, V_storage, V_ELMO, MTOW, A_radiator, L_storage, m_cargo >
-    
+    #   < m_EPS, m_FC, m_H2, m_storage, m_TMS, V_FC, V_storage, V_ELMO, MTOW, L_storage, D_storage >
     # Keep a 'design' tensor that maintains the original tensor structure
     design      = copy.deepcopy(tensor)
     # Initialize a 'tradeoff' tensor with the same N, M, P dimensions and a 4th dimension containing 4 np.nan values
     tradeoff    = np.full(tensor.shape[:-1] + (4,), np.nan)
-    tradeoff[:, :, :] = tensor[:, :, :]
+
+    # Score each of the tradeoff elements
+    tradeoff[:, :, :, 0], N_PAX, m_cargo = integration(design)
+    tradeoff[:, :, :, 1] = mtow(design)
+    tradeoff[:, :, :, 2] = n_pax(N_PAX)
+    tradeoff[:, :, :, 3] = cargo(m_cargo)
     
+    # Weighted sum of the tradeoff scores
+    scores = np.sum(tradeoff * weights, axis=-1)
+    
+    # Find optimal design configuration
+    max_score_idx = np.unravel_index(np.nanargmax(scores, axis=None), scores.shape)
+    optimal_design = design[max_score_idx]
+    optimal_setting = {
+        'power_split': splits[max_score_idx[0]],
+        'toga_throttle': toga_throttle[max_score_idx[1]],
+        'cruise_throttle': cruise_throttle[max_score_idx[2]],
+        'design_variables': optimal_design
+    }
+    
+    # Print the optimal design configuration
+    print("Optimal Design Configuration:")
+    print(f"Power Split: {optimal_setting['power_split']:.2f}")
+    print(f"TOGA Throttle Setting: {optimal_setting['toga_throttle']:.2f}")
+    print(f"Cruise Throttle Setting: {optimal_setting['cruise_throttle']:.2f}")
+    print(f"Design Variables: {optimal_setting['design_variables']}")
+    print(f"Maximum Score: {np.nanmax(scores):.4f}")
+    print(f"Optimal Design Index: {max_score_idx}")

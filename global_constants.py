@@ -1,13 +1,13 @@
+# file: global_constants.py
+# desc: Global constants used throughout the project.
+
+# Global imports
 import numpy as np
 from typing import Tuple
-
-
 import pickle
 
-
-"""
-This file comprises global constants used throughout the project
-"""
+# Local imports
+from SHTARWaRS.performance.MTOW import ca
 
 # General constants
 R_AIR = 287.05                                          # [J/(kg·K)]
@@ -47,6 +47,10 @@ V_cruise   = 144.044
 rho_cruise = 0.550798
 ROC, V_climb = 10.16, 73.43
 
+# Original aircraft performance constraints
+OG_constraints = ca.constraint_curves(C_d_0_orig, MTOW_orig)
+PW_OG_TO = TOGA/MTOW_orig
+SW_OG_TO = S / MTOW_orig
 
 #######################################################################################
 #################### Code specific constants from each part ###########################
