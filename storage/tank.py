@@ -291,4 +291,18 @@ def main_storage(m_h2):
     Qmax = 100  # Use a fixed Qmax for speed, or precompute if needed
     Mt, Vt, t1, dv, t2, L_out, R_out = compute_tank(material, material2, mat_property, MAWP, mass_h2, Q_str, mat2_property, str_mass, fill_ratio, V_in, P_vent, Qmax)
     Mt = Mt - mass_h2
-    return Mt, Vt, t1, dv, t2, L_out, R_out
+
+    # --- N_PAX ---
+    N_PAX = None
+    if L_out < 4.52 and L_out >= 3.76:
+        N_PAX = 11
+    elif L_out < 3.76 and L_out >= 3.0:
+        N_PAX = 13
+    elif L_out < 3.0 and L_out >= 2.24:
+        N_PAX = 15
+    elif L_out < 2.24 and L_out >= 1.48:
+        N_PAX = 17
+    elif L_out < 1.48 and L_out >= 0.72:
+        N_PAX = 19 
+
+    return Mt, Vt, t1, dv, t2, L_out, R_out, N_PAX
