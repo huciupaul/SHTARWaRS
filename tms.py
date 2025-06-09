@@ -1,10 +1,14 @@
-import math
 import abc
 import numpy as np
 from CoolProp.CoolProp import PropsSI
 import matplotlib.pyplot as plt
+import tms_plotting 
 
 # ------------------------------ PARAMETERS -----------------------------------
+# TODO: 
+# - Delete all parameters that are not used in the code
+# - List all constants clearly and cite from literature
+
 
 # Ambient Conditions --------------------------------
 ambient_conditions= {
@@ -17,37 +21,8 @@ ambient_conditions= {
 # parameters
 gamma = 1.4
 
-# Power and Efficiency Parameters --------------------
-total_power = 1.812 *1e6
-power_split_fc = 0.45
-fc_power = total_power * power_split_fc
-cc_power = total_power * (1 - power_split_fc)
-fc_eff = 0.6
-
-# Battery
-bat_p = 0.0
-battery_heat_fraction = 0.05
-
-#EM
-em_power = 400000  # Watts
-em_eff = 0.99 * 0.95
-
 # TEG
 efficiency_teg = 0.05 
-
-# H2 ---------------------------------------------------
-t_init = 20 # K
-# FC Loop
-h2_mf_fc = 0.029  # kg/s per MW
-p_init_fc = 6e5 
-p_fin_fc = 3e5
-t_fin_fc = 180 + 273.15 # K
-
-# CC Loop
-h2_mf_cc = 0.0294  # kg/s 
-p_init_cc = 6e5
-p_fin_cc = 12.1e5
-t_fin_cc = 180 + 273.15 # K
 
 # Ram Air HX -------------------------------
 # Air properties
@@ -72,15 +47,14 @@ fan_eff = 0.7
 ra_density = ambient_conditions['rho']  # kg/m³, air density
 delta_pressure = 1000  # Pa, pressure drop across the fan
 
-
 #Skin HX -----------------------------------------------	
-area_wing = 4.6  # only wing area for SHX
+area_wing = 2.3
 
 #Coolant
 k_in = 0.258 # thermal conductivity of coolant [W/m.K]
 prandtl_in = 0.71 # fluid
 Reynolds = 1e4 # fluid
-f = (0.79 * math.log(Reynolds) - 1.64) ** -2
+f = (0.79 * np.log(Reynolds) - 1.64) ** -2
 nu = ((f/8)*(Reynolds-1000)*prandtl_in)/(1+12.7*(f/8)**0.5 * (prandtl_in**0.66-1)) # Nusselt number for turbulent flow in tubes [m²/s]
 dh = 0.01 #tube diameter [m]
 h_in = k_in * nu / dh
@@ -89,84 +63,19 @@ wing_coolant_temp = 320  # K
 # Air
 prandtl_air = 0.71
 reynolds_air = 1e7  # depends on temperature?
-h_ext = ambient_conditions['rho'] * ambient_conditions['V'] * cp_air * 0.185 * (math.log10(reynolds_air))**-2.584 * prandtl_air**-0.66
+h_ext = ambient_conditions['rho'] * ambient_conditions['V'] * cp_air * 0.185 * (np.log10(reynolds_air))**-2.584 * prandtl_air**-0.66
 recovery_factor = prandtl_air ** 0.33  
 
 U_wing = 1/(1/h_in + 1/h_ext)
 
 
-# HX 1 (FC-FC) -----------------------------------------------
-# Coolant properties
-coolant_cp = 3672.348 # (3672.347969811853, 4222.1975576689)  
-k_coolant = 0.485  #  (0.48537754234800523, 0.6806615139526146)
-mu_coolant = 0.0002636  # (0.0001982859557074688, 0.0002636263335097737) 
-
-# H2 properties
-#h2_cp =  # (9384.657038075966, 16485.931431151545)
-mu_h2 = 1.4246e-05  # (1.494409455847204e-06, 1.4246629589288973e-05)
-k_h2 = 0.0272 # (0.02721713884147831, 0.24471920308558517)
+deltaT_fc = 20
+HEX_1_deltaT = 20 # Assumed temperature increase during evaporation
 
 
-# Main Classes for Thermal Management System (TMS) -------------------------------	
-
-class HeatSource(abc.ABC):
-    def __init__(self, name, power_output_w):
-        self.name = name
-        self.power_output = power_output_w  # Watts
-    @abc.abstractmethod
-    def waste_heat(self):
-        pass
-
-class HeatSink(abc.ABC):
-    def __init__(self, name):
-        self.name = name
-    @abc.abstractmethod
-    def absorb_heat(self, heat_w):
-        pass
- 
-
-# Main Subclasses for Heat Sources (TMS) -------------------------------
-
-class FuelCell(HeatSource):
-    def __init__(self, power_output_w, efficiency):
-        super().__init__("FuelCell", power_output_w)
-        self.efficiency = efficiency 
-    def waste_heat(self):
-        q = self.power_output * (1.0/self.efficiency - 1.0)
-        return q  # Watts
-
-class Battery(HeatSource):
-    def __init__(self, power_output_w, heat_fraction):
-        super().__init__("Battery", power_output_w)
-        self.heat_fraction = heat_fraction
-    def waste_heat(self):
-        # Simplified battery model (constant for maximum)
-        return self.power_output * self.heat_fraction
-
-class ElectricMotor(HeatSource):
-    def __init__(self, power_output_w, efficiency):
-        super().__init__("Motor", power_output_w)
-        self.efficiency = efficiency  
-    def waste_heat(self):
-        return self.power_output * (1.0/self.efficiency - 1.0)
+# Main Classes for Heat Sinks (TMS) -------------------------------
     
-
-# Main Subclasses for Heat Sinks (TMS) -------------------------------
-    
-class LH2Tank(HeatSink):
-    def __init__(self, mass_flow_kg_s, T_final_K=273+180, P_final=6e5, P_init = 600000):
-        super().__init__("LH2Tank")
-        self.m_dot = mass_flow_kg_s  
-        self.T_final = T_final_K         # K (before fuel cell)
-        self.P_final = P_final
-        self.P_init = P_init
-    def absorb_heat(self,heat_w):
-        H_fin = PropsSI('H', 'T', self.T_final, 'P', self.P_final, 'ParaHydrogen')  # Final enthalpy
-        H_init = PropsSI('H', 'P', self.P_init, 'Q', 0, 'ParaHydrogen')  # Initial enthalpy
-        Q_absorbed = self.m_dot * (H_fin - H_init)  # Heat absorbed in Joules
-        return Q_absorbed
-    
-class SkinHeatExchanger(HeatSink):
+class SkinHeatExchanger():
     def __init__(self, area_m2, U_W_per_m2K, coolant_temp_K):
         super().__init__("SkinHX")
         self.area = area_m2
@@ -174,7 +83,7 @@ class SkinHeatExchanger(HeatSink):
         self.coolant_temp = coolant_temp_K
         self.ambient_temp = None          # to be set based on flight condition
 
-    def set_ambient(self, T_ambient_K, recovery_factor=0.9, mach=0.4):
+    def set_ambient(self, T_ambient_K, recovery_factor=0.9, mach=0.3):
         # Set effective ambient (adiabatic wall) temperature for convection calculations
         T_aw = T_ambient_K * (1 + recovery_factor*0.5*(1.4-1)*mach**2)
         self.ambient_temp = T_aw 
@@ -184,11 +93,11 @@ class SkinHeatExchanger(HeatSink):
 
         Q_capacity = self.U * self.area * (self.coolant_temp - self.ambient_temp)
         Q_absorbed = min(heat_w, Q_capacity)
-        if Q_capacity > Q_absorbed:
-            print(f"SkinHX: Absorbed {Q_absorbed:.2f} W, remaining capacity {Q_capacity - Q_absorbed:.2f} W")
+        # if Q_capacity > Q_absorbed:
+        #     print(f"SkinHX: Absorbed {Q_absorbed:.2f} W, remaining capacity {Q_capacity - Q_absorbed:.2f} W")
         return Q_absorbed
     
-class RamAirHeatExchanger(HeatSink):
+class RamAirHeatExchanger():
     def __init__(self, U_W_per_m2K, coolant_temp_K):
         super().__init__("RamAirHX")
         self.U = U_W_per_m2K
@@ -213,7 +122,7 @@ class RamAirHeatExchanger(HeatSink):
         if abs(dT2 - dT1) < 1e-6:
             dT_lm = 0.5 * (dT1 + dT2)
         else:
-            dT_lm = (dT2 - dT1) / math.log(dT2 / dT1)
+            dT_lm = (dT2 - dT1) / np.log(dT2 / dT1)
 
         self.required_area = heat_w / (self.U * dT_lm)
         return self.required_area
@@ -238,8 +147,8 @@ class RamAirHeatExchanger(HeatSink):
         skin_area = A_open / porosity  # m² of total panel with holes
         if skin_area >= 0.10:
             d_m = hole_diameter_mm / 1000.0
-            area_per_hole = math.pi * (d_m / 2) ** 2 # m² per hole
-            hole_count = int(math.ceil(A_open / area_per_hole))
+            area_per_hole = np.pi * (d_m / 2) ** 2 # m² per hole
+            hole_count = int(np.ceil(A_open / area_per_hole))
         else:
             hole_count = 0
             d_m = 0.0
@@ -319,8 +228,7 @@ class RamAirHeatExchanger(HeatSink):
         numerator = (2.0 * gamma / (gamma - 1.0) * R) * term2 * ( T0 * (1.0 + 0.5 * (gamma - 1.0) * M0**2) + deltaT_HX0)
 
         denominator = M0 * np.sqrt(gamma * R * T0) * (1.0 + CD_d_CD_sp / 2.0)
-
-
+        
         TR = np.sqrt(numerator) / denominator - 1.0
         #TR = np.where(value > 0, np.sqrt(value) - 1.0, np.nan)  # nan for impossible points
         return TR
@@ -340,20 +248,22 @@ class RamAirHeatExchanger(HeatSink):
             eta_p07       = eta,   # optional override
             CD_d_CD_sp    = 0.11    # optional override
         )
-        plt.plot(deltaT, TR, label=f"ηₚ,07 = {eta:.3f}")
+        # plt.plot(deltaT, TR, label=f"ηₚ,07 = {eta:.3f}")
 
-    print(TR[-1])
+    # print(TR[-1])
     # -- plot ---------------------------------------------------------------
     #plt.plot(deltaT, TR, marker="o")
+    '''
     plt.xlabel("ΔT_HX⁰ (K)")
     plt.ylabel("Thrust Ratio (TR)")
     plt.title("Temperature difference of Radiator vs TR (for different pressure ratios)")
     plt.grid(True)
     plt.legend()
     plt.show()
+    '''
 
 
-class ThermoElectricGenerator(HeatSink):
+class ThermoElectricGenerator():
     def __init__(self, hot_temp_K, cold_temp_K, efficiency):
         super().__init__("TEG")
         self.efficiency = efficiency
@@ -364,7 +274,7 @@ class ThermoElectricGenerator(HeatSink):
         P_out = self.efficiency * Q_absorbed
         
         Q_rejected = Q_absorbed - P_out
-        print(f"TEG: Absorbed {Q_absorbed:.2f} W, Power output {P_out:.2f} W, Heat rejected {Q_rejected:.2f} W")
+        # print(f"TEG: Absorbed {Q_absorbed:.2f} W, Power output {P_out:.2f} W, Heat rejected {Q_rejected:.2f} W")
         return P_out  # return the heat that still needs disposal
 
 
@@ -378,16 +288,16 @@ class Fan():
     def power(self):
         return (self.ra_mf * self.delta_pressure) / (self.fan_eff * self.ra_density)
     
-class Pump(): # Only for liquid coolant systems
-    def __init__(self, pump_eff, coolant_mf, coolant_density, delta_pressure):
+class Pump(): 
+    def __init__(self, fluid, pump_eff, delta_pressure):
         self.pump_eff = pump_eff
-        self.coolant_mf = coolant_mf
-        self.coolant_density = coolant_density
+        self.coolant_mf = fluid.mf_given
+        self.coolant_density = fluid.rho
         self.delta_pressure = delta_pressure
     def power(self):
         return (self.coolant_mf * self.delta_pressure) / (self.pump_eff * self.coolant_density)
 
-class HX():
+class HEX():
     def __init__(self, name, fluid_cold, fluid_hot, Q_req):
         self.name = name
         self.fluid_cold = fluid_cold
@@ -432,13 +342,13 @@ class HX():
             delta_t1 = t_hot_out - t_cold_in
             delta_t2 = t_hot_in - t_cold_out
             
-            lmtd = (delta_t2 - delta_t1) / math.log(delta_t2 / delta_t1)
+            lmtd = (delta_t2 - delta_t1) / np.log(delta_t2 / delta_t1)
             S_eff = self.Q_req / (lmtd * H_hx)
             #s_eff = area * size_factor #assumed area of heat exchanger plate
-            #N_plates = math.ceil(S_eff / s_eff)
-            s_eff = (area - 4* math.pi * (dh_coolant/2)**2 ) * size_factor  # TOTAL EFF AREA
-            #N_plates = min(math.ceil(S_eff / s_eff),15)
-            n_channels = math.ceil((N_plates-1) / 2)
+            #N_plates = np.ceil(S_eff / s_eff)
+            s_eff = (area - 4* np.pi * (dh_coolant/2)**2 ) * size_factor  # TOTAL EFF AREA
+            #N_plates = min(np.ceil(S_eff / s_eff),15)
+            n_channels = np.ceil((N_plates-1) / 2)
             volume = N_plates * area * (plate_thickness+gap_bt_plates)  # m³
             
             # Coolant
@@ -446,7 +356,7 @@ class HX():
             y_coolant = 0.663   # Chevron angle of 30deg
             R_fh = 0.0003526
             Pr_coolant = self.fluid_hot.mu * self.fluid_hot.cp / self.fluid_hot.k
-            Re_coolant = self.fluid_hot.mf_calculated * 4/  (math.pi * dh_coolant * self.fluid_hot.mu) 
+            Re_coolant = self.fluid_hot.mf_calculated * 4/  (np.pi * dh_coolant * self.fluid_hot.mu) 
             Nu_coolant = C_h_coolant * Re_coolant**y_coolant * Pr_coolant**0.33 * 1 # Assuming (mu/mu_w)**0.17 = 1, given the tubes are very narrow
             hc_hot = Nu_coolant * self.fluid_hot.k / dh_coolant
 
@@ -454,8 +364,8 @@ class HX():
             C_h_h2 = 0.348  # Chevron angle of 30deg
             y_h2 = 0.663    # Chevron angle of 30deg
             R_fc = 8.815 * 1e-5 # for vapour
-            Pr_h2 = self.fluid_cold.mu * self.fluid_cold.cp / self.fluid_cold.k  # Prandtl number for H2
-            Re_h2 = self.fluid_cold.mf_calculated * 4/  (math.pi * dh_h2 * self.fluid_cold.mu) 
+            Pr_h2 = self.fluid_cold.Pr  # Prandtl number for H2
+            Re_h2 = self.fluid_cold.mf_calculated * 4 / (np.pi * dh_h2 * self.fluid_cold.mu) 
             Nu_h2 = C_h_h2 * Re_h2**y_h2 * Pr_h2**0.33 * 1 # Assuming (mu/mu_w)**0.17 = 1, given the tubes are very narrow
             hc_cold = Nu_h2 * self.fluid_cold.k / dh_h2
 
@@ -465,28 +375,39 @@ class HX():
 
             # Recalculate the heat transferred
             Q = H_hx * s_eff * lmtd * N_plates  * N_passes
-            print("Try Q:{H_hx*}")
+            # print("Try Q:{H_hx*}")
             factor = self.Q_req / Q 
-            print(f"Iteration: Q = {Q:.2f} W, Required Q = {self.Q_req:.2f} W, Factor = {factor:.2f}")
-            print(f"Iteration: Area = {area:.2f} m², Volume = {volume:.2f} m³, N_plates = {N_plates}, n_channels = {n_channels}")
-            hole_area = math.pi * (dh_coolant/2)**2
+            # print(f"Iteration: Q = {Q:.2f} W, Required Q = {self.Q_req:.2f} W, Factor = {factor:.2f}")
+            # print(f"Iteration: Area = {area:.2f} m², Volume = {volume:.2f} m³, N_plates = {N_plates}, n_channels = {n_channels}")
+            hole_area = np.pi * (dh_coolant/2)**2
             ratio =  hole_area / area
-            print(f"Pipe diameter: {dh_coolant:.3f} m")
-            print(f"Coolant mass flow rate: {self.fluid_hot.mf_calculated:.2f} kg/s")
-            print(f"Total Surface Required: {S_eff:.2f} m²") 
+            # print(f"Pipe diameter: {dh_coolant:.3f} m")
+            # print(f"Coolant mass flow rate: {self.fluid_hot.mf_calculated:.2f} kg/s")
+            # print(f"Total Surface Required: {S_eff:.2f} m²") 
 
             area *= factor    
-            iteration += 1        
-
-        return self.fluid_hot.mf_calculated, area, volume, iteration
+            iteration += 1
         
+        # TODO: Add pressure drop -------------------- REDO FUNCTION---------------------
+        self.fluid_hot.T = t_hot_in
+        cool_in = self.fluid_hot
+        cool_in.mf_given *= 0.5
+        self.fluid_hot.T = t_hot_out
+        cool_out = cool_in
+        self.fluid_cold.T = t_cold_out
+        cold_out = self.fluid_cold
+
+        return cool_in, cool_out, cold_out, area, volume
+
 class Compressor():
     def __init__(self, comp_efficiency, pressure_ratio, fluid):
         self.efficiency = comp_efficiency
         self.pressure_ratio = pressure_ratio
         self.fluid = fluid  
 
-    def power(self, inlet_temperature, gamma):
+    def power(self):
+        inlet_temperature = self.fluid.T  
+        gamma = self.fluid.gamma 
         T_out = inlet_temperature * (1 + 1 / self.efficiency * (self.pressure_ratio ** ((gamma - 1) / gamma) - 1))  # Isentropic relation
 
         cp = self.fluid.cp  
@@ -496,7 +417,6 @@ class Compressor():
     
     def mass(self, power):
         return power * 0.0400683 + 5.17242
-
 
 class Turbine():
     def __init__(self, turbine_efficiency, fluid):
@@ -511,7 +431,7 @@ class Turbine():
         return power_provide
 
 class Valve():
-    def __init__(self, valve_efficiency, fluid):
+    def __init__(self, fluid, valve_efficiency = 0.9 ):
         self.efficiency = valve_efficiency
         self.fluid = fluid
 
@@ -520,31 +440,52 @@ class Valve():
         return (0.568 * mdot_coolant ** 0.5541)
 
 class Fluid():
-    def __init__(self, name, T, P, C,cp,mf,k, mu, gamma):
+    def __init__(self, name, T, P, mf, fluid_type, C = None):
+        sat_temp = 0
+        gas = True
+        if P < PropsSI('PCRIT', fluid_type):
+            sat_temp = PropsSI('T', 'P', P, 'Q', 0, fluid_type)  # Saturation temperature at given pressure
+        if abs(T - sat_temp) < 1e-3:
+            gas = False
         self.name = name
         self.T = T  # Temperature in Kelvin
         self.P = P  # Pressure in Pascals
-        self.C = C  # Heat capacity in J/(kg*K)
-        self.cp = cp
-        self.mf_calculated = C/cp
+        self.cp = PropsSI('C', 'P', P, 'T', T, fluid_type) if gas else PropsSI('C', 'P', P, 'Q', 0, fluid_type)  # Specific heat capacity at constant pressure
+        self.C = C if C is not None else self.cp * mf  # Heat capacity rate
+        self.mf_calculated = self.C/self.cp
         self.mf_given = mf
-        self.k = k
-        self.mu = mu
-        self.gamma = gamma
-        #self.rho = rho #Density in kg/m³
-        #self.vdot = mf / rho  # Volumetric flow rate in m³/s
-
-
-
-
-class PipeAnalyzer:
-    def __init__(self):
+        self.k = PropsSI('CONDUCTIVITY', 'P', P, 'T', T, fluid_type) if gas else PropsSI('CONDUCTIVITY', 'P', P, 'Q', 0, fluid_type)  # Thermal conductivity of LH2 at storage pressure
+        self.dyn_visc = PropsSI('VISCOSITY', 'P', P, 'T', T, fluid_type) if gas else PropsSI('VISCOSITY', 'P', P, 'Q', 0, fluid_type) # Viscosity of LH2 at storage pressure
+        self.gamma = PropsSI('CP0MASS', 'P', P, 'T', T, fluid_type) / PropsSI('CVMASS', 'P', P, 'T', T, fluid_type) if gas else PropsSI('CP0MASS', 'P', P, 'Q', 0, fluid_type) / PropsSI('CVMASS', 'P', P, 'Q', 0, fluid_type) # Heat capacity ratio of LH2 at storage pressure
+        self.Pr = PropsSI('PRANDTL', 'P', P, 'T', T, fluid_type) if gas else PropsSI('PRANDTL', 'P', P, 'Q', 0, fluid_type) # Prandtl number of LH2 at storage pressure
+        self.rho = PropsSI('D', 'P', P, 'T', T, fluid_type) if gas else PropsSI('D', 'P', P, 'Q', 0, fluid_type) # Density of LH2 at storage pressure
+        self.vdot = mf / self.rho  # Volumetric flow rate in m³/s
+        self.kin_visc = self.dyn_visc / self.rho  # Kinematic viscosity of LH2 at storage pressure
+        self.fluid_type = fluid_type
+        self.mu = self.dyn_visc  # Dynamic viscosity of the fluid
+    
+class Pipe():
+    def __init__(self, length, d_in, fluid, type = 'normal'):
         """Initialize the Heat Pipe Analyzer"""
+        self.length = length
+        self.d_in = d_in
+        self.d_out = self.d_in * 1.1
+        self.d_is = self.d_out * 1.1
+        self.temp_fluid = fluid.T
+        self.temp_air = 273.15 + 20
+        self.therm_conduc_fluid = fluid.k
+        self.prandtl_number = fluid.Pr
+        self.mass_flow = fluid.mf_given
+        self.spec_heat = fluid.cp
+        self.heat_trans_air = 10
+        self.therm_conduc_pipe = 15
+        self.therm_conduc_insulation = 15
+        self.density_fluid = fluid.rho
+        self.kinematic_visc = fluid.kin_visc
+        self.material_roughness = 0.004e-3
+        self.fluid = fluid  # Store the fluid object for later use
 
-    def analyze_heat_pipe(self, length, d_in, d_out, d_is, temp_fluid, temp_air,
-                          therm_conduc_fluid, prandtl_number, mass_flow, spec_heat,
-                          heat_trans_air, therm_conduc_pipe, therm_conduc_insulation,
-                          density_fluid, kinematic_visc, material_roughness):
+    def analyze_heat_pipe(self):
         """
         Combined analysis of heat pipe: calculate both pressure drop and temperature distribution
 
@@ -570,166 +511,320 @@ class PipeAnalyzer:
         dict: {'pressure_drop': float, 'temperature_profile': np.array, 'reynolds': float}
         """
         # Calculate fluid velocity
-        velocity_fluid = mass_flow / (density_fluid * ((d_in / 2) ** 2) * np.pi)
+        velocity_fluid = self.mass_flow / (self.density_fluid * ((self.d_in / 2) ** 2) * np.pi)
 
         # Calculate Reynolds number
-        reynolds = velocity_fluid * d_in / kinematic_visc
+        reynolds = velocity_fluid * self.d_in / self.kinematic_visc
+        
 
         # ==================== PRESSURE DROP CALCULATION ====================
         # Check for laminar or turbulent flow and calculate Darcy-Weisbach coefficient
         if reynolds < 2300:
             darcy_weisbach = 64 / reynolds
         else:
-            x_darcy = (-2.457 * np.log((7 / reynolds) ** 0.9 + 0.27 * material_roughness / d_in)) ** 16
+            x_darcy = (-2.457 * np.log((7 / reynolds) ** 0.9 + 0.27 * self.material_roughness / self.d_in)) ** 16
             y_darcy = (37530 / reynolds) ** 16
             darcy_weisbach = 8 * ((8 / reynolds) ** 12 + (x_darcy + y_darcy) ** -1.5) ** (1 / 12)
 
         # Calculate pressure drop at the end of the pipe
-        pressure_drop = length * (darcy_weisbach * density_fluid * velocity_fluid ** 2) / (d_in * 2)
+        pressure_drop = self.length * (darcy_weisbach * self.density_fluid * velocity_fluid ** 2) / (self.d_in * 2)
 
         # ==================== TEMPERATURE PROFILE CALCULATION ====================
         # Initialize temperature array
-        temperature = [temp_fluid]
+        temperature = [self.temp_fluid]
         energies = 0
         steps = 100
 
         # Calculate heat transfer coefficient
-        nu_turb = 0.0223 * (reynolds ** 0.8) * prandtl_number ** 0.4
-        heat_trans_co = nu_turb * therm_conduc_fluid / d_in
+        nu_turb = 0.0223 * (reynolds ** 0.8) * self.prandtl_number ** 0.4
+        heat_trans_co = nu_turb * self.therm_conduc_fluid / self.d_in
 
         # Calculate surface areas
-        surface_in = np.pi * d_in * (length)
-        surface_out = np.pi * d_is * (length / steps)
+        surface_in = np.pi * self.d_in * (self.length)
+        surface_out = np.pi * self.d_is * (self.length / steps)
 
         # Calculate thermal resistances
-        r_fluid = (1 / (mass_flow * spec_heat * (1 - np.exp(-1 * heat_trans_co * surface_in / (mass_flow * spec_heat))))) * steps
-        r_air = 1 / (heat_trans_air * surface_out)
-        r_wall = np.log(d_out / d_in) / (2 * np.pi * therm_conduc_pipe * (length / steps))
-        r_insulation = np.log(d_is / d_out) / (2 * np.pi * therm_conduc_insulation * (length / steps))
+        r_fluid = (1 / (self.mass_flow * self.spec_heat * (1 - np.exp(-1 * heat_trans_co * surface_in / (self.mass_flow * self.spec_heat))))) * steps
+        r_air = 1 / (self.heat_trans_air * surface_out)
+        r_wall = np.log(self.d_out / self.d_in) / (2 * np.pi * self.therm_conduc_pipe * (self.length / steps))
+        r_insulation = np.log(self.d_is / self.d_out) / (2 * np.pi * self.therm_conduc_insulation * (self.length / steps))
         r_tot = r_fluid + r_air + r_wall + r_insulation
 
 
         # Calculate time in pipe
-        time_in_pipe = length / velocity_fluid
+        time_in_pipe = self.length / velocity_fluid
 
 
-        temps_fluid = temp_fluid
-        mass_section = (length / steps) * (d_in / 2) ** 2 * np.pi * density_fluid
+        temps_fluid = self.temp_fluid
+        mass_section = (self.length / steps) * (self.d_in / 2) ** 2 * np.pi * self.density_fluid
 
         # Calculate temperature at each step
         for i in range(steps):
-            delta_q = (temps_fluid - temp_air) / r_tot
-            delta_t = time_in_pipe * delta_q / (mass_section * spec_heat) / steps
+            delta_q = (temps_fluid - self.temp_air) / r_tot
+            delta_t = time_in_pipe * delta_q / (mass_section * self.spec_heat) / steps
             temps_fluid = temps_fluid - delta_t
             temperature.append(temps_fluid)
             energies = energies + delta_q
 
         energy_lost = energies
+        if type == 'normal':
+            self.fluid.p -= pressure_drop
+            self.fluid.T = temperature[-1]  # Update fluid temperature to final value
+        if type == 'inv':
+            self.fluid.p += pressure_drop
+            self.fluid.T += (temperature[0]- temperature[-1]) 
 
-        return {
-            'pressure_drop': pressure_drop,
-            'temperature_profile': np.array(temperature),
-            'Energy_lost' : energy_lost,
-            'reynolds': reynolds,
-            'velocity': velocity_fluid,
-            'darcy_weisbach': darcy_weisbach
-        }
-
-# ------------------------------ FUNCTIONS -----------------------------------
-
-def size_thermal_management(heat_sources, sinks):
-    total_heat = sum(src.waste_heat() for src in heat_sources)
-    print(f"Total waste heat = {total_heat/1000:.1f} kW")
-
-    remaining_heat = total_heat
-    for sink in sinks:
-        if remaining_heat <= 0:
-            break
-        if isinstance(sink, SkinHeatExchanger):
-            sink.set_ambient(T_ambient_K=ambient_conditions['T'], mach=ambient_conditions['M'], recovery_factor=recovery_factor)
-        if not isinstance(sink, RamAirHeatExchanger):
-            absorbed = sink.absorb_heat(remaining_heat)
-            print(f"{sink.name} absorbed {absorbed/1000:.1f} kW")
-            remaining_heat -= absorbed
-
-    if remaining_heat > 0:
-        # assume last sink is RamAirHX
-        for sink in sinks:
-            if isinstance(sink, RamAirHeatExchanger):
-                
-                area = sink.size_exchanger(heat_w=remaining_heat,T_air_in_K=T_air_in,T_air_out_K=T_air_out)
-                print(f"Radiator face area required: {area:.2f} m²")
-                sizing = sink.compute_hole_and_skin_area(
-                    heat_w=remaining_heat,
-                    T_air_in_K=T_air_in,
-                    T_air_out_K=T_air_out,
-                    flight_speed_m_s=ambient_conditions['V'],
-                    air_density=ambient_conditions['rho'],
-                    porosity=porosity,
-                    hole_diameter_mm=hole_diameter_mm,
-                    inlet_CD=inlet_cd,       
-                    cp_air=cp_air,
-                    meredith_recovery=meredith_recovery
-                )
-                print(f"Air mass flow required: {sizing['m_dot_air']:.2f} kg/s")
-                print(f"Total open hole area: {sizing['A_open']:.3f} m²")
-                print(f"Total skin area (10% porosity): {sizing['skin_area']:.2f} m²")
-                print(f"Number of {hole_diameter_mm:.1f} mm holes: {sizing['hole_count']}")
-                #print(f"Raw inlet drag: {sizing['drag_N']:.1f} N")
-                #print(f"Net drag after Meredith (50% recovery): {sizing['net_drag_N']:.1f} N")
-
-                fan = Fan(
-                    fan_eff=fan_eff,
-                    ra_mf=sizing['m_dot_air'],
-                    ra_density=ambient_conditions['rho'],
-                    delta_pressure=delta_pressure
-                )
-                fan_power = fan.power()
-                print(f"Fan power required during Take-off: {fan_power/1000:.2f} kW")
-
-                remaining_heat = 0
-    if remaining_heat > 0:
-        print(f"WARNING: {remaining_heat/1000:.1f} kW of heat could not be dissipated!")
-
+        return self.fluid
 
 
 # ------------------------------ MAIN PROGRAM -----------------------------------
 
 
-# Heat Sources
-fuel_cell = FuelCell(power_output_w=fc_power, efficiency=fc_eff)
-battery = Battery(power_output_w=bat_p, heat_fraction=battery_heat_fraction)
-motor = ElectricMotor(power_output_w=em_power, efficiency=em_eff)
-
-heat_sources = [fuel_cell, battery, motor]
-
-# Heat Sinks
-lh2_tank = LH2Tank(mass_flow_kg_s=(2*h2_mf_fc*fc_power/1e6),T_final_K=t_fin_fc,P_final=p_fin_fc,P_init=p_init_fc) # for both wings (FC)
-lh2_tank_1 = LH2Tank(mass_flow_kg_s=2*h2_mf_cc,T_final_K=t_fin_cc, P_final = p_fin_cc, P_init = p_init_cc) # for 2 comb. (CC)
-skin_hx = SkinHeatExchanger(area_m2=area_wing, U_W_per_m2K=U_wing, coolant_temp_K=wing_coolant_temp) # for 2 wings
-ram_air_hx = RamAirHeatExchanger(U_W_per_m2K=U_ra, coolant_temp_K=ra_coolant_temp)
-teg = ThermoElectricGenerator(hot_temp_K=wing_coolant_temp, cold_temp_K=ambient_conditions['T'], efficiency=efficiency_teg)
+def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf_fc, T_amb, rho_amb, V_amb, p_amb, h2_mf_rec, air_out_fc, p_sto):
+    
+    p_cool = 5.7e5
+    fc_press_drop_cool = 100000
+    cool_0 = Fluid(name="FuelCellCoolantGeneric", T=T_fc, P=p_cool, C=None, mf=10, fluid_type='Water')  # Coolant to FC
+    cool_mf_per_fc = Q_dot_fc / (cool_0.cp * deltaT_fc * 2)
+    cool_0.mf_given = cool_mf_per_fc  # Mass flow rate of coolant to FC
 
 
-sinks = [lh2_tank, lh2_tank_1,teg, skin_hx, ram_air_hx]
+    sources = np.array([Q_dot_fc, Q_dot_eps])
+    Q_dot_rem = np.sum(sources)
+    
+    h2_mf_fc = h2_mf_fc * 2  # Total H2 mass flow rate to fuel cell (both wings)
+    h2_mf_cc = h2_mf_cc * 2  # Total H2 mass flow rate to combustion chamber (both wings)
 
+    # Initialize -----------------------------
+    T_tank = PropsSI('T', 'P', p_sto, 'Q', 0, 'ParaHydrogen')  # Initial temperature of LH2 tank
+    h2_1 = Fluid(name="H2_1", T=T_tank, P=p_sto, C = None, mf = h2_mf_fc + h2_mf_cc, fluid_type='ParaHydrogen')
+
+    # Pipe h2 12
+    pipe_h2_12 = Pipe(1, 0.05, h2_1)  # 1 m length, 50 mm diameter
+    h2_2 = pipe_h2_12.analyze_heat_pipe()
+
+    # Pipe h2 34
+    T_sat_h2 = PropsSI('T', 'P', h2_2.P, 'Q', 0, h2_2.fluid_type)  # Saturation temperature of H2 at pressure P
+    h2_3 = Fluid(name="H2_3", T=T_sat_h2 + HEX_1_deltaT, P=p_sto, C = None, mf = h2_mf_fc + h2_mf_cc, fluid_type='ParaHydrogen')
+    pipe_h2_34 = Pipe(1, 0.05, h2_3)  # 1 m length, 50 mm diameter
+    h2_4 = pipe_h2_34.analyze_heat_pipe()
+
+    # Superheater HEX
+    cool_19 = Fluid(name="FuelCellCoolant", T=T_fc, P=p_cool-fc_press_drop_cool, C=None, mf = cool_mf_per_fc * 2, fluid_type='Water') 
+    Q_h2_heat = (PropsSI('H', 'P', h2_2.P, 'T', T_fc, h2_2.fluid_type) - PropsSI('H', 'P', h2_2.P, 'T', T_sat_h2 + HEX_1_deltaT, h2_2.fluid_type)) * h2_2.mf_given   # Heat of vaporization
+    hx_heat = HEX(name="Vaporizer", fluid_cold=h2_4, fluid_hot=cool_19, Q_req=Q_h2_heat)
+    cool_19,cool_20,h2_5, hx_heat_area, hx_heat_volume = hx_heat.size()
+    Q_dot_rem -= Q_h2_heat 
+
+    # Pipe cool 20-1
+    pipe_cool_20_1 = Pipe(1, 0.05, cool_20)  # 1 m length, 50 mm diameter
+    cool_1 = pipe_cool_20_1.analyze_heat_pipe()
+
+    # Vaporizer HEX
+    Q_vap = (PropsSI('H', 'P', h2_2.P, 'T', T_sat_h2 + HEX_1_deltaT, h2_2.fluid_type) - PropsSI('H', 'P', h2_2.P, 'Q', 0, h2_2.fluid_type)) * h2_2.mf_given   # Heat of vaporization
+    hx_vap = HEX(name="Vaporizer", fluid_cold=h2_2, fluid_hot=cool_1, Q_req=Q_vap)
+    cool_1,cool_2,h2_3, hx_vap_area, hx_vap_volume = hx_vap.size()
+    Q_dot_rem -= Q_vap
+
+    # Pipe h2 5-6
+    pipe_h2_5_6 = Pipe(1, 0.05, h2_5)  # 1 m length, 50 mm diameter
+    h2_6 = pipe_h2_5_6.analyze_heat_pipe()
+
+    # Intersection 6-11-7
+    h2_7 = Fluid(name="H2_7", T=h2_6.T, P=h2_6.P, C=0, mf=h2_mf_fc, fluid_type='ParaHydrogen')  # H2 to fuel cell
+    h2_11 = Fluid(name="H2_7", T=h2_6.T, P=h2_6.P, C=0, mf=h2_mf_cc, fluid_type='ParaHydrogen')  # H2 to CC
+    valve_6711 = Valve(fluid=h2_6, valve_efficiency=0.9)  # Valve for H2 to fuel cell
+    valve_6711_mass = valve_6711.valve_mass()  # Mass of the valve
+
+    # PATH to CC ----------------------------------------------
+    # Pipe h2 11-12
+    pipe_h2_11_12 = Pipe(1, 0.05, h2_11)  # 1 m length, 50 mm diameter
+    h2_12 = pipe_h2_11_12.analyze_heat_pipe()
+
+    # Intersection 12-13-26
+    comp_14_15_PI = 5
+    split_13_26 = 1 - ((p_cc+1)/h2_12.P - comp_14_15_PI)/(h2_12.P - comp_14_15_PI)
+    h2_13 = Fluid(name="H2_13", T=h2_12.T, P=h2_12.P, C=0, mf=h2_mf_cc * split_13_26, fluid_type='ParaHydrogen')  # H2 to Compressor
+    h2_26 = Fluid(name="H2_26", T=h2_12.T, P=h2_12.P, C=0, mf=h2_mf_cc * (1-split_13_26), fluid_type='ParaHydrogen')  # H2 around Compressor
+    valve_121326 = Valve(fluid=h2_12, valve_efficiency=0.9)  # Valve for H2 to CC
+    valve_121326_mass = valve_121326.valve_mass()  # Mass of the valve
+
+    # Pipe h2 13-14
+    pipe_h2_13_14 = Pipe(1, 0.05, h2_13)  # 1 m length, 50 mm diameter
+    h2_14 = pipe_h2_13_14.analyze_heat_pipe()
+
+    # Pipe h2 26-18
+    pipe_h2_26_18 = Pipe(1, 0.05, h2_26)  # 1 m length, 50 mm diameter
+    h2_18 = pipe_h2_26_18.analyze_heat_pipe()
+
+    # Compressor 14-15
+    comp_14_15 = Compressor(comp_efficiency=0.9, pressure_ratio=comp_14_15_PI, fluid=h2_14)
+    comp14_15_power = comp_14_15.power()
+    comp_14_15_mass = comp_14_15.mass(comp14_15_power)
+    h2_15 = Fluid(name="H2_15", T=h2_14.T, P=h2_14.P * comp_14_15_PI, C=0, mf=h2_14.mf_given, fluid_type='ParaHydrogen')
+
+    # Pipe h2 15-16
+    pipe_h2_15_16 = Pipe(1, 0.05, h2_15)  # 1 m length, 50 mm diameter
+    h2_16 = pipe_h2_15_16.analyze_heat_pipe()
+
+    # Intersection 16-17-18
+    h2_17 = Fluid(name="H2_17", T=h2_16.T, P=p_cc + 1e5, C=0, mf=h2_mf_cc, fluid_type='ParaHydrogen')  # H2 to CC
+
+    # Pipe h2 17-19
+    pipe_h2_17_19 = Pipe(1, 0.05, h2_17)  # 1 m length, 50 mm diameter
+    h2_19 = pipe_h2_17_19.analyze_heat_pipe()
+
+    # Valve 19-20
+    valve_1920 = Valve(fluid=h2_19, valve_efficiency=0.9) 
+    valve_1920_mass = valve_1920.valve_mass()  # Mass of the valve
+    h2_20 = Fluid(name="H2_20", T=h2_19.T, P=p_cc, C=0, mf=h2_mf_cc, fluid_type='ParaHydrogen')  # H2 to CC
+
+    # Pipe h2 20-21
+    h2_20_copy = Fluid(name="H2_20_copy", T=h2_20.T, P=h2_20.P, C=0, mf=h2_mf_cc/2, fluid_type='ParaHydrogen')
+    pipe_h2_20_21 = Pipe(1, 0.05, h2_20_copy)  # 1 m length, 50 mm diameter
+    h2_21 = pipe_h2_20_21.analyze_heat_pipe()
+
+    # PATH to FC -------------------------------------------------
+    pipe_h2_7_8 = Pipe(1, 0.05, h2_7)  # 1 m length, 50 mm diameter
+    h2_8 = pipe_h2_7_8.analyze_heat_pipe()
+    h2_8_copy = Fluid(name="H2_8_copy", T=h2_8.T, P=h2_8.P, C=0, mf=h2_mf_fc/2, fluid_type='ParaHydrogen')
+    
+    valve_8_9 = Valve(fluid=h2_8, valve_efficiency=0.9)  # Valve for H2 to fuel cell
+    valve_8_9_mass = valve_8_9.valve_mass()  # Mass of the valve
+    h2_9 = Fluid(name="H2_9", T=h2_8.T, P=p_fc, C=0, mf=h2_mf_fc, fluid_type='ParaHydrogen')  # H2 to fuel cell
+
+    # Pipe h2 9-10
+    h2_9_copy = Fluid(name="H2_9_copy", T=h2_9.T, P=h2_9.P, C=0, mf=h2_mf_fc/2, fluid_type='ParaHydrogen')
+    pipe_h2_9_10 = Pipe(1, 0.05, h2_9_copy)  # 1 m length, 50 mm diameter
+    h2_10 = pipe_h2_9_10.analyze_heat_pipe()
+
+    # FC Circulation 
+    fc_press_drop_h2 = 100000
+    h2_22 = Fluid(name="H2_22", T=T_fc, P=p_fc - fc_press_drop_h2 , C=0, mf=h2_mf_rec, fluid_type='ParaHydrogen')  
+
+    # Pipe h2 22-23
+    pipe_h2_22_23 = Pipe(1, 0.05, h2_22)  # 1 m length, 50 mm diameter
+    h2_23 = pipe_h2_22_23.analyze_heat_pipe()
+
+    # Compressor 23-24
+    comp_23_24_PI = p_fc / h2_23.P
+    comp_23_24 = Compressor(comp_efficiency=0.9, pressure_ratio=comp_23_24_PI, fluid=h2_23)
+    comp23_24_power = comp_23_24.power()
+    comp_23_24_mass = comp_23_24.mass(comp23_24_power)
+    h2_24 = Fluid(name="H2_24", T=h2_23.T, P=h2_23.P * comp_23_24_PI, C=0, mf=h2_mf_fc/2, fluid_type='ParaHydrogen')
+
+    # Pipe h2 24-25
+    pipe_h2_24_25 = Pipe(1, 0.05, h2_24)  # 1 m length, 50 mm diameter
+    h2_25 = pipe_h2_24_25.analyze_heat_pipe()
+
+    # FC Cooling ----------------------------------------
+
+    # Pipe cool 2-3
+    pipe_cool_2_3 = Pipe(1, 0.05, cool_2)  # 1 m length, 50 mm diameter
+    cool_3 = pipe_cool_2_3.analyze_heat_pipe()
+
+    # Intersection 3-4A-4B
+    cool_4 = Fluid(name="Cool_4", T=cool_3.T, P=cool_3.P, C=0, mf=cool_3.mf_given/2, fluid_type='Water') 
+
+    # Pipe cool 4-5
+    pipe_cool_4_5 = Pipe(1, 0.05, cool_4)  # 1 m length, 50 mm diameter
+    cool_5 = pipe_cool_4_5.analyze_heat_pipe()
+
+    # Pipe 19-22
+    pipe_cool_19_22 = Pipe(1, 0.05, cool_19, type ='inv')  # 1 m length, 50 mm diameter
+    cool_22 = pipe_cool_19_22.analyze_heat_pipe()
+
+    # Intersection 22-21A-21B
+    cool_21 = Fluid(name="Cool_21", T=cool_22.T, P=cool_22.P, C=0, mf=cool_22.mf_given/2, fluid_type='Water')
+
+    # Pipe 21-20
+    pipe_cool_21_20 = Pipe(1, 0.05, cool_21, type='inv')  # 1 m length, 50 mm diameter
+    cool_20 = pipe_cool_21_20.analyze_heat_pipe()
+
+    # Pipe 12-13
+    cool_12 = Fluid(name="Cool_12", T=T_fc, P=p_cool, C=0, mf=cool_mf_per_fc, fluid_type='Water')  # Coolant to FC
+    pipe_cool_12_13 = Pipe(1, 0.05, cool_12)  # 1 m length, 50 mm diameter
+    cool_13 = pipe_cool_12_13.analyze_heat_pipe()
+
+    # Valve 13-20-14
+    valve_132014 = Valve(fluid=cool_13, valve_efficiency=0.9)  # Valve for coolant to FC
+    valve_132014_mass = valve_132014.valve_mass()  # Mass of the valve
+    cool_14 = Fluid(name="Cool_14", T=cool_13.T, P=cool_13.P, C=None, mf=cool_13.mf_given - cool_20.mf_given, fluid_type='Water')  # Coolant to FC
+    
+    # Pipe 14-15
+    pipe_cool_14_15 = Pipe(1, 0.05, cool_14)  # 1 m length, 50 mm diameter
+    cool_15 = pipe_cool_14_15.analyze_heat_pipe()
+
+    # Valve 15-16-17
+    valve_151617 = Valve(fluid=cool_15, valve_efficiency=0.9)  # Valve for coolant to FC    
+    valve_151617_mass = valve_151617.valve_mass()  # Mass of the valve
+    
+    # Calculate bypass flow rate:
+    T_not_HEX = (cool_12.mf_given * (cool_12.T - deltaT_fc) - cool_20.mf_given * cool_5.T) / (cool_12.mf_given - cool_20.mf_given)  # Temperature of coolant to FC without HEX
+    cool_17_mf_minimum = Q_dot_rem / (cool_15.cp * (cool_15.T - T_amb))  
+    cool_mf_bypass = (T_not_HEX * cool_14.mf_given - cool_17_mf_minimum * T_amb) / cool_15.T
+    cool_17_mf = np.maximum(cool_17_mf_minimum, cool_15.mf_given - cool_mf_bypass)  # Minimum mass flow rate of coolant to FC
+
+    cool_17 = Fluid(name="Cool_17", T=cool_15.T, P=cool_15.P, C=0, mf=cool_17_mf, fluid_type='Water')  # Coolant to FC
+    cool_16 = Fluid(name="Cool_16", T=cool_15.T, P=cool_15.P, C=0, mf=cool_15.mf_given - cool_17_mf, fluid_type='Water')  # Coolant to FC
+    
+    # Pipe 17-18
+    pipe_cool_17_18 = Pipe(1, 0.05, cool_17)  # 1 m length, 50 mm diameter    
+    cool_18 = pipe_cool_17_18.analyze_heat_pipe()
+
+    # Skin Heat Exchanger
+    # ---------------------------------- COMPLETE THE SKIN HX SIZING HERE ----------------------------------
+    cool_23 = cool_18
+    cool_24 = cool_23
+    cool_24.T -= Q_dot_rem / (cool_24.mf_given * cool_24.cp)
+
+    # Intersection 24-5-25
+    cool_25 = Fluid(name="Cool_25", T=(cool_24.T * cool_24.mf_given + cool_5.T * cool_5.mf_given) / (cool_5.mf_given + cool_24.mf_given), P=cool_24.P, C=0, mf=cool_24.mf_given + cool_5.mf_given, fluid_type='Water') 
+
+    # Electric heater:
+    if cool_25.T <= T_fc - deltaT_fc:
+        Q_dot_heater = (cool_25.mf_given * cool_25.cp * (T_fc - deltaT_fc - cool_25.T))  # Heat required to heat the coolant to FC temperature
+    else:
+        Q_dot_heater = 0
+    cool_26 = Fluid(name="Cool_26", T= cool_25.T + Q_dot_heater / (cool_25.cp * cool_25.mf_given), P=cool_25.P, C=0, mf=cool_25.mf_given, fluid_type='Water') 
+
+    # Coolant pump
+    pump_26_27 = Pump(fluid=cool_26, pump_eff=0.9, delta_pressure=p_cool - cool_26.P)  # Pump for coolant to FC
+    pump_26_27_power = pump_26_27.power()
+    cool_27 = Fluid(name="Cool_27", T=cool_26.T, P=p_cool, C=0, mf=cool_26.mf_given, fluid_type='Water')  # Coolant to FC after pump
+
+    # Store all Fluid instances in a dictionary with their name as key
+    fluids_dict = {}
+    for var_name, var_value in locals().items():
+        if isinstance(var_value, Fluid):
+            fluids_dict[var_value.name] = {
+                'massflow': var_value.mf_given,
+                'temperature': var_value.T,
+                'pressure': var_value.P
+            }
+    return fluids_dict
 
 # RUN -----------------------------------------------------------
 if __name__ == "__main__":
-    size_thermal_management(heat_sources, sinks)
+    
+    # Dummy values for main function inputs
+    Q_dot_fc = 500000         # Waste heat from fuel cell [W]
+    Q_dot_eps = 20000        # Waste heat from EPS [W]
+    p_fc = 1.8e5               # Fuel cell pressure [Pa]
+    p_cc = 12e5             # Combustion chamber pressure [Pa]
+    h2_mf_fc = 0.01          # H2 mass flow to FC [kg/s]
+    h2_mf_cc = 0.01          # H2 mass flow to CC [kg/s]
+    T_fc = 273.15+160            # Fuel cell temperature [K]
+    T_cc = T_fc           # Combustion chamber temperature [K]
+    air_mf_fc = 1.0          # Air mass flow to FC [kg/s]
+    T_amb = 273.15+15           # Ambient temperature [K]
+    rho_amb = 1.225          # Ambient air density [kg/m^3]
+    V_amb = 120.0            # Ambient velocity [m/s]
+    p_amb = 101325           # Ambient pressure [Pa]
+    h2_mf_rec = 0.005         # H2 recirculation mass flow [kg/s]
+    air_out_fc = 1         # Air out of FC [kg/s]
+    p_sto = 6e5              # Storage pressure [Pa]
 
-    # Sizing
-    C_h2 = lh2_tank.absorb_heat(fuel_cell.waste_heat())/(t_fin_fc - t_init)
-    print(f"Capacity rate of LH2: {C_h2:.2f})") 
-    fluid_cold = Fluid(name="LH2", T=t_init, P=p_init_fc, C=C_h2, cp = C_h2/h2_mf_fc, k = k_h2, mu = mu_h2, mf = h2_mf_fc , gamma = 1.4 )
-    fluid_hot = Fluid(name="FuelCellCoolant", T=t_fin_fc, P=p_fin_fc, C=0, cp = h_cool, mf = 10 ,  k=k_coolant, mu=mu_coolant, gamma= 1.4) 
-
-    hx = HX(name="FuelCellHX", fluid_cold=fluid_cold, fluid_hot=fluid_hot, Q_req=lh2_tank.absorb_heat(fuel_cell.waste_heat()))
-    hx_cool_flow_mass, hx_area, hx_volume, iteration = hx.size()
-    print(f"Coolant Mass Flow: {hx_cool_flow_mass:.2f} kg/s")
-    print(f"Heat Exchanger Area: {hx_area:.4f} m²")
-    print(f"Heat Exchanger Volume: {hx_volume:.4f} m³")
-    print("Done after iteration number", iteration)
-
-
-
+    fluids = main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf_fc, T_amb, rho_amb, V_amb, p_amb, h2_mf_rec, air_out_fc, p_sto)
+    
+    tms_plotting.fluids_table(fluids)
