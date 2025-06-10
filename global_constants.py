@@ -72,8 +72,8 @@ P_A=1.6 * 101325 + 0.06 * 1e5,                          # [Pa] Anode Pressure
 P_C=1.6 * 101325,                                       # [Pa] Cathode Pressure
 T_FC = 273.15 + 160,                                    # [K] Fuel Cell Temperature
 
-FC_prod_gwp = 30.5                                      # [kg CO2/kW] GWP of the fuel cell production (see excel)
-
+FC_prod_gwp = 30.5                                      # [kg CO2/kW] GWP of the fuel cell production with bop (see excel)
+FC_cost = 640                                           # [$/kW] Cost of the fuel cell with bop (flyzero)
 
 ### FOR CODE CHECKING PURPOSES ONLY ###
 #50% power split
