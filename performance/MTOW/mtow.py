@@ -14,47 +14,74 @@ _WS_x      = _cons["WS_x"]
 _PW_cl     = _cons["PW_cl"]
 _PW_cr     = _cons["PW_cr"]
 _WS_stall  = _cons["WS_stall"]
+# Original 
 
-_PW_req_curve = np.maximum(_PW_cl, _PW_cr)
+_PW_req_curve_TO = np.maximum(_PW_cl, _PW_cr)
+_PW_req_curve_cr = _cons["PW_req_curve_cr"]
 
 
-def mtow_score(
-    loading_vector: np.ndarray
+def power_and_wing_loading(
+    design: np.ndarray,
+    loading: np.ndarray
     ) -> np.ndarray:
-    """Check MTOW against original aircraft constraints analysis and return a score.
+    """Check loading against original aircraft constraints analysis and return a mask.
 
     Args:
-        MTOW (Union[float, np.ndarray]): Maximum Take-Off Weight.
-        PW (Union[float, np.ndarray]): Power loading.
-        SW (Union[float, np.ndarray]): Wing loading.
-
-    Returns:
-        np.ndarray: Score for the design based on MTOW, power loading, and wing loading.
-    """
+        design (np.ndarray): Design tensor with shape (N, M, P, Q) where:
+            N: Power splits (FC use vs Turboprop use)
+            M: FC TOGA throttle setting
+            P: FC cruise throttle setting
+            Q: Design variables: 
+                < m_EPS, m_FC, m_H2, m_storage, m_TMS, V_FC, V_storage, V_ELMO, MTOW, L_storage, D_storage >
+                
+        loading (np.ndarray): Mass loading tensor with shape (N, M, P, Q, 4) where:
+            N: Power splits (FC use vs Turboprop use)
+            M: FC TOGA throttle setting
+            P: FC cruise throttle setting
+            Q: Flight-phase dependent loading vector:
+                < PW_1, WS_1, PW_2, WS_2 > x 4
+                where:
+                    PW_1: Power loading at phase start
+                    WS_1: Wing loading at phase start
+                    PW_2: Power loading at phase end
+                    WS_2: Wing loading at phase end
     
-    PW_req_at_WS = np.interp(
-        WS,
+    Returns:
+        np.ndarray: Boolean mask indicating whether the tensor indices meet the constraints.
+    """
+    PW_1 = loading[:, :, :, :, 0]  # Power loading at phase start
+    WS_1 = loading[:, :, :, :, 1]
+    PW_2 = loading[:, :, :, :, 2]  # Power loading at phase end
+    WS_2 = loading[:, :, :, :, 3]
+    
+    # Check the first two rows for Take-Off (TO) and Second-Stage Climb
+    PW_req_at_WS_TO = np.interp(
+        WS_1[:2],
         _WS_x,
-        _PW_req_curve,
+        _PW_req_curve_TO,
         left=np.inf,
         right=np.inf
     )
     
-    valid_design = (PW >= PW_req_at_SW) & (SW <= _WS_stall)
-    
-    # For valid designs, calculate the distance from the original design point
-    d = np.where(
-        valid_design,
-        np.sqrt(
-            ((PW - PW_OG_TO) / PW_OG_TO) ** 2 +
-            ((SW - SW_OG_TO) / SW_OG_TO) ** 2
-        )
+    # Check cruise and hold
+    PW_req_at_WS_cr = np.interp(
+        WS_2[2:],
+        _WS_x,
+        _PW_req_curve_cr,
+        left=np.inf,
+        right=np.inf
     )
     
-    score = np.where(
-        valid_design,
-        1/ (1 + d),
-        0.0
+    valid_design = (
+        (np.all(PW_1[:2] >= PW_req_at_WS_TO)) &  # TO and Second-Stage Climb
+        (np.all(PW_2[2:] >= PW_req_at_WS_cr)) &  # Cruise and Hold
+        (np.all(WS_1 >= _WS_stall)) &  # Stall speed check
+        (np.all(WS_2 >= _WS_stall))    # Stall speed check
     )
     
-    return score
+    # Design vectors that do not meet the constraints are filled with NaN
+    de = np.full_like(design, np.nan, dtype=np.float64)
+    de[valid_design] = design[valid_design]
+    
+    
+    return de
