@@ -52,6 +52,12 @@ OG_constraints = ca.constraint_curves(C_d_0_orig, MTOW_orig)
 PW_OG_TO = TOGA/MTOW_orig
 SW_OG_TO = S / MTOW_orig
 
+# 100 year GWP of gases (compared to CO2)
+
+GWP_CO2 = 1.0                                            # [-] Global Warming Potential of CO2
+GWP__NOx = 273.0                                          # [-] Global Warming Potential of NOx https://www.epa.gov/ghgemissions/understanding-global-warming-potentials#:~:text=Nitrous%20Oxide%20(N2O,Sinks%20uses%20a%20different%20value.)
+GWP_H2O = 0.0005                                   # [-] Global Warming Potential of H2O        https://iopscience.iop.org/article/10.1088/1748-9326/aae018/pdf
+
 #######################################################################################
 #################### Code specific constants from each part ###########################
 
