@@ -53,28 +53,29 @@ def integration(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]
     
     return scores, N_PAX, m_cargo
     
-def mtow(design: np.ndarray) -> np.ndarray:
-    """Evaluate design MTOW against original aircraft constraints and score the results.
+def constrain_mass(loading: np.ndarray) -> np.ndarray:
+    """Evaluate the mass constraints, and check whether it's within the feasible design region across flight.
 
     Args:
-        design (np.ndarray): design tensor with shape (N, M, P, Q) where:
+        loading (np.ndarray): Mass loading tensor with shape (N, M, P, Q, 4) where:
             N: Power splits (FC use vs Turboprop use)
             M: FC TOGA throttle setting
             P: FC cruise throttle setting
-            Q: Design variables: 
-                < m_EPS, m_FC, m_H2, m_storage, m_TMS, V_FC, V_storage, V_ELMO, MTOW, L_storage, D_storage >
+            Qx4: Loading: 
+                < P/W_1, W/S_1, P/W_2, W/S_2 > x Q
 
     Returns:
-        np.ndarray: Vector of MTOW scores
+        np.ndarray: Mask of feasible designs, where True indicates feasible design in terms
+                    of mass only.
     """
     # Create np.array of relevant design variables
     var_idx = np.array([8])  # MTOW index
-    mtow_values = design[:, :, :, var_idx]
+    mtow_values = loading[:, :, :, var_idx]
     
     # Calculate MTOW scores using the mtow_score function (automatically bounded between 0 and 1)
-    scores = mtow.mtow_score(mtow_values)    
+    mask = mtow.mtow_score(mtow_values)    
     
-    return scores
+    return mask
 
 def n_pax(N_PAX: np.ndarray, K: float=14) -> np.ndarray:
     """Evaluate the number of passengers against original design and score the results.

@@ -6,10 +6,10 @@ import numpy as np
 from typing import Tuple, Union
 
 # Local imports
-from SHTARWaRS.global_constants import OG_constraints, PW_OG_TO, SW_OG_TO, \
-    S, TOGA
-    
-_cons      = OG_constraints
+from SHTARWaRS.global_constants import OG_constraints, MTOW_orig, C_d_0_orig
+from SHTARWaRS.performance.MTOW import ca
+ 
+_cons      = ca.constraint_curves(C_d_0_orig, MTOW_orig) 
 _WS_x      = _cons["WS_x"]
 _PW_cl     = _cons["PW_cl"]
 _PW_cr     = _cons["PW_cr"]
@@ -19,7 +19,7 @@ _PW_req_curve = np.maximum(_PW_cl, _PW_cr)
 
 
 def mtow_score(
-    MTOW: Union[float, np.ndarray]
+    loading_vector: np.ndarray
     ) -> np.ndarray:
     """Check MTOW against original aircraft constraints analysis and return a score.
 
@@ -31,12 +31,9 @@ def mtow_score(
     Returns:
         np.ndarray: Score for the design based on MTOW, power loading, and wing loading.
     """
-    # Is the power and wing loading within the most restrictive original aircraft constraints?
-    PW = TOGA / MTOW
-    SW = S / MTOW
     
-    PW_req_at_SW = np.interp(
-        SW,
+    PW_req_at_WS = np.interp(
+        WS,
         _WS_x,
         _PW_req_curve,
         left=np.inf,
