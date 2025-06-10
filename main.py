@@ -25,6 +25,8 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    # Initialize a nested defaultdict that automatically creates new levels
+
     # Define power split array
     # power_splits = np.linspace(args.min, args.max, args.n_splits+1)
     # fc_toga_percentages = np.linspace(0, 1, 200)  # Percentage of TOGA power for the fuel cell
@@ -44,14 +46,14 @@ def main():
             
                 MTOW = Beechcraft_1900D['OEW'] # Original Maximum Take-Off Weight  OEW
                 delta_ap, c_d_rad = 0.0, 0.0
-                m_eps_prev, m_fc_tms_prev, m_h2_prev, m_sto_prev, m_cargo_prev = 0.0, 326.63, 315.39, 141.38, 0.0 # from midterm
+                m_eps_prev, m_fc_tms_prev, m_h2_prev, m_sto_prev, m_cargo_prev = 0.0, 326.63, 315.39, 141.38, 714.05 # from midterm
                 MTOW += (m_eps + m_fc_tms_prev + m_h2_prev + m_sto_prev)  # Initial MTOW update
-                for i in range(10):
+                for i in range(2):
                     print(MTOW)
                     if i > 0:
                         # Update the values based on the previous iteration
                         m_eps_prev = m_eps
-                        m_fc_tms_prev = m_tms_aft + m_tms_front + m_fc
+                        m_fc_tms_prev = m_tms_aft + m_tms_front + m_tms_mid + m_fc
                         m_h2_prev = m_h2
                         m_sto_prev = m_sto
                         m_cargo_prev = m_cargo
@@ -65,28 +67,18 @@ def main():
                     # Update delta_AP, c_D_rad based on the TMS code and get:
                     m_tms_front = 0
                     m_tms_aft = 0
+                    m_tms_mid = 0
                     m_cargo = 0
                     
                     #MTOW update
-                    MTOW += ((m_eps - m_eps_prev) + (m_h2 - m_h2_prev) + (m_sto - m_sto_prev) + (m_tms_front + m_tms_aft + m_fc - m_fc_tms_prev))
-                tensor = np.array([m_eps, m_fc, m_h2, m_sto,V_fc, V_sto, V_elmo, MTOW, length_sto, diameter_sto, m_cargo, m_tms_front, m_tms_aft])
+                    MTOW += ((m_eps - m_eps_prev) + (m_h2 - m_h2_prev) + (m_sto - m_sto_prev) + (m_tms_front + m_tms_aft + m_tms_mid + m_fc - m_fc_tms_prev))
+                tensor = np.array([m_eps, m_fc, m_h2, m_sto,V_fc, V_sto, V_elmo, MTOW, length_sto, diameter_sto, m_cargo, m_tms_front, m_tms_aft, m_tms_mid])
 
-                # Initialize results array if it doesn't exist
-                if 'results' not in locals():
-                    results = []
-
-                # Append current results
-                results.append([split, fc_toga_percentage, fc_cruise_percentage, tensor])
-
-                # After all loops, save as 4D numpy array and pickle
-                if split == power_splits[-1] and fc_toga_percentage == fc_toga_percentages[-1] and fc_cruise_percentage == fc_toga_percentages[-1]:
-                    results_array = np.array(results, dtype=object)
-                    with open(os.path.join(output_dir, "results.pkl"), "wb") as f:
-                        pickle.dump(results_array, f)
-
-    return MTOW                
+    return None       
+    
 
 #main()
+
 
 # if __name__=="__main__":
 #     args = argparse.ArgumentParser(description="SHTARWaRS Design Tool")
