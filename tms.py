@@ -286,7 +286,7 @@ class Fan():
         self.ra_density = ra_density
         self.delta_pressure = delta_pressure
     def power(self):
-        return (self.ra_mf * self.delta_pressure) / (self.fan_eff * self.ra_density)
+        return (self.ra_mf * self.delta_pressure) / (self.fan_eff * self.ra_density)    
     
 class Pump(): 
     def __init__(self, fluid, pump_eff, delta_pressure):
@@ -471,6 +471,7 @@ class Fluid():
 class Pipe():
     def __init__(self, length, d_in, fluid, type = 'normal'):
         """Initialize the Heat Pipe Analyzer"""
+        self.mat_density = 7900
         self.length = length
         self.d_in = d_in
         self.d_out = self.d_in * 1.1
@@ -569,18 +570,72 @@ class Pipe():
             temps_fluid = temps_fluid - delta_t
             temperature.append(temps_fluid)
             energies = energies + delta_q
-
+        
         energy_lost = energies
         if type == 'normal':
-            self.fluid.p -= pressure_drop
+            self.fluid.P -= pressure_drop
             self.fluid.T = temperature[-1]  # Update fluid temperature to final value
         if type == 'inv':
-            self.fluid.p += pressure_drop
+            self.fluid.P += pressure_drop
             self.fluid.T += (temperature[0]- temperature[-1]) 
 
         return self.fluid
 
+    def mass(self):
+        """
+        Calculate the mass of the pipe
+        Returns:
+        float: mass of the pipe in kg
+        """
+        mass = self.mat_density * self.length * np.pi * ((self.d_out / 2) ** 2 - (self.d_in / 2) ** 2)
+        return mass
 
+
+def size_pipes_h2(h2_mf_fc, h2_mf_cc, p_sto,fluid,diam_est):
+    sf_delta_p = 2e5
+    pressure_drop = p_sto -4.511e5 - sf_delta_p 
+    total_pressure_drop = 0
+
+    # First half
+    length1 = 6.3425
+    diam1 = diam_est
+    mf1 = (h2_mf_fc + h2_mf_cc)
+    v_fluid1 = mf1 / (fluid.rho * ((diam1 / 2) ** 2) * np.pi)
+    reynolds1 = v_fluid1 * diam1 / fluid.kin_visc
+
+    if reynolds1 < 2300:
+            darcy_weisbach = 64 / reynolds1
+    else:
+        x_darcy = (-2.457 * np.log((7 / reynolds1) ** 0.9 + 0.27 * 0.004e-3 / diam1)) ** 16
+        y_darcy = (37530 / reynolds1) ** 16
+        darcy_weisbach = 8 * ((8 / reynolds1) ** 12 + (x_darcy + y_darcy) ** -1.5) ** (1 / 12)
+    pressure_drop1 = length1 * (darcy_weisbach * fluid.rho * v_fluid1 ** 2) / (diam1 * 2)
+
+    # Second half
+    diam2 = diam_est * h2_mf_cc / (h2_mf_cc + h2_mf_fc) 
+    length2 = 3.225
+    mf2 = h2_mf_cc
+    v_fluid2 = mf2 / (fluid.rho * ((diam2 / 2) ** 2) * np.pi)
+    reynolds2 = v_fluid2 * diam2 / fluid.kin_visc
+
+    if reynolds2 < 2300:
+            darcy_weisbach = 64 / reynolds2
+    else:
+        x_darcy = (-2.457 * np.log((7 / reynolds2) ** 0.9 + 0.27 * 0.004e-3 / diam2)) ** 16
+        y_darcy = (37530 / reynolds2) ** 16
+        darcy_weisbach = 8 * ((8 / reynolds2) ** 12 + (x_darcy + y_darcy) ** -1.5) ** (1 / 12)
+    pressure_drop2 = length2 * (darcy_weisbach * fluid.rho * v_fluid2 ** 2) / (diam2 * 2)
+
+    # Total pressure drop
+    total_pressure_drop = pressure_drop1 + pressure_drop2
+    press_err = total_pressure_drop - pressure_drop
+    if press_err < 0:
+        print(f"Selected pipe diameter {diam_est:.3f} m is adequate, pressure drop is {total_pressure_drop:.2f} Pa, with an estimated maximum allowed of {pressure_drop:.2f} Pa")
+    else: 
+        print(f"Increase pipe diameter, pressure drop is {total_pressure_drop:.2f} Pa, with an estimated maximum allowed of {pressure_drop:.2f} Pa")
+
+
+    
 # ------------------------------ MAIN PROGRAM -----------------------------------
 
 
@@ -598,6 +653,17 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
     
     h2_mf_fc = h2_mf_fc * 2  # Total H2 mass flow rate to fuel cell (both wings)
     h2_mf_cc = h2_mf_cc * 2  # Total H2 mass flow rate to combustion chamber (both wings)
+
+    # Calculate pipe diameter for H2
+    h2_test = Fluid(
+        name="H2_Test",
+        T=PropsSI('T', 'P', p_sto, 'Q', 1, 'ParaHydrogen'),  # Q=1 for saturated vapor (gaseous H2)
+        P=p_sto,
+        mf=h2_mf_fc + h2_mf_cc,
+        fluid_type='ParaHydrogen'
+    )
+    diam_est = 0.02
+    size_pipes_h2(h2_mf_fc, h2_mf_cc, p_sto,h2_test, diam_est)
 
     # Initialize -----------------------------
     T_tank = PropsSI('T', 'P', p_sto, 'Q', 0, 'ParaHydrogen')  # Initial temperature of LH2 tank
@@ -827,7 +893,7 @@ if __name__ == "__main__":
     p_amb = 101325           # Ambient pressure [Pa]
     h2_mf_rec = 0.005         # H2 recirculation mass flow [kg/s]
     air_out_fc = 1         # Air out of FC [kg/s]
-    p_sto = 6e5              # Storage pressure [Pa]
+    p_sto = 7e5              # Storage pressure [Pa]
 
     fluids = main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf_fc, T_amb, rho_amb, V_amb, p_amb, h2_mf_rec, air_out_fc, p_sto)
     
