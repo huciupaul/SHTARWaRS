@@ -115,7 +115,7 @@ if __name__ == "__main__":
     plt.plot(P_dense, eta_dense, '-', label="Cubic‐spline, η(P)")
     # plt.plot(j_dense , eta_dense_j, '-', label="Cubic‐spline, η(j)")
     plt.plot()
-    plt.xlabel("Current density $j$ [A/m²]")
+    plt.xlabel("Throttle")
     plt.ylabel("Energy Efficiency η [%]")
     plt.title("Cubic‐Spline Interpolator for η at T=473 K")
     plt.grid(True, alpha=0.3)
