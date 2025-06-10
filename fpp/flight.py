@@ -1,5 +1,5 @@
-import sys
-sys.path.append("..")  # Add parent directory to path
+# import sys
+# sys.path.append("..")  # Add parent directory to path
 
 import numpy as np
 from scipy.optimize import fsolve
@@ -9,9 +9,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # Local imports
-from turboprop import Turboprop
-from SHTARWaRS.global_constants import MAXC, TOGA, base_AP, G_0, E_SCALE, R_AIR, k_air, isa_atmosphere
-from SHTARWaRS.fc.fc_for_wrapper import FuelCell
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from fpp.turboprop import Turboprop
+import global_constants
+from global_constants import MAXC, TOGA, base_AP, G_0, E_SCALE, R_AIR, k_air, isa_atmosphere
+from fc.fc_for_wrapper import FuelCell
 
 # Dataclass definitions
 @dataclass
@@ -567,7 +571,7 @@ class FlightMission:
         plt.show()
         
     
-def main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: float = 0.1, MTOW: float=8037.6, CD_HEX: float=0.0, delta_AP: float=0.0, dt: float=0.1) -> tuple:
+def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: float = 0.1, MTOW: float=8037.6, CD_HEX: float=0.0, delta_AP: float=0.0, dt: float=0.1) -> tuple:
     """
     Main flight performance function to obtain the fuel mass and shaft power profile.
     Args:
@@ -694,7 +698,7 @@ if __name__ == "__main__":
         # recompute mH2 for each (TOGA, cruise) at this split
         for i in range(Tg.shape[0]):
             for j in range(Tg.shape[1]):
-                _, mH2, mFC, _ = main(
+                _, mH2, mFC, _ = fpp_main(
                     fc_split=s,
                     throttle_TOGA=Tg[i,j],
                     throttle_cruise=Cg[i,j],
@@ -730,7 +734,7 @@ if __name__ == "__main__":
     
     
 # if __name__ == "__main__":
-#     # _, _ = main(fc_split=0.8, dt=10)
+#     # _, _ = fpp_main(fc_split=0.8, dt=10)
 
     
 #     splits = np.linspace(0.0, 1.0, 101)
@@ -744,8 +748,8 @@ if __name__ == "__main__":
     
 #     for i, split in enumerate(splits):
 #         print(f"Split {i+1}/{len(splits)}: {split:.2f}")
-#         _, mH2[i], _, _ = main(fc_split=split, throttle_TOGA=throttle_TOGA, throttle_cruise=throttle_cruise, MTOW=8037.6, CD_HEX=0.0, delta_AP=0.0, dt=1)
-#         # mH2[i], _, mdot_dumpy, _ = main(fc_split=split, dt=1)
+#         _, mH2[i], _, _ = fpp_main(fc_split=split, throttle_TOGA=throttle_TOGA, throttle_cruise=throttle_cruise, MTOW=8037.6, CD_HEX=0.0, delta_AP=0.0, dt=1)
+#         # mH2[i], _, mdot_dumpy, _ = fpp_main(fc_split=split, dt=1)
 #         # dumpy[i] = np.sum(mdot_dumpy) * 10
 #         # print(f"mH2: {mH2:.2f} kg")
 

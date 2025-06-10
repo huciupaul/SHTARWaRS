@@ -82,10 +82,6 @@ def eps_main(powersplit):
     motor_vol = motor_volume(radius, length)
     inverter_vol = inverter_volume(P_req)
 
-    return {
-        "total_weight": motor_w + inverter_w + cable_w,
-        "total heat_dissipation": heat_motor + heat_inverter,
-        "motor_volume": motor_vol
-    }
+    return (motor_w + inverter_w + cable_w), (heat_motor + heat_inverter), motor_vol
 
 #print(eps_main(0.5))  

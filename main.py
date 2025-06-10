@@ -8,22 +8,23 @@ import argparse
 import warnings
 import matplotlib.pyplot as plt
 import numpy as np
-from global_constants import TOGA, MTOW_orig # Import global constants
+from global_constants import * # Import global constants
 import pickle
 
 from eps.eps_sizing import eps_main  # Import EPS sizing function
-from fpp.flight import main_fpp  # Import FPP sizing function
+from fpp.flight import fpp_main  # Import FPP sizing function
 from storage.tank import main_storage  # Import storage sizing function
 
 # Internal imports
 #...
+
 
 def main():
     # Check if the output directory exists, if not create it
     output_dir = "data/logs"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    
+
     # Define power split array
     # power_splits = np.linspace(args.min, args.max, args.n_splits+1)
     # fc_toga_percentages = np.linspace(0, 1, 200)  # Percentage of TOGA power for the fuel cell
@@ -40,61 +41,52 @@ def main():
 
             for fc_cruise_percentage in fc_toga_percentages:
 
-                
-                MTOW = MTOW_orig  # Original Maximum Take-Off Weight 
-                delta_ap, c_d_rad = 0, 0
-                m_eps_prev, m_fc_prev, m_h2_prev, m_sto_prev, m_tms_prev = 0, 0, 0, 0, 0
-
+            
+                MTOW = Beechcraft_1900D['OEW'] # Original Maximum Take-Off Weight  OEW
+                delta_ap, c_d_rad = 0.0, 0.0
+                m_eps_prev, m_fc_tms_prev, m_h2_prev, m_sto_prev, m_cargo_prev = 0.0, 326.63, 315.39, 141.38, 0.0 # from midterm
+                MTOW += (m_eps + m_fc_tms_prev + m_h2_prev + m_sto_prev)  # Initial MTOW update
                 for i in range(10):
-                    
+                    print(MTOW)
                     if i > 0:
                         # Update the values based on the previous iteration
                         m_eps_prev = m_eps
-                        m_fc_prev = m_fc
+                        m_fc_tms_prev = m_tms_aft + m_tms_front + m_fc
                         m_h2_prev = m_h2
                         m_sto_prev = m_sto
-                        m_tms_prev = m_tms
-                        
-
+                        m_cargo_prev = m_cargo
+                    
                     # Perform optimization steps here
-                    TMS_inputs, m_h2, FC_outputs, mission_profile = main_fpp(split, fc_toga_percentage, fc_cruise_percentage, MTOW, c_d_rad, delta_ap, 0.1)
-                    print("Test", m_h2, FC_outputs, split, fc_toga_percentage, fc_cruise_percentage)
-                    #m_sto, V_sto, t1, dv, t2, length_sto, diameter_sto = main_storage(m_h2)
+                    TMS_inputs, m_h2, FC_outputs, mission_profile = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, c_d_rad, delta_ap, 0.1)
+                    m_fc = FC_outputs['m_fc']
+                    V_fc = FC_outputs['V_fc']
+                    m_sto, V_sto, t1, dv, t2, length_sto, diameter_sto = main_storage(m_h2)
 
-                    # Update delta_AP, c_D_rad based on the TMS code
-                    m_tms = 0
-                    m_sto = 0
-                    m_fc = 0
+                    # Update delta_AP, c_D_rad based on the TMS code and get:
+                    m_tms_front = 0
+                    m_tms_aft = 0
+                    m_cargo = 0
+                    
                     #MTOW update
-                    MTOW += (m_eps - m_eps_prev + m_fc - m_fc_prev + m_h2 - m_h2_prev + m_sto - m_sto_prev + m_tms - m_tms_prev)
-    return MTOW
+                    MTOW += ((m_eps - m_eps_prev) + (m_h2 - m_h2_prev) + (m_sto - m_sto_prev) + (m_tms_front + m_tms_aft + m_fc - m_fc_tms_prev))
+                tensor = np.array([m_eps, m_fc, m_h2, m_sto,V_fc, V_sto, V_elmo, MTOW, length_sto, diameter_sto, m_cargo, m_tms_front, m_tms_aft])
 
+                # Initialize results array if it doesn't exist
+                if 'results' not in locals():
+                    results = []
 
-print(main())
+                # Append current results
+                results.append([split, fc_toga_percentage, fc_cruise_percentage, tensor])
 
-                
-                ### TENSOR SHAPE DESCRIPTION ###
-                # The tensor is expected to have the shape (N, M, P, Q) where:
-                # N: split
-                # M: fc_toga_percentage
-                # P: fc_cruise_percentage
-                # Q: Design variables: 
-                #   < m_eps, m_fc, m_h2, m_sto, m_tms, V_FC, V_sto, V_elmo, MTOW, length_Sto, diameter_sto >
+                # After all loops, save as 4D numpy array and pickle
+                if split == power_splits[-1] and fc_toga_percentage == fc_toga_percentages[-1] and fc_cruise_percentage == fc_toga_percentages[-1]:
+                    results_array = np.array(results, dtype=object)
+                    with open(os.path.join(output_dir, "results.pkl"), "wb") as f:
+                        pickle.dump(results_array, f)
 
-                # tensor = np.array([
-                #         m_eps, m_fc, m_h2, m_sto, m_tms,
-                #         V_fc, V_sto, V_elmo, MTOW, length_sto, diameter_sto
-                #     ])
+    return MTOW                
 
-                # # === Save tensor to a pickle file ===
-                # file_name = f"tensor_split{split}_toga{fc_toga_percentage}_cruise{fc_cruise_percentage}.pkl"
-                # file_path = os.path.join(output_dir, file_name)
-
-                # with open(file_path, 'wb') as f:
-                #     pickle.dump(tensor, f)
-
-                
-
+#main()
 
 # if __name__=="__main__":
 #     args = argparse.ArgumentParser(description="SHTARWaRS Design Tool")
