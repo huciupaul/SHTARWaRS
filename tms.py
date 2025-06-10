@@ -429,6 +429,10 @@ class Turbine():
         mdot = self.fluid.mf_given
         power_provide = mdot * cp_gas * (T_in - T_out) / self.efficiency  # Power in Watts\
         return power_provide
+    
+    def mass(self, power):
+        # MASSIVE assumption of turbine mass being calculated in the same way as compressor
+        return power * 0.0400683 + 5.17242
 
 class Valve():
     def __init__(self, fluid, valve_efficiency = 0.9 ):
