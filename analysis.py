@@ -9,7 +9,7 @@ from typing import Tuple
 
 # Local imports
 from SHTARWaRS.global_constants import Beechcraft_1900D
-from SHTARWaRS.performance.MTOW import mtow
+from SHTARWaRS.performance.MTOW import power_and_wing_loading as pws
 
 # Cached constants
 M_CARGO_AFT = Beechcraft_1900D["M_cargo_aft"]  # [kg] Cargo mass in the aft compartment
@@ -28,7 +28,7 @@ def load_tensor(file_path: str) -> np.ndarray:
         tensor = pickle.load(f)
     return tensor
 
-def integration(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def constrain_integration(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Evaluate design integration into existing aircraft, score the results and normalize.
 
     Args:
@@ -53,10 +53,16 @@ def integration(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]
     
     return scores, N_PAX, m_cargo
     
-def constrain_mass(loading: np.ndarray) -> np.ndarray:
-    """Evaluate the mass constraints, and check whether it's within the feasible design region across flight.
+def constrain_mass(design: np.ndarray, loading: np.ndarray) -> np.ndarray:
+    """Evaluate the mass constraints, and return feasible design points in the tensor (else NaN).
 
     Args:
+        design (np.ndarray): Design tensor with shape (N, M, P, Q) where:
+            N: Power splits (FC use vs Turboprop use)
+            M: FC TOGA throttle setting
+            P: FC cruise throttle setting
+            Q: Design variables: 
+                < m_EPS, m_FC, m_H2, m_storage, m_TMS, V_FC, V_storage, V_ELMO, MTOW, L_storage, D_storage >
         loading (np.ndarray): Mass loading tensor with shape (N, M, P, Q, 4) where:
             N: Power splits (FC use vs Turboprop use)
             M: FC TOGA throttle setting
@@ -65,17 +71,12 @@ def constrain_mass(loading: np.ndarray) -> np.ndarray:
                 < P/W_1, W/S_1, P/W_2, W/S_2 > x Q
 
     Returns:
-        np.ndarray: Mask of feasible designs, where True indicates feasible design in terms
-                    of mass only.
+        np.ndarray: Constrained design tensor.
     """
     # Create np.array of relevant design variables
-    var_idx = np.array([8])  # MTOW index
-    mtow_values = loading[:, :, :, var_idx]
+    de = pws(design, loading)
     
-    # Calculate MTOW scores using the mtow_score function (automatically bounded between 0 and 1)
-    mask = mtow.mtow_score(mtow_values)    
-    
-    return mask
+    return de
 
 def n_pax(N_PAX: np.ndarray, K: float=14) -> np.ndarray:
     """Evaluate the number of passengers against original design and score the results.
@@ -106,7 +107,8 @@ def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
          dim_bounds: np.ndarray=np.array([[0.1, 1.0],
                                           [0.1, 1.0],
                                           [0.0, 1.0]]),
-         fpath: str='data/design_space.pkl'):
+         fpath_design: str='data/design_space.pkl',
+         fpath_loading: str='data/loading_space.pkl') -> None:
     """Main function to collapse the 4D design space to a 3D scalar field using the provided weights.
 
     Args:
@@ -122,9 +124,17 @@ def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
     
     # Load the 4D design space tensor
     try:
-        tensor = load_tensor(fpath)
+        tensor = load_tensor(fpath_design)
     except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {fpath}")
+        raise FileNotFoundError(f"File not found: {fpath_design}")
+    
+    # Load the 4D loading space tensor
+    try:
+        loading = load_tensor(fpath_loading)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {fpath_loading}")
+    
+    
     
     # Create axes for the tensor dimensions
     N, M, P, Q = tensor.shape
@@ -144,14 +154,9 @@ def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
     # Initialize a 'tradeoff' tensor with the same N, M, P dimensions and a 4th dimension containing 4 np.nan values
     tradeoff    = np.full(tensor.shape[:-1] + (4,), np.nan)
 
-    # Score each of the tradeoff elements
-    tradeoff[:, :, :, 0], N_PAX, m_cargo = integration(design)
-    tradeoff[:, :, :, 1] = mtow(design)
-    tradeoff[:, :, :, 2] = n_pax(N_PAX)
-    tradeoff[:, :, :, 3] = cargo(m_cargo)
-    
-    # Weighted sum of the tradeoff scores
-    scores = np.sum(tradeoff * weights, axis=-1)
+    # Apply design space constraints
+    design, N_PAX, m_cargo = constrain_integration(design)
+    design = constrain_mass(design, loading)
     
     # Find optimal design configuration
     max_score_idx = np.unravel_index(np.nanargmax(scores, axis=None), scores.shape)

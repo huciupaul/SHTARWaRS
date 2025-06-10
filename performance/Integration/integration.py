@@ -20,21 +20,136 @@ class Original_aircraft:
 
     @property
     def X_PAX(self) -> float:
+        """Calculate the center of gravity position of the passenger seats."""
         return ((self.num_PAX-3)*M_PAX * (X_first_seat + (self.num_PAX-5)/2 * seat_pitch / 2) + 3*M_PAX * (X_first_seat + (self.num_PAX-3)/2 * seat_pitch)) / (self.num_PAX*M_PAX)
-
-    @property
-    def M_cargo(self, V_cargo_specific) -> float:
-        return 939 * V_cargo_specific/Beechcraft_1900D['V_cargo']
     
-    @property
-    def X_OEW(self) -> float:
-        M_cargo_tot = self.M_cargo(Beechcraft_1900D['V_cargo_fwd']) + self.M_cargo(Beechcraft_1900D['V_cargo_aft'])
-        M_payload = self.num_PAX*M_PAX + M_cargo_tot
+    
+    def loading_diagram(self) -> Dict[str, List[float]]:        
+        """Generate the loading diagram data for the original aircraft."""
+        def X_OEW(self) -> float:
+            """Calculate the center of gravity position of the original aircraft's empty weight."""
+            M_cargo_tot = self.M_cargo(Beechcraft_1900D['V_cargo_fwd']) + self.M_cargo(Beechcraft_1900D['V_cargo_aft'])
+            M_payload = self.num_PAX*M_PAX + M_cargo_tot
 
-        X_cargo_tot = (self.M_cargo(Beechcraft_1900D['V_cargo_fwd'])*self.X_cargo_fwd + self.M_cargo(Beechcraft_1900D['V_cargo_aft'])*self.X_cargo_aft) / M_cargo_tot
-        X_payload = (self.num_PAX*M_PAX*self.X_PAX + M_cargo_tot*X_cargo_tot) / M_payload
+            X_cargo_tot = (self.M_cargo(Beechcraft_1900D['V_cargo_fwd'])*self.X_cargo_fwd + self.M_cargo(Beechcraft_1900D['V_cargo_aft'])*self.X_cargo_aft) / M_cargo_tot
+            X_payload = (self.num_PAX*M_PAX*self.X_PAX + M_cargo_tot*X_cargo_tot) / M_payload
 
-        return (self.MTOW*self.X_MTOW - self.M_fuel*self.X_fuel - M_payload*X_payload) / self.OEW
+            return (self.MTOW*self.X_MTOW - self.M_fuel*self.X_fuel - M_payload*X_payload) / self.OEW
+    
+        def __cargo(X_cargo_fwd, X_cargo_aft, M_cargo_fwd, M_cargo_aft, X_OEW, OEW):
+            """Calculate the center of gravity position and weight of OEW+cargo."""
+            W_cargo_front = np.zeros(3)
+            X_cargo_front = np.zeros(3)
+            W_cargo_back = np.zeros(3)
+            X_cargo_back = np.zeros(3)
+
+            """Initial point: OEW"""
+            W_cargo_front[0] = OEW
+            X_cargo_front[0] = X_OEW
+            W_cargo_back[0] = W_cargo_front[0]
+            X_cargo_back[0] = X_cargo_front[0]
+
+            """Cargo loaded: front or aft first"""
+            W_cargo_front[1] = W_cargo_front[0] + M_cargo_fwd
+            X_cargo_front[1] = ((X_cargo_fwd * M_cargo_fwd) + (X_OEW * OEW)) / W_cargo_front[1]
+            W_cargo_back[1] = OEW + M_cargo_aft
+            X_cargo_back[1] = ((X_cargo_aft * M_cargo_aft) + (X_OEW * OEW)) / W_cargo_back[1]
+
+            """Cargo loaded: the rest"""
+            W_cargo_front[2] = W_cargo_front[1] + M_cargo_aft
+            X_cargo_front[2] = ((X_cargo_aft * M_cargo_aft) + (X_cargo_front[1] * W_cargo_front[1])) / W_cargo_front[2]
+            W_cargo_back[2] = W_cargo_front[2]
+            X_cargo_back[2] = X_cargo_front[2]
+
+            return X_cargo_front, W_cargo_front, X_cargo_back, W_cargo_back
+
+        def __passengers(X_cargo_front, W_cargo_front, num_PAX):
+            """Calculate the center of gravity position and weight of OEW+cargo+PAX."""
+            X_start = X_cargo_front[-1]
+            W_start = W_cargo_front[-1]
+            num_2PAX_rows = (num_PAX - 3) // 2
+            num_3PAX_rows = 1
+
+            """Front to back"""
+            X_seat_front = np.zeros(num_2PAX_rows + num_3PAX_rows)
+            W_seat_front = np.zeros(num_2PAX_rows + num_3PAX_rows)
+            X_seat_front[0] = X_start
+            W_seat_front[0] = W_start
+
+            for i in range(1, num_2PAX_rows):
+                W_seat_front[i] = W_seat_front[i - 1] + (2 * M_PAX)
+                X_seat_front[i] = (((X_first_seat + (i * seat_pitch)) * 2 * M_PAX) + 
+                            (X_seat_front[i - 1] * W_seat_front[i - 1])) / W_seat_front[i]
+            
+            W_seat_front[-1] = W_seat_front[-2] + (3 * M_PAX)
+            X_seat_front[-1] = ((X_first_seat + (num_2PAX_rows * seat_pitch)) * 3 * M_PAX +
+                                (X_seat_front[-2] * W_seat_front[-2])) / W_seat_front[-1]
+
+            """Back to front"""
+            X_seat_back = np.zeros(num_2PAX_rows + num_3PAX_rows)
+            W_seat_back = np.zeros(num_2PAX_rows + num_3PAX_rows)
+            X_seat_back[0] = X_start
+            W_seat_back[0] = W_start
+            X_last_seat = X_first_seat + (num_2PAX_rows * seat_pitch)
+
+            W_seat_back[1] = W_seat_back[0] + (3 * M_PAX)
+            X_seat_back[1] = (X_last_seat * 3 * M_PAX +
+                            (X_seat_back[0] * W_seat_back[0])) / W_seat_back[1]
+
+            for i in range(2, num_2PAX_rows + 1):
+                W_seat_back[i] = W_seat_back[i - 1] + (2 * M_PAX)
+                X_seat_back[i] = (((X_first_seat - (i * seat_pitch)) * 2 * M_PAX) + 
+                                (X_seat_back[i - 1] * W_seat_back[i - 1])) / W_seat_back[i]
+
+            return X_seat_front, W_seat_front, X_seat_back, W_seat_back
+
+
+        def __fuel(X_seat_front, W_seat_front, X_fuel, M_fuel):
+            """Calculate the center of gravity position and weight of OEW+cargo+PAX+fuel."""
+            X_fuel = np.zeros(2)
+            W_fuel = np.zeros(2)
+            X_fuel[0] = X_seat_front[-1]
+            W_fuel[0] = W_seat_front[-1]
+
+            W_fuel[1] = W_fuel[0] + M_fuel
+            X_fuel[1] = ((X_fuel * W_fuel) + (X_fuel[0] * W_fuel[0])) / W_fuel[1]
+
+            return X_fuel, W_fuel
+        
+        def min_max_X_cg_positions(self, X_cargo_aft, M_cargo_aft, num_PAX, X_fuel, M_fuel):
+            """Find the minimum and maximum center of gravity positions."""
+            X_OEW = X_OEW(self) 
+            X_cargo_front, W_cargo_front, X_cargo_back, W_cargo_back = __cargo(Beechcraft_1900D['X_cargo_fwd'], X_cargo_aft, Beechcraft_1900D['M_cargo_fwd'], M_cargo_aft, X_OEW, Beechcraft_1900D['OEW'])
+            X_seat_front, W_seat_front, X_seat_back, W_seat_back = __passengers(X_cargo_front, W_cargo_front, num_PAX)
+            X_fuel, W_fuel = __fuel(X_seat_front, W_seat_front, X_fuel, M_fuel)
+
+            arrays = [X_cargo_front, X_cargo_back, X_seat_front, X_seat_back, X_fuel]
+            array_names = ["X_cargo", "X_seat_front", "X_seat_back", "X_fuel"]
+
+            min_cg = np.min(np.hstack([def_X_cargo, def_X_seat_front, def_X_seat_back, def_X_fuel]))
+            max_cg = np.max(np.hstack([def_X_cargo, def_X_seat_front, def_X_seat_back, def_X_fuel]))
+
+            min_index = np.argmin(np.hstack([def_X_cargo, def_X_seat_front, def_X_seat_back, def_X_fuel]))
+            max_index = np.argmax(np.hstack([def_X_cargo, def_X_seat_front, def_X_seat_back, def_X_fuel]))
+
+            cumulative_lengths = np.cumsum([len(arr) for arr in arrays])
+
+            def __find_source_array_and_index(flat_index):
+                """Finds the original array and the index within that array."""
+                for i, length in enumerate(cumulative_lengths):
+                    if flat_index < length:
+                        original_index = flat_index - (cumulative_lengths[i - 1] if i > 0 else 0)
+                        return array_names[i], original_index
+                return None, None
+
+            # Get source array names and indices
+            min_source, min_array_index = __find_source_array_and_index(min_index)
+            max_source, max_array_index = __find_source_array_and_index(max_index)
+
+            print(f"Min value with 2% margin: {min_cg*0.98}, found in {min_source} at index {min_array_index}")
+            print(f"Max value with 2% margin: {max_cg*1.02}, found in {max_source} at index {max_array_index}")
+
+            return min_cg, max_cg        
 
 @dataclass
 class Retrofitted_aircraft:
@@ -66,17 +181,6 @@ class CG_calculation:
         
 
 def main():
-    Beechcraft_1900D = Aircraft_data(
-        MTOW=7766
-        X_MTOW=7.51
-        M_fuel=337
-        X_fuel=7.29
-        X_cargo_fwd=X_cargo_fwd
-        X_cargo_aft=12.64
-        num_PAX=19
-        X_PAX=7.74
-        OEW=4894
-    )
 
     H2D2 = Aircraft_data(
 
