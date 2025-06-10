@@ -5,7 +5,11 @@ from typing import Tuple
 # from common.constants import R_AIR, MAXC
 
 # Global imports
-from SHTARWaRS.global_constants import R_AIR, MAXC
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+import global_constants
+from global_constants import R_AIR, MAXC
 
 class Turboprop:
     """Full model of a turboprop engine. The model is based on the following
