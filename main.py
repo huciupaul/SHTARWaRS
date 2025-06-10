@@ -9,6 +9,7 @@ import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 from global_constants import TOGA, MTOW_mod # Import global constants
+import pickle
 
 # Internal imports
 #...
@@ -53,14 +54,20 @@ def main(args):
                 # Q: Design variables: 
                 #   < m_eps, m_fc, m_h2, m_sto, m_tms, V_FC, V_sto, V_elmo, MTOW, length_Sto, diameter_sto >
 
+                tensor = np.array([
+                        m_eps, m_fc, m_h2, m_sto, m_tms,
+                        V_fc, V_sto, V_elmo, MTOW, length_sto, diameter_sto
+                    ])
+
+                # === Save tensor to a pickle file ===
+                file_name = f"tensor_split{split}_toga{fc_toga_percentage}_cruise{fc_cruise_percentage}.pkl"
+                file_path = os.path.join(output_dir, file_name)
+
+                with open(file_path, 'wb') as f:
+                    pickle.dump(tensor, f)
+
                 
 
-
-
-
-    
-    
-    
 
 if __name__=="__main__":
     args = argparse.ArgumentParser(description="SHTARWaRS Design Tool")
