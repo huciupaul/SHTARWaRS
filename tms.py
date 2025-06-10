@@ -76,12 +76,13 @@ HEX_1_deltaT = 20 # Assumed temperature increase during evaporation
 # Main Classes for Heat Sinks (TMS) -------------------------------
     
 class SkinHeatExchanger():
-    def __init__(self, area_m2, U_W_per_m2K, coolant_temp_K):
+    def __init__(self, area_m2, U_W_per_m2K, fluid):
         super().__init__("SkinHX")
         self.area = area_m2
         self.U = U_W_per_m2K              # overall HT coefficient (W/m^2.K)
-        self.coolant_temp = coolant_temp_K
+        self.coolant_temp = fluid.T
         self.ambient_temp = None          # to be set based on flight condition
+        self.fluid = fluid                
 
     def set_ambient(self, T_ambient_K, recovery_factor=0.9, mach=0.3):
         # Set effective ambient (adiabatic wall) temperature for convection calculations
@@ -93,9 +94,12 @@ class SkinHeatExchanger():
 
         Q_capacity = self.U * self.area * (self.coolant_temp - self.ambient_temp)
         Q_absorbed = min(heat_w, Q_capacity)
-        # if Q_capacity > Q_absorbed:
-        #     print(f"SkinHX: Absorbed {Q_absorbed:.2f} W, remaining capacity {Q_capacity - Q_absorbed:.2f} W")
-        return Q_absorbed
+        t_coolant_out = self.coolant_temp - Q_absorbed / (self.fluid.cp * self.fluid.mf_given)
+        if Q_absorbed < heat_w:
+            return Q_absorbed, t_coolant_out
+        else:
+            print("No need for Radiator")
+            return Q_absorbed, t_coolant_out
     
 class RamAirHeatExchanger():
     def __init__(self, U_W_per_m2K, coolant_temp_K):
@@ -844,7 +848,20 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
 
     # Skin Heat Exchanger
     # ---------------------------------- COMPLETE THE SKIN HX SIZING HERE ----------------------------------
-    cool_23 = cool_18
+    skin_hx = HEX(name="SkinHeatExchanger", area = area_wing, fluid = cool_18, U = 80)
+    skin_hx.set_ambient(T_ambient_K = ambient_conditions['T'])
+    Q_abs, t_cool_out = skin_hx.absorb_heat(Q_dot_rem)
+    cool_23 = Fluid(name="Cool_23", T=t_cool_out, P=cool_18.P, C=0, mf=cool_18.mf_given, fluid_type='Water')  
+    Q_dot_rem -= Q_abs  
+
+    #TODO: Fix if lofic and add pipes, also add radiator
+    if Q_dot_rem > 0:
+        #TODO: Implement radiator
+        pass
+    else:
+        # No need for radiator, all waste heat is absorbed
+        pass
+    
     cool_24 = cool_23
     cool_24.T -= Q_dot_rem / (cool_24.mf_given * cool_24.cp)
 
