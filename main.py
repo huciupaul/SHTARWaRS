@@ -44,6 +44,14 @@ def main(args):
 
                     # Update MTOW_mod, delta_AP, c_D_rad based on the optimization logic
                     #MTOW = OEW - () + (m_eps + m_fc + m_tms + m_h2 + m_sto)
+                
+                ### TENSOR SHAPE DESCRIPTION ###
+                # The tensor is expected to have the shape (N, M, P, Q) where:
+                # N: split
+                # M: fc_toga_percentage
+                # P: fc_cruise_percentage
+                # Q: Design variables: 
+                #   < m_eps, m_fc, m_h2, m_sto, m_tms, V_FC, V_sto, V_elmo, MTOW, length_Sto, diameter_sto >
 
                 
 

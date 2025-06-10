@@ -303,6 +303,8 @@ def main_storage(m_h2):
     elif L_out < 2.24 and L_out >= 1.48:
         N_PAX = 17
     elif L_out < 1.48 and L_out >= 0.72:
-        N_PAX = 19 
+        N_PAX = 19
+    
+    d_out = 2 * R_out
 
-    return Mt, Vt, t1, dv, t2, L_out, R_out, N_PAX
+    return Mt, Vt, t1, dv, t2, L_out, d_out
