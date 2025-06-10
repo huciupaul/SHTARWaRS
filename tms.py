@@ -3,6 +3,7 @@ import numpy as np
 from CoolProp.CoolProp import PropsSI
 import matplotlib.pyplot as plt
 import tms_plotting 
+import math
 
 # ------------------------------ PARAMETERS -----------------------------------
 # TODO: 
@@ -12,13 +13,13 @@ import tms_plotting
 
 # Ambient Conditions --------------------------------
 ambient_conditions= {
-    'T': 238.651,  # Ambient temperature in Kelvin
+    'T': 238.651,  # Ambient temperature in K
     'M': 0.4,  # Flight Mach number
     'V': 123.8644,  # Flight speed in m/s
-    'rho': 1.225  # Air density at sea level in kg/m^3
+    'rho': 0.55  # Air density at cruise in kg/m^3
 }
 
-# parameters
+# Parameters
 gamma = 1.4
 
 # TEG
@@ -26,15 +27,14 @@ efficiency_teg = 0.05
 
 # Ram Air HX -------------------------------
 # Air properties
-h_air = 200 
+h_air = 250         # REF: Shah 
 cp_air = 1005.0
 T_air_in = ambient_conditions['T']
 T_air_out = ambient_conditions['T'] + 20.0
 
-# Coolant and HX Properties
-h_cool = 1500 # average coolant heat transfer coefficient for double phase
-U_ra = 1 / (1/h_air + 1/h_cool) # overall heat transfer coefficient
-ra_coolant_temp = 350.0 # K
+# Coolant and HX Properties 
+ra_coolant_temp = 165 + 20 + 273.15 # K
+        
 
 # Sizing Parameters
 porosity = 0.10              
@@ -50,24 +50,15 @@ delta_pressure = 1000  # Pa, pressure drop across the fan
 #Skin HX -----------------------------------------------	
 area_wing = 2.3
 
-#Coolant
-k_in = 0.258 # thermal conductivity of coolant [W/m.K]
-prandtl_in = 0.71 # fluid
-Reynolds = 1e4 # fluid
-f = (0.79 * np.log(Reynolds) - 1.64) ** -2
-nu = ((f/8)*(Reynolds-1000)*prandtl_in)/(1+12.7*(f/8)**0.5 * (prandtl_in**0.66-1)) # Nusselt number for turbulent flow in tubes [m²/s]
-dh = 0.01 #tube diameter [m]
-h_in = k_in * nu / dh
-wing_coolant_temp = 320  # K
-
 # Air
 prandtl_air = 0.71
 reynolds_air = 1e7  # depends on temperature?
-h_ext = ambient_conditions['rho'] * ambient_conditions['V'] * cp_air * 0.185 * (np.log10(reynolds_air))**-2.584 * prandtl_air**-0.66
+h_ext_w = ambient_conditions['rho'] * ambient_conditions['V'] * cp_air * 0.185 * (np.log10(reynolds_air))**-2.584 * prandtl_air**-0.66
 recovery_factor = prandtl_air ** 0.33  
 
-U_wing = 1/(1/h_in + 1/h_ext)
-
+# Overall heat coefficients WING and RADIATOR
+#U_wing = 1/(1/h_cool + 1/h_ext_w)
+#U_ra = 1 / (1/h_air + 1/h_cool)
 
 deltaT_fc = 20
 HEX_1_deltaT = 20 # Assumed temperature increase during evaporation
@@ -98,12 +89,16 @@ class SkinHeatExchanger():
         return Q_absorbed
     
 class RamAirHeatExchanger():
-    def __init__(self, U_W_per_m2K, coolant_temp_K):
-        super().__init__("RamAirHX")
-        self.U = U_W_per_m2K
+    def __init__(self, coolant_temp_K, fluid):
+        #self.U = U_W_per_m2K
         self.coolant_temp = coolant_temp_K
+        self.Pr = fluid.Pr
+        self.dyn_visc = fluid.dyn_visc
+        self.mf_coolant = fluid.mf_given
+        self.k_cool = fluid.k
 
         # To be determined during sizing:
+        self.U_ra = None
         self.required_area = 0.0    # m² of radiator face
         self.inlet_area = 0.0       # m² of total open hole area
         self.skin_area = 0.0        # m² of skin needed (porous area)
@@ -111,20 +106,73 @@ class RamAirHeatExchanger():
         self.TR = 0.0
         #self.drag_N = 0.0           # N, raw drag before Meredith effect
         self.net_drag_N = 0.0       # N, after Meredith recovery
+    
+    def U_rad(self):
+
+        # PRINT fluid parameters
+        #print("k_cool:", self.k_cool)
+        #print("Pr:", self.Pr)
+        #print("mf_coolant:", self.mf_coolant)
+        #print("dyn_visc:", self.dyn_visc)
+
+        # Coolant constants
+        dh = 0.002    # 4*A/P  hydraulic diameter
+
+        # Reynolds calc
+        Re = 4*self.mf_coolant/(np.pi * dh * self.dyn_visc)
+        if Re < 2300:
+            raise ValueError("Reynolds number in laminar regime, use a turbulent/combined relation correlation.")
+        
+        # Nusselt calc
+        f = (0.79 * np.log(Re) - 1.64) ** -2
+        nu = 0.023*Re**(4/5)*self.Pr**0.3        #nu = ((f/8)*(Re-1000)*self.Pr)/(1+12.7*(f/8)**0.5 * (self.Pr**0.66-1)) # Nusselt number for turbulent flow in tubes [m²/s]
+        #print("Nusselt number of the coolant:", nu)
+        h_cool = 1500#self.k_cool * nu / dh
+        wing_coolant_temp = 320  # K
+        #print("Heat transfer coefficient of the coolant:", h_cool)
+
+        self.U_ra = 1 / (1/h_air + 1/h_cool)
+        #print("Overall heat transfer coefficient", self.U_ra)
+
+        return self.U_ra
+
 
     def absorb_heat(self, heat_w):
         return heat_w
 
-    def size_exchanger(self, heat_w, T_air_in_K, T_air_out_K):
-        dT1 = self.coolant_temp - T_air_in_K
-        dT2 = self.coolant_temp - T_air_out_K
+    def size_exchanger(self, heat_w, T_air_in_K):
+        self.U_rad()
 
-        if abs(dT2 - dT1) < 1e-6:
-            dT_lm = 0.5 * (dT1 + dT2)
-        else:
+        # Iteration for delta T
+        deltaT_grid = np.linspace(1, 150, 100 )        
+        tol = 0.1                                       # “almost 1” → ±1 %
+
+        for T in deltaT_grid:
+            print(T)
+
+            dT1 = self.coolant_temp - T_air_in_K                      
+            dT2 = self.coolant_temp - (T_air_in_K + T)                
+
             dT_lm = (dT2 - dT1) / np.log(dT2 / dT1)
 
-        self.required_area = heat_w / (self.U * dT_lm)
+            self.required_area = heat_w / (self.U_ra * dT_lm)
+            beta  = 800
+            vol_rad = self.required_area/beta
+            front_area_rad = vol_rad/0.05
+            length_rad = np.sqrt(front_area_rad)
+            mf_air = front_area_rad * ambient_conditions['V'] * ambient_conditions['rho']
+
+            # --- ratio we want to drive to 1 -----------------------------------------
+            ratio = (mf_air * cp_air * T) / (self.U_ra * dT_lm)
+
+            if abs(ratio - 1.0) < tol:           # close enough
+                print(f"Converged: ΔT_air = {T:.3f} K  (ratio = {ratio:.4f})")
+                print("Heat area radiator", self.required_area, "W/m²K")
+                print("Length of the radiator", length_rad, "m")
+                print("Volume of the radiator", vol_rad, "m³")
+                break
+            
+
         return self.required_area
 
     def compute_hole_and_skin_area(self,
@@ -591,7 +639,7 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
 
     sources = np.array([Q_dot_fc, Q_dot_eps])
     Q_dot_rem = np.sum(sources)
-    
+
     h2_mf_fc = h2_mf_fc * 2  # Total H2 mass flow rate to fuel cell (both wings)
     h2_mf_cc = h2_mf_cc * 2  # Total H2 mass flow rate to combustion chamber (both wings)
 
@@ -780,6 +828,11 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
 
     # Intersection 24-5-25
     cool_25 = Fluid(name="Cool_25", T=(cool_24.T * cool_24.mf_given + cool_5.T * cool_5.mf_given) / (cool_5.mf_given + cool_24.mf_given), P=cool_24.P, C=0, mf=cool_24.mf_given + cool_5.mf_given, fluid_type='Water') 
+    
+    # Radiator 
+    Rad_1 = RamAirHeatExchanger(coolant_temp_K=ra_coolant_temp, fluid=cool_23)
+    radiator_area = Rad_1.size_exchanger(Q_dot_rem/2, T_amb )        # T_amb + 0.5 * (cool_23.T - T_amb)
+    #print(f"Heat exchange area of the rad: {radiator_area}")
 
     # Electric heater:
     if cool_25.T <= T_fc - deltaT_fc:
@@ -826,5 +879,5 @@ if __name__ == "__main__":
     p_sto = 6e5              # Storage pressure [Pa]
 
     fluids = main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf_fc, T_amb, rho_amb, V_amb, p_amb, h2_mf_rec, air_out_fc, p_sto)
-    
-    tms_plotting.fluids_table(fluids)
+
+    #tms_plotting.fluids_table(fluids)
