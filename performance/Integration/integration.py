@@ -6,11 +6,11 @@ import matplotlib.pyplot as plt
 from SHTARWaRS.global_constants import Beechcraft_1900D, seat_pitch, rho_cargo, M_PAX, M_cargo_fwd, X_most_fwd, X_most_aft, X_cargo_fwd, X_first_seat, X_front_of_first_seat, X_wing_end, V_cargo_fwd, V_wing, l_aft_cyl, w_aft_cyl, h_aft_cyl_ave, d_aft_cone_beg, d_aft_cone_end, l_aft_cone, X_aft_cone_beg, X_aft_cone_end, X_wing
 from SHTARWaRS.performance.Integration import aft_configuration as acfg
 
-def X_PAX(num_PAX, M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank) -> float:
+def X_PAX(num_PAX) -> float:
     """Calculate the center of gravity position of the passenger seats."""
     return ((num_PAX-3)*M_PAX * (X_first_seat + (num_PAX-5)/2 * seat_pitch / 2) + 3*M_PAX * (X_first_seat + (num_PAX-3)/2 * seat_pitch)) / (num_PAX*M_PAX)
 
-def X_OEW(num_PAX) -> float:
+def X_OEW(num_PAX, M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_TMS, X_tank_front) -> float:
     """Calculate the center of gravity position of the original aircraft's empty weight."""
     """Original aircraft OEW"""
     M_cargo_og = V_cargo_fwd * rho_cargo + Beechcraft_1900D['M_cargo_aft']
@@ -25,8 +25,10 @@ def X_OEW(num_PAX) -> float:
     # TODO: X_OEW_og = (Beechcraft_1900D['MTOW']*Beechcraft_1900D['X_MTOW'] - Beechcraft_1900D['M_fuel'] * X_wing - M_payload*X_payload) / self.OEW
     X_OEW_og = ...
 
-    OEW_H2D2 = Beechcraft_1900D['OEW'] + M_FC + M_TMS_fwd + M_TMS_aft + M_TMS_mid + M_EPS + M_tank
+    OEW_H2D2 = Beechcraft_1900D['OEW'] + M_FC + M_EPS + M_TMS_fwd + M_TMS_aft + M_tank + M_TMS_mid
+    X_OEW_H2D2 = (Beechcraft_1900D['OEW'] * X_OEW_og + (M_FC + M_EPS + M_TMS_fwd) * X_wing + (M_TMS_aft + M_tank) * X_tank_TMS + M_TMS_mid * (X_wing_end + X_tank_front) / 2) / OEW_H2D2
 
+    return OEW_H2D2, X_OEW_H2D2
 
 def __cargo(X_cargo_fwd, X_cargo_aft, M_cargo_fwd, M_cargo_aft, X_OEW, OEW):
     """Calculate the center of gravity position and weight of OEW+cargo."""
@@ -109,8 +111,8 @@ def __fuel(X_seat_front, W_seat_front, X_wing, M_fuel):
 
 def min_max_X_cg_positions(X_cargo_aft, M_cargo_aft, num_PAX, M_fuel):
     """Find the minimum and maximum center of gravity positions."""
-    X_OEW = X_OEW(num_PAX) 
-    X_cargo_front, W_cargo_front, X_cargo_back, W_cargo_back = __cargo(Beechcraft_1900D['X_cargo_fwd'], X_cargo_aft, Beechcraft_1900D['M_cargo_fwd'], M_cargo_aft, X_OEW, Beechcraft_1900D['OEW'])
+    OEW_H2D2, X_OEW_H2D2 = X_OEW(num_PAX, M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_TMS, X_tank_front) 
+    X_cargo_front, W_cargo_front, X_cargo_back, W_cargo_back = __cargo(Beechcraft_1900D['X_cargo_fwd'], X_cargo_aft, Beechcraft_1900D['M_cargo_fwd'], M_cargo_aft, X_OEW_H2D2, OEW_H2D2)
     X_seat_front, W_seat_front, X_seat_back, W_seat_back = __passengers(X_cargo_front, W_cargo_front, num_PAX)
     X_fuel, W_fuel = __fuel(X_seat_front, W_seat_front, X_wing, M_fuel)
 
