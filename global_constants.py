@@ -48,8 +48,8 @@ ROC, V_climb = 10.16, 73.43
 # 100 year GWP of gases (compared to CO2)
 
 GWP_CO2 = 1.0                                            # [-] Global Warming Potential of CO2
-GWP__NOx = 273.0                                          # [-] Global Warming Potential of NOx https://www.epa.gov/ghgemissions/understanding-global-warming-potentials#:~:text=Nitrous%20Oxide%20(N2O,Sinks%20uses%20a%20different%20value.)
-GWP_H2O = 0.0005                                   # [-] Global Warming Potential of H2O        https://iopscience.iop.org/article/10.1088/1748-9326/aae018/pdf
+GWP_NOx = 273.0                                          # [-] Global Warming Potential of NOx https://www.epa.gov/ghgemissions/understanding-global-warming-potentials#:~:text=Nitrous%20Oxide%20(N2O,Sinks%20uses%20a%20different%20value.)
+GWP_H2O = 0.0005                                         # [-] Global Warming Potential of H2O        https://iopscience.iop.org/article/10.1088/1748-9326/aae018/pdf
 
 #######################################################################################
 #################### Code specific constants from each part ###########################
@@ -72,7 +72,7 @@ P_A=1.6 * 101325 + 0.06 * 1e5,                          # [Pa] Anode Pressure
 P_C=1.6 * 101325,                                       # [Pa] Cathode Pressure
 T_FC = 273.15 + 160,                                    # [K] Fuel Cell Temperature
 
-FC_prod_gwp = 30.5                                      # [kg CO2/kW] GWP of the fuel cell production with bop (see excel)
+FC_prod_gwp = 30.5                                      # [kg CO2/kW] GWP of the fuel cell production with bop (see excel) DOI: 10.4271/2024-24-0020
 FC_cost = 640                                           # [$/kW] Cost of the fuel cell with bop (flyzero)
 
 ### FOR CODE CHECKING PURPOSES ONLY ###
