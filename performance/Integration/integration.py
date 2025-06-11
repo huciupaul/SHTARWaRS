@@ -47,7 +47,6 @@ def __cargo(X_cargo_fwd: float,
     X_cargo_back = np.zeros(3)
 
     """Initial point: OEW"""
-    print(OEW, type(OEW))
     W_cargo_front[0] = OEW
     X_cargo_front[0] = X_OEW
     W_cargo_back[0] = W_cargo_front[0]
