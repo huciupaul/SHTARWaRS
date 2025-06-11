@@ -240,8 +240,11 @@ def main_storage(m_h2):
 
     def compute_tank(material, material2, mat_property, MAWP, mass_h2, Q_str, mat2_property, str_mass, fill_ratio, V_in, P_vent, Qmax):
         tankh2 = Tank(MAWP, material, material2, mat_property, mass_h2, mat2_property, fill_ratio, V_in, P_vent)
-        L_solution = opt.root_scalar(tankh2.volume_equation, bracket=[2 * tankh2.R_in, 10], method='brentq')
-        L_in = L_solution.root if L_solution.converged else 2 * tankh2.R_in + 1
+        # L_solution = opt.root_scalar(tankh2.volume_equation, bracket=[2 * tankh2.R_in, 10], method='brentq')
+        # L_in = L_solution.root if L_solution.converged else 2 * tankh2.R_in + 1
+        L_in = (V_in - (4 / 3) * np.pi * tankh2.R_in**3) / (np.pi * tankh2.R_in**2) + 2 * tankh2.R_in
+        if L_in < 2 * tankh2.R_in:
+            L_in = 2 * tankh2.R_in + 1
         t1, ang1_w = tankh2.inner_tank_thickness()
         t1 = max(t1, t_limit)
         L_cyl = L_in - 2 * tankh2.R_in
