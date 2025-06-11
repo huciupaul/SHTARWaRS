@@ -11,8 +11,15 @@ import math
 # - Delete all parameters that are not used in the code
 # - List all constants clearly and cite from literature
 
+# TO conditions ------------------------------------
+TO_conditions= {
+    'T': 293.15,  # Ambient temperature in K
+    'M': 0.157,  # Flight Mach number
+    'V': 54.0167,  # Flight speed in m/s
+    'rho': 1.225 # Air density at cruise in kg/m^3
+}
 
-# Ambient Conditions --------------------------------
+# CRUISE Ambient Conditions --------------------------------
 ambient_conditions= {
     'T': 238.651,  # Ambient temperature in K
     'M': 0.4,  # Flight Mach number
@@ -22,6 +29,10 @@ ambient_conditions= {
 
 # Parameters
 gamma = 1.4
+R = 287.052874
+
+# Wing
+S_w = 28.79 # m² TOTAL 
 
 # TEG
 efficiency_teg = 0.05 
@@ -94,9 +105,9 @@ class SkinHeatExchanger():
             return Q_absorbed, t_coolant_out
     
 class RamAirHeatExchanger():
-    def __init__(self, coolant_temp_K, fluid):
+    def __init__(self, fluid):
         #self.U = U_W_per_m2K
-        self.coolant_temp = coolant_temp_K
+        #self.coolant_temp = fluid.T
         self.Pr = fluid.Pr
         self.dyn_visc = fluid.dyn_visc
         self.mf_coolant = fluid.mf_given
@@ -110,7 +121,7 @@ class RamAirHeatExchanger():
         self.hole_count = 0         # total number of small holes
         self.TR = 0.0
         #self.drag_N = 0.0           # N, raw drag before Meredith effect
-        self.net_drag_N = 0.0       # N, after Meredith recovery
+        #self.net_drag_N = 0.0       # N, after Meredith recovery
     
     def U_rad(self):
 
@@ -132,7 +143,7 @@ class RamAirHeatExchanger():
         f = (0.79 * np.log(Re) - 1.64) ** -2
         nu = 0.023*Re**(4/5)*self.Pr**0.3        #nu = ((f/8)*(Re-1000)*self.Pr)/(1+12.7*(f/8)**0.5 * (self.Pr**0.66-1)) # Nusselt number for turbulent flow in tubes [m²/s]
         #print("Nusselt number of the coolant:", nu)
-        h_cool = 1500#self.k_cool * nu / dh
+        h_cool = self.k_cool * nu / dh #1500
         wing_coolant_temp = 320  # K
         #print("Heat transfer coefficient of the coolant:", h_cool)
 
@@ -143,41 +154,115 @@ class RamAirHeatExchanger():
 
 
     def absorb_heat(self, heat_w):
+
         return heat_w
+    
+        # THRUST RECOVERY
+    def thrust_ratio(self):
+
+        # Constants
+        CD_d_CD_sp = 0.11
+        #deltaT_HX0 = np.asarray(deltaT_HX0, dtype=float)
+
+        # variables
+        #deltaT_HX0 = np.linspace(0, 10, 100)
+        deltaT_HX0 = 8.485  # from T iteration
+        #eta_values = [0.995, 0.95, 0.92, 0.90]
+        eta_values = [0.92]
+
+        # TAKE OFF (TO)
+        #for eta in eta_values:
+         #   comp_ratio = (1.0 + 0.5 * (gamma - 1.0) * TO_conditions['M']**2) * eta ** ((gamma - 1.0) / gamma)
+          #  term2 = 1.0 - 1.0 / comp_ratio
+
+           # numerator = (2.0 * gamma / (gamma - 1.0) * R) * term2 * ( TO_conditions['T'] * (1.0 + 0.5 * (gamma - 1.0) * TO_conditions['M'] **2) + deltaT_HX0)
+
+            #denominator = TO_conditions['M'] * np.sqrt(gamma * R * TO_conditions['T']) * (1.0 + CD_d_CD_sp / 2.0)
+            
+            #self.TR = np.sqrt(numerator) / denominator - 1.0
+
+            # plot results
+            #plt.plot(deltaT_HX0, self.TR, label=f"ηₚ,07 = {eta:.3f}")
+        #plt.xlabel("ΔT_HX⁰ (K)")
+        #plt.ylabel("Thrust Ratio (TR)")
+        #plt.title("Temperature difference of Radiator vs TR at TO")
+        #plt.grid(True)
+        #plt.legend()
+        #plt.show()
+
+
+        # CRUISE
+        for eta in eta_values:
+            comp_ratio = (1.0 + 0.5 * (gamma - 1.0) * ambient_conditions['M']**2) * eta ** ((gamma - 1.0) / gamma)
+            term2 = 1.0 - 1.0 / comp_ratio
+
+            numerator = (2.0 * gamma / (gamma - 1.0) * R) * term2 * ( ambient_conditions['T'] * (1.0 + 0.5 * (gamma - 1.0) * ambient_conditions['M'] **2) + deltaT_HX0)
+
+            denominator = ambient_conditions['M'] * np.sqrt(gamma * R * ambient_conditions['T']) * (1.0 + CD_d_CD_sp / 2.0)
+            
+            self.TR = np.sqrt(numerator) / denominator - 1.0
+            print("TR:", self.TR)
+
+            # plot results
+            #plt.plot(deltaT_HX0, self.TR, label=f"ηₚ,07 = {eta:.3f}")
+        #plt.xlabel("ΔT_HX⁰ (K)")
+        #plt.ylabel("Thrust Ratio (TR)")
+        #plt.title("Temperature difference of Radiator vs TR at CRUISE")
+        #plt.grid(True)
+        #plt.legend()
+        #plt.show()
+
+        return self.TR
 
     def size_exchanger(self, heat_w, T_air_in_K):
+        #To evaluate the
+        #core entrance losses, it will be assumed that the temperature change at the entrance is
+        #small and that the fluid velocity is small compared to the velocity of sound
         self.U_rad()
+        self.TR = self.thrust_ratio()
+        #print("fluid T", self.coolant_temp)
 
         # Iteration for delta T
-        deltaT_grid = np.linspace(1, 150, 100 )        
-        tol = 0.1                                       # “almost 1” → ±1 %
+        coolant_temp = 160 + 273.15             # ADJUST TO FLUID.T (in __init__)
+        deltaT_grid = np.linspace(1, 20, 100 )        
+        tol = 0.003                                      
 
         for T in deltaT_grid:
-            print(T)
 
-            dT1 = self.coolant_temp - T_air_in_K                      
-            dT2 = self.coolant_temp - (T_air_in_K + T)                
+            dT1 = coolant_temp - T_air_in_K                      
+            dT2 = coolant_temp - (T_air_in_K + T)                
 
             dT_lm = (dT2 - dT1) / np.log(dT2 / dT1)
 
             self.required_area = heat_w / (self.U_ra * dT_lm)
-            beta  = 800
+            beta  = 1100
             vol_rad = self.required_area/beta
             front_area_rad = vol_rad/0.05
             length_rad = np.sqrt(front_area_rad)
             mf_air = front_area_rad * ambient_conditions['V'] * ambient_conditions['rho']
 
-            # --- ratio we want to drive to 1 -----------------------------------------
+            # ratio we want to drive to 1 
             ratio = (mf_air * cp_air * T) / (self.U_ra * dT_lm)
 
-            if abs(ratio - 1.0) < tol:           # close enough
+            # Drag 
+            D_g = mf_air * ambient_conditions['V']
+            C_D_rad = D_g/(0.5*ambient_conditions['rho'] * ambient_conditions['V']**2 * S_w/2) # C_D for both radiator 
+            F_n = (self.TR - 1 )*D_g
+            net_drag = D_g - F_n
+
+
+            if abs(ratio - 1.0) < tol:         
                 print(f"Converged: ΔT_air = {T:.3f} K  (ratio = {ratio:.4f})")
-                print("Heat area radiator", self.required_area, "W/m²K")
+                print("Heat area radiator", self.required_area, "m²")
                 print("Length of the radiator", length_rad, "m")
                 print("Volume of the radiator", vol_rad, "m³")
+                print("Mass flow of air", mf_air, "kg/s")
+                #print("Gross drag for one radiator", D_g, "N")
+                #print("Gross drag for two radiator", 2*D_g, "N")
+                print("C_D for the radiators:", C_D_rad, "-")
+                print("The net drag of the aircraft due to the radiators:", net_drag, "N")
                 break
             
-
         return self.required_area
 
     def compute_hole_and_skin_area(self,
@@ -232,89 +317,7 @@ class RamAirHeatExchanger():
             #'drag_N': drag_N,
             #'net_drag_N': net_drag_N
         }
-
     
-
-
-    # THRUST RECOVERY
-    def thrust_ratio(
-        deltaT_HX0,                 # can be a scalar or a NumPy array
-        gamma: float,
-        R: float,
-        M0: float,
-        T0: float,
-        eta_p07: float ,
-        CD_d_CD_sp: float
-    ) -> np.ndarray:
-        """
-        Vectorised thrust-ratio calculation.
-
-        Parameters
-        ----------
-        deltaT_HX0 : float or array-like
-            Heat-exchanger temperature rise(s) [K].
-        gamma      : float
-            Ratio of specific heats.
-        R          : float
-            Gas constant [J kg⁻¹ K⁻¹].
-        M0         : float
-            Flight Mach number.
-        T0         : float
-            Ambient static temperature [K].
-        eta_p07    : float
-            Propulsive efficiency term.
-        CD_d_CD_sp : float
-            Sum (C_D,d + C_D,sp).
-
-        Returns
-        -------
-        TR : ndarray
-            Thrust ratio(s) corresponding to `deltaT_HX0`.
-        """
-        deltaT_HX0 = np.asarray(deltaT_HX0, dtype=float)
-
-        comp_ratio = (1.0 + 0.5 * (gamma - 1.0) * M0**2) * eta_p07 ** ((gamma - 1.0) / gamma)
-
-        # Guard against unphysical D <= 1
-        term2 = 1.0 - 1.0 / comp_ratio
-
-        numerator = (2.0 * gamma / (gamma - 1.0) * R) * term2 * ( T0 * (1.0 + 0.5 * (gamma - 1.0) * M0**2) + deltaT_HX0)
-
-        denominator = M0 * np.sqrt(gamma * R * T0) * (1.0 + CD_d_CD_sp / 2.0)
-        
-        TR = np.sqrt(numerator) / denominator - 1.0
-        #TR = np.where(value > 0, np.sqrt(value) - 1.0, np.nan)  # nan for impossible points
-        return TR
-    
-
-    # -- sweep ΔT_HX0 from 0 to 110 K --------------------------------------
-    deltaT = np.linspace(0, 100, 100)
-    eta_values = [0.995, 0.92, 0.90, 0.85]
-
-    for eta in eta_values:
-        TR = thrust_ratio(
-            deltaT,
-            gamma = 1.4,
-            R     = 287.058,
-            M0    = ambient_conditions["M"],
-            T0    = ambient_conditions["T"],
-            eta_p07       = eta,   # optional override
-            CD_d_CD_sp    = 0.11    # optional override
-        )
-        # plt.plot(deltaT, TR, label=f"ηₚ,07 = {eta:.3f}")
-
-    # print(TR[-1])
-    # -- plot ---------------------------------------------------------------
-    #plt.plot(deltaT, TR, marker="o")
-    '''
-    plt.xlabel("ΔT_HX⁰ (K)")
-    plt.ylabel("Thrust Ratio (TR)")
-    plt.title("Temperature difference of Radiator vs TR (for different pressure ratios)")
-    plt.grid(True)
-    plt.legend()
-    plt.show()
-    '''
-
 
 class ThermoElectricGenerator():
     def __init__(self, hot_temp_K, cold_temp_K, efficiency):
@@ -922,9 +925,13 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
     cool_25 = Fluid(name="Cool_25", T=(cool_24.T * cool_24.mf_given + cool_5.T * cool_5.mf_given) / (cool_5.mf_given + cool_24.mf_given), P=cool_24.P, C=0, mf=cool_24.mf_given + cool_5.mf_given, fluid_type='Water') 
     
     # Radiator 
-    Rad_1 = RamAirHeatExchanger(coolant_temp_K=ra_coolant_temp, fluid=cool_23)
+    Rad_1 = RamAirHeatExchanger(fluid=cool_23)
     radiator_area = Rad_1.size_exchanger(Q_dot_rem/2, T_amb )        # T_amb + 0.5 * (cool_23.T - T_amb)
     #print(f"Heat exchange area of the rad: {radiator_area}")
+
+    # Drag penalty Radiator
+    Rad_TR = RamAirHeatExchanger(fluid=cool_23)
+    TR_rad = Rad_TR.thrust_ratio()
 
     # Electric heater:
     if cool_25.T <= T_fc - deltaT_fc:
