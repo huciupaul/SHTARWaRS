@@ -15,11 +15,15 @@ Given (mdot1, X1) and (mdot2, X2), the module returns:
 The algorithm is independent of the thermodynamic mechanism as long as all
 species listed in X₁ and X₂ are present.
 """
+import sys
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.join(current_dir, '..')
+sys.path.insert(0, os.path.abspath(parent_dir))
 
 from typing import Tuple, Union, Mapping
 import cantera as ct
 from MECH import MECH
-
 
 LHV_KEROSENE = 43e6   # J kg⁻¹ increase it increases the ammount of hydrogen needed
 LHV_H2       = 120.0e6   # J kg⁻¹
@@ -152,27 +156,27 @@ def air_mass_flow_for_phi(
     return mdot_H2/(phi*0.0292)
 
 
-def mix_streams_const_HP(stream1, stream2, stream3, P):
+def mix_streams_const_HP(stream1, stream2, P):
     """
     Mix two Cantera Quantity streams at constant enthalpy and pressure.
     Returns the mixture composition (X), temperature (T), and mass flow rate (mdot).
     """
     # Total mass flow
-    mdot_mix = stream1.mass + stream2.mass + stream3.mass
+    mdot_mix = stream1.mdot + stream2.mdot
 
     # Total enthalpy (J)
-    H_total = stream1.enthalpy + stream2.enthalpy + stream3.enthalpy
+    H_total = stream1.enthalpy + stream2.enthalpy
 
     # Mixture composition (mass-weighted)
     X1 = stream1.X
     X2 = stream2.X
-    X3 = stream3.X
-    X_mix = (stream1.mass * X1 + stream2.mass * X2 + stream3.mass * X3) / mdot_mix
+    X_mix = (stream1.mdot * X1 + stream2.mdot * X2) / mdot_mix
 
     # Create a new gas object for the mixture
-    gas = ct.Solution(stream1.phase.source)
+    gas = ct.Solution(MECH)
+
     # Guess initial temperature (mass-weighted average)
-    T_guess = (stream1.T * stream1.mass + stream2.T * stream2.mass + stream3.T * stream3.mass) / mdot_mix
+    T_guess = (stream1.T * stream1.mdot + stream2.T * stream2.mdot) / mdot_mix
 
     # Set initial guess
     gas.TPX = T_guess, P, X_mix
