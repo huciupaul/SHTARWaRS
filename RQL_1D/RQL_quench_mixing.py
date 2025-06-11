@@ -37,7 +37,7 @@ class gas_obj:
         self.gas.TPX = T, P, X
 
 
-def main(dt: float = 0.01) -> Tuple[List[float], np.ndarray]:
+def main(time_limit: float = 10.0, dt: float = 0.01, hdot_h2o_step: float = 1e-3) -> Tuple[List[float], np.ndarray]:
     #----------Inputs----------
     rich_ex = gas_obj(
             mdot=0.23071218802678672,
@@ -73,29 +73,43 @@ def main(dt: float = 0.01) -> Tuple[List[float], np.ndarray]:
 
     #----------Outputs----------
     times_to_reach_limit_NOx = []
+    NOx = []
+    NOx_tot_final = []
+    water_content = []
 
-    mdot_h2o = np.arange(0, 0.2 + 1e-2, 1e-2)  # kg/s
-    NOx_limit = 2 * 1e-9 # mole fraction
-    time_limit = 10.0
+    mdot_h2o = np.arange(0, 0.2 + 1e-2, hdot_h2o_step)  # kg/s
+    NOx_limit = 2.5 * 1e-5 # mole fraction equivalent to 25 ppm
 
     #----------Iteration----------
     for m_dot_h2o_i in tqdm(mdot_h2o):
         NOx_emitted = 0.0
         t = 0.0
 
-        # TODO: Liquid water injected
         lh2o = gas_obj(
                 mdot=m_dot_h2o_i,
                 X="H2O:1",
                 T=333.0,
                 P=rich_ex.P
                 )
-
+        
+        # # Liquid water properties
+        # water = ct.Water()
+        # # Set to saturated liquid at 12.1 atm
+        # water.set_sat_p(lh2o.P, x=0.0)
+        # h_liq = water.enthalpy_mass
+        # # Set to saturated vapor at 12.1 atm
+        # water.set_sat_p(lh2o.P, x=1.0)
+        # h_vap = water.enthalpy_mass
+        # h_fg = h_vap - h_liq
+        # lh2o.gas.enthalpy_mass -= h_fg
+        
         X_mix, T_mix, mdot_mix = mix_streams_const_HP(
             stream1=stoich_mix,
             stream2=lh2o,
             P=rich_ex.P
         )
+
+        water_content.append(lh2o.mdot/mdot_mix)
 
         stoich_with_water = gas_obj(
             mdot=mdot_mix,
@@ -103,15 +117,17 @@ def main(dt: float = 0.01) -> Tuple[List[float], np.ndarray]:
             T=T_mix,
             P=rich_ex.P
         )
-        print(f"m_dot_h2o_i = {m_dot_h2o_i:.3f} kg/s, T = {stoich_with_water.T:.2f} K, P = {stoich_with_water.P/ct.one_atm:.2f} atm, X = {stoich_with_water.X}")
 
-        while NOx_emitted < NOx_limit and t < time_limit:
+        while t < time_limit and NOx_emitted < NOx_limit:
             try:
                 # Set up 0D reactor
                 reactor = ct.IdealGasConstPressureReactor(stoich_with_water.gas)
                 sim = ct.ReactorNet([reactor])
                 sim.advance(t)
                 NOx_emitted += reactor.thermo['NO'].X[0]
+                NOx_final = reactor.thermo['NO'].X[0]
+                # print(f"Time: {t:.2f} s, NOx Emitted: {NOx_emitted:.2e} mole fraction")
+                # print(reactor.thermo['NO'].X[0])
                 t += dt
             except Exception as e:
                 print("Error at m_dot_h2o_i =", m_dot_h2o_i)
@@ -119,24 +135,21 @@ def main(dt: float = 0.01) -> Tuple[List[float], np.ndarray]:
                 print("P =", stoich_with_water.gas.P)
                 print("X =", stoich_with_water.gas.X)
                 raise
-
+        
         times_to_reach_limit_NOx.append(t)
+        NOx.append(NOx_emitted)
+        NOx_tot_final.append(NOx_final)
+
     times_to_reach_limit_NOx = np.array(times_to_reach_limit_NOx)
+    NOx = np.array(NOx)
+    water_content = np.array(water_content)
+    NOx_tot_final = np.array(NOx_tot_final)
 
-    return times_to_reach_limit_NOx, mdot_h2o
-
-def plot(mdot_h2o: np.ndarray,
-    times: np.ndarray) -> None:
-
-    plt.figure(figsize=(8, 5))
-    plt.plot(mdot_h2o, times, marker='o')
-    plt.xlabel('Injected H2O Mass Flow Rate [kg/s]')
-    plt.ylabel('Time to Reach NOx Limit [s]')
-    plt.title('Effect of H2O Injection on Time to Reach NOx Limit')
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+    return times_to_reach_limit_NOx, mdot_h2o, NOx, water_content, NOx_tot_final
 
 if __name__ == "__main__":
-    times, mdot_h2o = main(dt=0.001)
-    plot(mdot_h2o, times)
+    times, mdot_h2o, NOx, water_content, NOx_tot_final = main(time_limit=5.0, dt=1e-10, hdot_h2o_step=1e-2)
+    #plot(water_content, times, 'Water percentage', 'Time to reach NOx limit [s]')
+    plt.figure()
+    plt.plot(water_content, times)
+    plt.show()
