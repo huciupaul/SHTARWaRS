@@ -10,6 +10,7 @@ from typing import Tuple
 # Local imports
 from SHTARWaRS.global_constants import Beechcraft_1900D
 from SHTARWaRS.performance.MTOW import power_and_wing_loading as pws
+from SHTARWaRS.performance.Integration import integration as cg_excursion
 
 # Cached constants
 M_CARGO_AFT = Beechcraft_1900D["M_cargo_aft"]  # [kg] Cargo mass in the aft compartment
@@ -28,33 +29,8 @@ def load_tensor(file_path: str) -> np.ndarray:
         tensor = pickle.load(f)
     return tensor
 
-def constrain_integration(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Evaluate design integration into existing aircraft, score the results and normalize.
-
-    Args:
-        design (np.ndarray): design tensor with shape (N, M, P, Q) where:
-            N: Power splits (FC use vs Turboprop use)
-            M: FC TOGA throttle setting
-            P: FC cruise throttle setting
-            Q: Design variables: 
-                < m_EPS, m_FC, m_H2, m_storage, m_TMS, V_FC, V_storage, V_ELMO, MTOW, L_storage, D_storage >
-
-    Returns:
-        np.ndarray: Vector of integration scores, N_PAX, m_cargo
-    """
-    # Create np.array of relevant design variables
-    var_idx = np.array([0, 1, 2, 3, 4])
-    m_EPS, m_FC, m_H2, m_storage, m_TMS = design[:, :, :, var_idx]
-    
-    # TODO: REPLACE PLACEHOLDERS WITH ACTUAL INTEGRATION SCORING LOGIC
-    scores = None
-    N_PAX = None
-    m_cargo = None
-    
-    return scores, N_PAX, m_cargo
-    
-def constrain_mass(design: np.ndarray, loading: np.ndarray) -> np.ndarray:
-    """Evaluate the mass constraints, and return feasible design points in the tensor (else NaN).
+def f_obj(design: np.ndarray) -> np.ndarray:
+    """Design tensor objective function to evaluate the design based.
 
     Args:
         design (np.ndarray): Design tensor with shape (N, M, P, Q) where:
@@ -63,45 +39,11 @@ def constrain_mass(design: np.ndarray, loading: np.ndarray) -> np.ndarray:
             P: FC cruise throttle setting
             Q: Design variables: 
                 < m_EPS, m_FC, m_H2, m_storage, m_TMS, V_FC, V_storage, V_ELMO, MTOW, L_storage, D_storage >
-        loading (np.ndarray): Mass loading tensor with shape (N, M, P, Q, 4) where:
-            N: Power splits (FC use vs Turboprop use)
-            M: FC TOGA throttle setting
-            P: FC cruise throttle setting
-            Qx4: Loading: 
-                < P/W_1, W/S_1, P/W_2, W/S_2 > x Q
 
     Returns:
-        np.ndarray: Constrained design tensor.
+        np.ndarray: A 3D tensor of scores with shape (N, M, P) where each element is the score for the corresponding design.
     """
-    # Create np.array of relevant design variables
-    de = pws(design, loading)
-    
-    return de
-
-def n_pax(N_PAX: np.ndarray, K: float=14) -> np.ndarray:
-    """Evaluate the number of passengers against original design and score the results.
-    
-    Args:
-        N_PAX (np.ndarray): 1D array of number of passengers for each design configuration.
-        K (float, optional): Scaling factor for the sigmoid function. Defaults to 14.
-        
-    Returns:
-        np.ndarray: Vector of passenger scores, bounded between 0 and 1.
-    """
-    return 1/(1 + np.exp(-K * ((N_PAX - 15) / 4) - 0.5))
-
-def cargo(m_cargo: np.ndarray) -> np.ndarray:
-    """Evaluate the cargo mass against original design and score the results.
-    
-    Args:
-        m_cargo (np.ndarray): 1D array of cargo mass for each design configuration.
-        
-    Returns:
-        np.ndarray: Vector of cargo scores, bounded between 0 and 1.
-    """
-    return np.clip(m_cargo / M_CARGO_AFT, 0, 1)
-    
-     
+    pass
 
 def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
          dim_bounds: np.ndarray=np.array([[0.1, 1.0],
@@ -155,8 +97,17 @@ def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
     tradeoff    = np.full(tensor.shape[:-1] + (4,), np.nan)
 
     # Apply design space constraints
-    design, N_PAX, m_cargo = constrain_integration(design)
-    design = constrain_mass(design, loading)
+    valid_integration, N_PAX, m_cargo = cg_excursion(design)
+    valid_mass = pws(loading)
+    
+    constrained_space = valid_integration & valid_mass
+    # Keep only valid designs, fill rest with np.nan
+    design[~constrained_space] = np.nan
+    
+    print(f"Percentage pruned from design space: {np.sum(~constrained_space) / np.prod(design.shape) * 100:.2f}%")
+    
+    # Calculate scores for each design configuration
+    scores = f_obj(design)
     
     # Find optimal design configuration
     max_score_idx = np.unravel_index(np.nanargmax(scores, axis=None), scores.shape)

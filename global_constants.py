@@ -153,8 +153,8 @@ rho_cargo = 161
 M_PAX = 84
 M_cargo_fwd = 1.01371425*rho_cargo
 
-X_most_fwd  = 7.51
-X_most_aft  = 6.79
+X_most_aft  = 7.51
+X_most_fwd  = 6.79
 
 X_cargo_fwd = 3.87
 X_first_seat = 4.70
