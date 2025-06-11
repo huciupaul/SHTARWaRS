@@ -160,22 +160,32 @@ class RamAirHeatExchanger():
                 print("Length of the radiator", length_rad, "m")
                 print("Volume of the radiator", vol_rad, "m³")
                 break
-            
+        self.delta_t_air = T
+        print(f"Air temperature rise: {self.delta_t_air:.2f} K")
+        A_0 = front_area_rad
+        P_air = ambient_conditions['rho'] * ambient_conditions['V']**2 * 0.5 + p_amb 
+        mu_air = PropsSI('VISCOSITY', 'P', P_air, 'T', ambient_conditions['T'], 'Air')
+        g_c = 1  
+        L = length_rad
+        P = A_0 * L
+        G = mf_air / A_0 
+        r_h = A_0/P
+        D_h = 4 * r_h
+        Re = G * D_h / mu_air
+        f = 0.046 * Re**-0.2
+        t_w = f /( 2 * g_c * ambient_conditions['rho'] / G**2 )
+        pressure_drop = mu_air /(2* g_c * ambient_conditions['rho']) * (4 * L /D_h**2) * (mf_air**2/A_0) * (f * Re) 
+        print(f"Pressure drop in the radiator: {pressure_drop:.2f} Pa")
+        eta_p = 1 - pressure_drop / P_air 
+        print(f"Propulsive efficiency: {eta_p:.3f}")
+
         cool_out = Fluid(name = "Coolant Out", T = coolant_temp_out, P = self.fluid.P, 
                          mf = self.fluid.mf_given, fluid_type = self.fluid.fluid_type)
         
-        return self.required_area, cool_out, power_fan
+        return self.required_area, cool_out, power_fan, eta_p
 
     # THRUST RECOVERY
-    def thrust_ratio(
-        deltaT_HX0,                 # can be a scalar or a NumPy array
-        gamma: float,
-        R: float,
-        M0: float,
-        T0: float,
-        eta_p07: float ,
-        CD_d_CD_sp: float
-    ) -> np.ndarray:
+    def thrust_ratio(self,gamma, R, M0, T0, eta_p07, CD_d_CD_sp):
         """
         Vectorised thrust-ratio calculation.
 
@@ -201,8 +211,7 @@ class RamAirHeatExchanger():
         TR : ndarray
             Thrust ratio(s) corresponding to `deltaT_HX0`.
         """
-        deltaT_HX0 = np.asarray(deltaT_HX0, dtype=float)
-
+        deltaT_HX0 = self.delta_t_air
         comp_ratio = (1.0 + 0.5 * (gamma - 1.0) * M0**2) * eta_p07 ** ((gamma - 1.0) / gamma)
 
         # Guard against unphysical D <= 1
@@ -216,7 +225,7 @@ class RamAirHeatExchanger():
         #TR = np.where(value > 0, np.sqrt(value) - 1.0, np.nan)  # nan for impossible points
         return TR
     
-
+    '''
     # -- sweep ΔT_HX0 from 0 to 110 K --------------------------------------
     deltaT = np.linspace(0, 100, 100)
     eta_values = [0.995, 0.92, 0.90, 0.85]
@@ -236,7 +245,7 @@ class RamAirHeatExchanger():
     # print(TR[-1])
     # -- plot ---------------------------------------------------------------
     #plt.plot(deltaT, TR, marker="o")
-    '''
+    
     plt.xlabel("ΔT_HX⁰ (K)")
     plt.ylabel("Thrust Ratio (TR)")
     plt.title("Temperature difference of Radiator vs TR (for different pressure ratios)")
@@ -404,8 +413,8 @@ class HEX():
         print(f"detla_t1: {delta_t1:.2f} K", f"detla_t2: {t_hot_in - t_cold_out:.2f} K")
 
         print(f"Final Area: {area:.2f} m², Volume: {volume:.2f} m³, N_plates: {N_plates}, n_channels: {n_channels}")
-        L_plate = 2/3 * area
-        w_plate = 1/3 * area
+        w_plate = np.sqrt(area/2)
+        L_plate = 2 * w_plate
         drop_h2 = self.pressure_drop(self.fluid_cold, Re_h2, L_plate, w_plate, gap_bt_plates, dh_h2, N_passes, pipe_diam)
         drop_coolant = self.pressure_drop(self.fluid_hot, Re_coolant, L_plate, w_plate, gap_bt_plates, dh_coolant, N_passes, pipe_diam)
 
@@ -884,8 +893,14 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
     
     if Q_dot_rem > 0:
         Rad_1 = RamAirHeatExchanger(coolant_temp_K=ra_coolant_temp, fluid=cool_23)
-        radiator_area, cool_24, power_fan = Rad_1.size_exchanger(Q_dot_rem/2, T_amb)
-
+        radiator_area, cool_24, power_fan,eta_p = Rad_1.size_exchanger(Q_dot_rem/2, T_amb)
+        TR = Rad_1.thrust_ratio(
+            gamma = k_air,
+            R     = R_AIR,
+            M0    = ambient_conditions["M"],
+            T0    = ambient_conditions["T"],
+            eta_p07 = eta_p,  
+            CD_d_CD_sp = 0.11)  
     else:
         # No need for radiator, all waste heat is absorbed
         cool_24 = Fluid(name="Cool_24", T=cool_23.T, P=cool_23.P, C=0, mf=cool_23.mf_given, fluid_type=coolant)
