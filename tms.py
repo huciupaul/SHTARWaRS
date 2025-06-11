@@ -5,6 +5,7 @@ from CoolProp.CoolProp import PropsSI
 import matplotlib.pyplot as plt
 import tms_plotting 
 import math
+from global_constants import *
 
 # ------------------------------ PARAMETERS -----------------------------------
 # TODO: 
@@ -20,49 +21,23 @@ ambient_conditions= {
     'rho': 0.55  # Air density at cruise in kg/m^3
 }
 
-# Parameters
-gamma = 1.4
-
-# TEG
-efficiency_teg = 0.05 
-
+ 
 # Ram Air HX -------------------------------
 # Air properties
-h_air = 250         # REF: Shah 
-cp_air = 1005.0
 T_air_in = ambient_conditions['T']
 T_air_out = ambient_conditions['T'] + 20.0
 
 # Coolant and HX Properties 
 ra_coolant_temp = 165 + 20 + 273.15 # K
-        
-
-# Sizing Parameters
-porosity = 0.10              
-hole_diameter_mm = 1.0 
-meredith_recovery = 0.50
-inlet_cd = 0.02 
 
 # Fan 
-fan_eff = 0.7
 ra_density = ambient_conditions['rho']  # kg/m³, air density
-delta_pressure = 1000  # Pa, pressure drop across the fan
 
 #Skin HX -----------------------------------------------	
-area_wing = 2.3
 
 # Air
-prandtl_air = 0.71
-reynolds_air = 1e7  # depends on temperature?
 h_ext_w = ambient_conditions['rho'] * ambient_conditions['V'] * cp_air * 0.185 * (np.log10(reynolds_air))**-2.584 * prandtl_air**-0.66
 recovery_factor = prandtl_air ** 0.33  
-
-# Overall heat coefficients WING and RADIATOR
-#U_wing = 1/(1/h_cool + 1/h_ext_w)
-#U_ra = 1 / (1/h_air + 1/h_cool)
-
-deltaT_fc = 20
-HEX_1_deltaT = 20 # Assumed temperature increase during evaporation
 
 
 # Main Classes for Heat Sinks (TMS) -------------------------------
@@ -180,62 +155,6 @@ class RamAirHeatExchanger():
 
         return self.required_area
 
-    def compute_hole_and_skin_area(self,
-                                   heat_w,
-                                   T_air_in_K,
-                                   T_air_out_K,
-                                   flight_speed_m_s,
-                                   air_density,
-                                   porosity=0.10,
-                                   hole_diameter_mm=1.0,
-                                   inlet_CD=0.02,
-                                   cp_air=1005.0,
-                                   meredith_recovery=0.50):        
-        delta_T_air = T_air_out_K - T_air_in_K
-        if delta_T_air <= 0:
-            raise ValueError("T_air_out must exceed T_air_in to carry heat away.")
-
-        m_dot_air = heat_w / (cp_air * delta_T_air)  # kg/s
-        A_open = m_dot_air / (air_density * flight_speed_m_s)  # m²
-        skin_area = A_open / porosity  # m² of total panel with holes
-        if skin_area >= 0.10:
-            d_m = hole_diameter_mm / 1000.0
-            area_per_hole = np.pi * (d_m / 2) ** 2 # m² per hole
-            hole_count = int(np.ceil(A_open / area_per_hole))
-        else:
-            hole_count = 0
-            d_m = 0.0
-            area_per_hole = 0.0
-
-        # Total gross drag
-        mdot_air = ambient_conditions['rho'] * ambient_conditions['V'] * A_open
-        D_g = mdot_air * ambient_conditions['V']
-
-        #drag_N = 0.5 * air_density * (flight_speed_m_s ** 2) * inlet_CD * A_open
-
-        # Net drag 
-        #net_drag_N = TR * (1.0 - meredith_recovery)
-
-        # Store results
-        self.inlet_area = A_open
-        self.skin_area = skin_area
-        self.hole_count = hole_count
-        self.D_g = D_g
-        #self.drag_N = drag_N
-        #self.net_drag_N = net_drag_N
-
-        return {
-            'm_dot_air': m_dot_air,
-            'A_open': A_open,
-            'skin_area': skin_area,
-            'hole_count': hole_count
-            #'drag_N': drag_N,
-            #'net_drag_N': net_drag_N
-        }
-
-    
-
-
     # THRUST RECOVERY
     def thrust_ratio(
         deltaT_HX0,                 # can be a scalar or a NumPy array
@@ -294,7 +213,7 @@ class RamAirHeatExchanger():
     for eta in eta_values:
         TR = thrust_ratio(
             deltaT,
-            gamma = 1.4,
+            gamma = k_air,
             R     = 287.058,
             M0    = ambient_conditions["M"],
             T0    = ambient_conditions["T"],
@@ -612,7 +531,7 @@ class Pipe():
         dict: {'pressure_drop': float, 'temperature_profile': np.array, 'reynolds': float}
         """
         # Calculate fluid velocity
-        velocity_fluid = self.mass_flow / (self.density_fluid * ((self.d_in / 2) ** 2) * np.pi)
+        velocity_fluid = abs(self.mass_flow / (self.density_fluid * ((self.d_in / 2) ** 2) * np.pi))
 
         # Calculate Reynolds number
         reynolds = velocity_fluid * self.d_in / self.kinematic_visc
