@@ -1,5 +1,6 @@
 import abc
 import numpy as np
+from CoolProp.CoolProp import get_global_param_string
 from CoolProp.CoolProp import PropsSI
 import matplotlib.pyplot as plt
 import tms_plotting 
@@ -67,10 +68,10 @@ HEX_1_deltaT = 20 # Assumed temperature increase during evaporation
 # Main Classes for Heat Sinks (TMS) -------------------------------
     
 class SkinHeatExchanger():
-    def __init__(self, area_m2, U_W_per_m2K, fluid):
-        super().__init__("SkinHX")
-        self.area = area_m2
-        self.U = U_W_per_m2K              # overall HT coefficient (W/m^2.K)
+    def __init__(self, area, U, fluid):
+        super().__init__()
+        self.area = area
+        self.U = U             # overall HT coefficient (W/m^2.K)
         self.coolant_temp = fluid.T
         self.ambient_temp = None          # to be set based on flight condition
         self.fluid = fluid                
@@ -439,8 +440,10 @@ class HEX():
 
             area *= factor    
             iteration += 1
-        
+
         # TODO: Add pressure drop -------------------- REDO FUNCTION---------------------
+        
+
         self.fluid_hot.T = t_hot_in
         cool_in = self.fluid_hot
         cool_in.mf_given *= 0.5
@@ -450,6 +453,9 @@ class HEX():
         cold_out = self.fluid_cold
 
         return cool_in, cool_out, cold_out, area, volume
+        
+        
+        
 
 class Compressor():
     def __init__(self, comp_efficiency, pressure_ratio, fluid):
@@ -692,7 +698,6 @@ def size_pipes_h2(h2_mf_fc, h2_mf_cc, p_sto,fluid,diam_est):
 
 
 def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf_fc, T_amb, rho_amb, V_amb, p_amb, h2_mf_rec, air_out_fc, p_sto):
-    
     p_cool = 5.7e5
     fc_press_drop_cool = 100000
     cool_0 = Fluid(name="FuelCellCoolantGeneric", T=T_fc, P=p_cool, C=None, mf=10, fluid_type='Water')  # Coolant to FC
@@ -896,7 +901,7 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
 
     # Skin Heat Exchanger
     # ---------------------------------- COMPLETE THE SKIN HX SIZING HERE ----------------------------------
-    skin_hx = HEX(name="SkinHeatExchanger", area = area_wing, fluid = cool_18, U = 80)
+    skin_hx = SkinHeatExchanger(area = area_wing, fluid = cool_18, U = 80)
     skin_hx.set_ambient(T_ambient_K = ambient_conditions['T'])
     Q_abs, t_cool_out = skin_hx.absorb_heat(Q_dot_rem)
     cool_23 = Fluid(name="Cool_23", T=t_cool_out, P=cool_18.P, C=0, mf=cool_18.mf_given, fluid_type='Water')  
