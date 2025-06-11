@@ -6,8 +6,8 @@ import numpy as np
 from typing import Tuple, Union
 
 # Local imports
-from SHTARWaRS.global_constants import OG_constraints, MTOW_orig, C_d_0_orig
-from SHTARWaRS.performance.MTOW import ca
+from global_constants import MTOW_orig, C_d_0_orig
+from performance.MTOW import ca
  
 _cons      = ca.constraint_curves(C_d_0_orig, MTOW_orig) 
 _WS_x      = _cons["WS_x"]
@@ -17,7 +17,7 @@ _WS_stall  = _cons["WS_stall"]
 # Original 
 
 _PW_req_curve_TO = np.maximum(_PW_cl, _PW_cr)
-_PW_req_curve_cr = _cons["PW_req_curve_cr"]
+_PW_req_curve_cr = _PW_cr
 
 
 def power_and_wing_loading(
@@ -48,34 +48,30 @@ def power_and_wing_loading(
     Returns:
         np.ndarray: Boolean mask indicating whether the tensor indices meet the constraints.
     """
-    PW_1 = loading[:, :, :, :, 0]  # Power loading at phase start
-    WS_1 = loading[:, :, :, :, 1]
-    PW_2 = loading[:, :, :, :, 2]  # Power loading at phase end
-    WS_2 = loading[:, :, :, :, 3]
-    
-    # Check the first two rows for Take-Off (TO) and Second-Stage Climb
+    # Extract the 4 load‐cases from the last axis (shape = N×M×P×Q×4)
+    pw_ws = loading[..., :4]               # (N, M, P, Q, 4)
+    pw_ws = np.moveaxis(pw_ws, -1, 0)      # (4, N, M, P, Q)
+    PW_1, WS_1, PW_2, WS_2 = pw_ws         # unpack channels
+
+    # Now PW_1, WS_1, … all have shape (N, M, P, Q)
+    # and you can proceed exactly as before:
     PW_req_at_WS_TO = np.interp(
-        WS_1[:2],
-        _WS_x,
-        _PW_req_curve_TO,
-        left=np.inf,
-        right=np.inf
-    )
-    
-    # Check cruise and hold
+        WS_1[:2].reshape(-1),
+        _WS_x, _PW_req_curve_TO,
+        left=np.inf, right=np.inf
+    ).reshape(2, *WS_1.shape[1:])
+
     PW_req_at_WS_cr = np.interp(
-        WS_2[2:],
-        _WS_x,
-        _PW_req_curve_cr,
-        left=np.inf,
-        right=np.inf
-    )
-    
+        WS_2[2:].reshape(-1),
+        _WS_x, _PW_req_curve_cr,
+        left=np.inf, right=np.inf
+    ).reshape(WS_2.shape[0]-2, *WS_2.shape[1:])
+
     valid_design = (
-        (np.all(PW_1[:2] >= PW_req_at_WS_TO)) &  # TO and Second-Stage Climb
-        (np.all(PW_2[2:] >= PW_req_at_WS_cr)) &  # Cruise and Hold
-        (np.all(WS_1 >= _WS_stall)) &  # Stall speed check
-        (np.all(WS_2 >= _WS_stall))    # Stall speed check
+        (np.all(PW_1[:2] >= PW_req_at_WS_TO)) &
+        (np.all(PW_2[2:] >= PW_req_at_WS_cr)) &
+        (np.all(WS_1 >= _WS_stall)) &
+        (np.all(WS_2 >= _WS_stall))
     )
-    
+
     return valid_design

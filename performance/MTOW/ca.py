@@ -5,26 +5,26 @@
 import numpy as np
 
 # Local imports
-from SHTARWARS.global_constants import \
-    G_0, rho_SL, C_d_0_orig, AR, e, k, S, V_TO, V_L, \
+from global_constants import \
+    G_0, rho_sl, C_d_0_orig, AR, e, k, S, V_TO, V_L, \
         V_stall_L, V_cruise, rho_cruise, ROC, V_climb, \
             eff_prop, mu_TO, S_g, S_land, LW_max, TOGA, \
                 MTOW_orig
 
 # Dynamic pressures
-q_climb = 0.5 * rho_SL     * V_climb**2
+q_climb = 0.5 * rho_sl     * V_climb**2
 q_c     = 0.5 * rho_cruise * V_cruise**2
 
 WS = np.linspace(500, 6000, 200)
 
 def constraint_curves(C_d_0, MTOW):
-    CL_max_TO = MTOW / (0.5 * rho_SL * V_stall_L**2 * S)
-    CL_TO     = MTOW / (0.5 * rho_SL * V_TO**2 * S)
-    CL_max_L  = LW_max / (0.5 * rho_SL * V_stall_L**2 * S)
+    CL_max_TO = MTOW / (0.5 * rho_sl * V_stall_L**2 * S)
+    CL_TO     = MTOW / (0.5 * rho_sl * V_TO**2 * S)
+    CL_max_L  = LW_max / (0.5 * rho_sl * V_stall_L**2 * S)
 
     # Take-off
     C_D_TO = C_d_0 + k * CL_TO**2
-    TW_TO  = (1.21 / (G_0 * rho_SL * CL_max_TO * S_g)) * WS \
+    TW_TO  = (1.21 / (G_0 * rho_sl * CL_max_TO * S_g)) * WS \
            + (0.605 / CL_TO) * (C_D_TO - mu_TO * CL_TO) + mu_TO
     PW_TO  = TW_TO * V_TO / eff_prop
 
@@ -37,8 +37,8 @@ def constraint_curves(C_d_0, MTOW):
     PW_cl  = TW_cl * V_climb / eff_prop
 
     # Limits
-    WS_stall = 0.5 * rho_SL * V_stall_L**2 * CL_max_TO
-    WS_land  = 0.5 * rho_SL * V_L**2       * CL_max_L
+    WS_stall = 0.5 * rho_sl * V_stall_L**2 * CL_max_TO
+    WS_land  = 0.5 * rho_sl * V_L**2       * CL_max_L
 
     # Design pt - stall line on climb curve
     PW_stall_int = np.interp(WS_stall, WS, PW_cl)

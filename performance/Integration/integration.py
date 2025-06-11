@@ -3,11 +3,11 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 import matplotlib.pyplot as plt
 
-from SHTARWaRS.global_constants import Beechcraft_1900D, seat_pitch, rho_cargo, M_PAX, \
+from global_constants import Beechcraft_1900D, seat_pitch, rho_cargo, M_PAX, \
     X_most_fwd, X_most_aft, X_cargo_fwd, X_first_seat, \
         X_wing_end, V_cargo_fwd, V_wing,\
-            X_wing
-from SHTARWaRS.performance.Integration import aft_configuration as acfg
+            X_wing, M_cargo_fwd
+from performance.Integration import aft_configuration as acfg
 
 def X_PAX(num_PAX) -> float:
     """Calculate the center of gravity position of the passenger seats."""
@@ -122,7 +122,7 @@ def min_max_X_cg_positions(
     ):
     """Find the minimum and maximum center of gravity positions."""
     OEW_H2D2, X_OEW_H2D2 = X_OEW(num_PAX, M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_TMS, X_tank_front) 
-    X_cargo_front, W_cargo_front, X_cargo_back, W_cargo_back = __cargo(Beechcraft_1900D['X_cargo_fwd'], X_cargo_aft, Beechcraft_1900D['M_cargo_fwd'], M_cargo_aft, X_OEW_H2D2, OEW_H2D2)
+    X_cargo_front, W_cargo_front, X_cargo_back, W_cargo_back = __cargo(X_cargo_fwd, X_cargo_aft, M_cargo_fwd, M_cargo_aft, X_OEW_H2D2, OEW_H2D2)
     X_seat_front, W_seat_front, X_seat_back, W_seat_back = __passengers(X_cargo_front, W_cargo_front, num_PAX)
     X_fuel, W_fuel = __fuel(X_seat_front, W_seat_front, X_wing, M_fuel)
 
@@ -231,9 +231,20 @@ def main(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     # Create np.array of relevant design variables
     var_idx = np.array([0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 13])
-    m_EPS, m_FC, m_H2, m_storage, \
-        V_FC, L_storage, D_storage, \
-            m_cargo, m_TMS_front, m_TMS_aft, m_TMS_mid = design[:, :, :, var_idx]
+    vars_4d = design[..., var_idx]
+    # move that last axis to the front so we can unpack it
+    vars_3d = np.moveaxis(vars_4d, -1, 0)  # shape (11, N, M, P)
+    (m_EPS,
+     m_FC,
+     m_H2,
+     m_storage,
+     V_FC,
+     L_storage,
+     D_storage,
+     m_cargo,
+     m_TMS_front,
+     m_TMS_aft,
+     m_TMS_mid) = vars_3d
             
     # Apply volumetric constraints
     # TODO: Revise margin

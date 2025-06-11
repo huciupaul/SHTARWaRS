@@ -8,9 +8,9 @@ import copy
 from typing import Tuple
 
 # Local imports
-from SHTARWaRS.global_constants import Beechcraft_1900D
-from SHTARWaRS.performance.MTOW import power_and_wing_loading as pws
-from SHTARWaRS.performance.Integration import integration as cg_excursion
+from global_constants import Beechcraft_1900D
+from performance.MTOW.mtow import power_and_wing_loading as pws
+from performance.Integration.integration import main as cg_excursion
 
 # Cached constants
 M_CARGO_AFT = Beechcraft_1900D["M_cargo_aft"]  # [kg] Cargo mass in the aft compartment
@@ -49,8 +49,8 @@ def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
          dim_bounds: np.ndarray=np.array([[0.1, 1.0],
                                           [0.1, 1.0],
                                           [0.0, 1.0]]),
-         fpath_design: str='data/design_space.pkl',
-         fpath_loading: str='data/loading_space.pkl') -> None:
+         fpath_design: str='data/logs/result_tensor.pkl',
+         fpath_loading: str='data/logs/loading_tensor.pkl') -> None:
     """Main function to collapse the 4D design space to a 3D scalar field using the provided weights.
 
     Args:
@@ -76,7 +76,8 @@ def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
     except FileNotFoundError:
         raise FileNotFoundError(f"File not found: {fpath_loading}")
     
-    
+    print(f"Design space tensor shape: {tensor.shape}")
+    print(f"Loading space tensor shape: {loading.shape}")
     
     # Create axes for the tensor dimensions
     N, M, P, Q = tensor.shape
@@ -94,36 +95,50 @@ def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
     # Keep a 'design' tensor that maintains the original tensor structure
     design      = copy.deepcopy(tensor)
     # Initialize a 'tradeoff' tensor with the same N, M, P dimensions and a 4th dimension containing 4 np.nan values
-    tradeoff    = np.full(tensor.shape[:-1] + (4,), np.nan)
 
     # Apply design space constraints
     valid_integration, N_PAX, m_cargo = cg_excursion(design)
     valid_mass = pws(loading)
     
-    constrained_space = valid_integration & valid_mass
+    valid3d = valid_integration & valid_mass
     # Keep only valid designs, fill rest with np.nan
-    design[~constrained_space] = np.nan
+    # lift into a 4th dim so it matches (N, M, P, Q)
+    valid4d = valid3d[..., None]        # shape (N, M, P, 1)
+    valid4d = np.broadcast_to(valid4d, design.shape)
+
+    # now prune
+    design[~valid4d] = np.nan
     
-    print(f"Percentage pruned from design space: {np.sum(~constrained_space) / np.prod(design.shape) * 100:.2f}%")
+    print(f"Percentage pruned from design space: {np.sum(~valid4d) / np.prod(design.shape) * 100:.2f}%")
     
     # Calculate scores for each design configuration
-    scores = f_obj(design)
+    # scores = f_obj(design)
     
-    # Find optimal design configuration
-    max_score_idx = np.unravel_index(np.nanargmax(scores, axis=None), scores.shape)
-    optimal_design = design[max_score_idx]
-    optimal_setting = {
-        'power_split': splits[max_score_idx[0]],
-        'toga_throttle': toga_throttle[max_score_idx[1]],
-        'cruise_throttle': cruise_throttle[max_score_idx[2]],
-        'design_variables': optimal_design
-    }
+    # # Find optimal design configuration
+    # max_score_idx = np.unravel_index(np.nanargmax(scores, axis=None), scores.shape)
+    # optimal_design = design[max_score_idx]
+    # optimal_setting = {
+    #     'power_split': splits[max_score_idx[0]],
+    #     'toga_throttle': toga_throttle[max_score_idx[1]],
+    #     'cruise_throttle': cruise_throttle[max_score_idx[2]],
+    #     'design_variables': optimal_design
+    # }
     
-    # Print the optimal design configuration
-    print("Optimal Design Configuration:")
-    print(f"Power Split: {optimal_setting['power_split']:.2f}")
-    print(f"TOGA Throttle Setting: {optimal_setting['toga_throttle']:.2f}")
-    print(f"Cruise Throttle Setting: {optimal_setting['cruise_throttle']:.2f}")
-    print(f"Design Variables: {optimal_setting['design_variables']}")
-    print(f"Maximum Score: {np.nanmax(scores):.4f}")
-    print(f"Optimal Design Index: {max_score_idx}")
+    # # Print the optimal design configuration
+    # print("Optimal Design Configuration:")
+    # print(f"Power Split: {optimal_setting['power_split']:.2f}")
+    # print(f"TOGA Throttle Setting: {optimal_setting['toga_throttle']:.2f}")
+    # print(f"Cruise Throttle Setting: {optimal_setting['cruise_throttle']:.2f}")
+    # print(f"Design Variables: {optimal_setting['design_variables']}")
+    # print(f"Maximum Score: {np.nanmax(scores):.4f}")
+    # print(f"Optimal Design Index: {max_score_idx}")
+    
+if __name__ == "__main__":
+    main(
+        weights=(0.5, 0.25, 0.125, 0.125),
+        dim_bounds=np.array([[0.1, 1.0],
+                                [0.1, 1.0],
+                                [0.0, 1.0]]),
+        fpath_design='data/logs/result_tensor.pkl',
+        fpath_loading='data/logs/loading_tensor.pkl'
+    )

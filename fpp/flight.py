@@ -660,6 +660,40 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
     
     mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=dt, total_range_m=707e3, throttle_cruise=throttle_cruise)
     
+    # Extract power loading and wing loading for corners of phases:
+    takeoff = mission_H2.profile['phase'] == 'takeoff'
+    climb   = (mission_H2.profile['phase'] == 'climb1') | (mission_H2.profile['phase'] == 'climb2')
+    cruise  = mission_H2.profile['phase'] == 'cruise'
+    hold    = mission_H2.profile['phase'] == 'hold'
+    
+    PW1_takeoff = mission_H2.profile['Pa'][takeoff][0]/(mission_H2.profile['mass'][takeoff][0]*G_0)
+    WS1_takeoff = mission_H2.profile['mass'][takeoff][0]/mission_H2.ac.wing_area
+    PW2_takeoff = mission_H2.profile['Pa'][takeoff][-1]/(mission_H2.profile['mass'][takeoff][-1]*G_0)
+    WS2_takeoff = mission_H2.profile['mass'][takeoff][-1]/mission_H2.ac.wing_area
+    
+    PW1_climb   = mission_H2.profile['Pa'][climb][0]/(mission_H2.profile['mass'][climb][0]*G_0)
+    WS1_climb   = mission_H2.profile['mass'][climb][0]/mission_H2.ac.wing_area
+    PW2_climb   = mission_H2.profile['Pa'][climb][-1]/(mission_H2.profile['mass'][climb][-1]*G_0)
+    WS2_climb   = mission_H2.profile['mass'][climb][-1]/mission_H2.ac.wing_area
+    
+    PW1_cruise  = mission_H2.profile['Pa'][cruise][0]/(mission_H2.profile['mass'][cruise][0]*G_0)
+    WS1_cruise  = mission_H2.profile['mass'][cruise][0]/mission_H2.ac.wing_area
+    PW2_cruise  = mission_H2.profile['Pa'][cruise][-1]/(mission_H2.profile['mass'][cruise][-1]*G_0)
+    WS2_cruise  = mission_H2.profile['mass'][cruise][-1]/mission_H2.ac.wing_area
+    
+    PW1_hold    = mission_H2.profile['Pa'][hold][0]/(mission_H2.profile['mass'][hold][0]*G_0)
+    WS1_hold    = mission_H2.profile['mass'][hold][0]/mission_H2.ac.wing_area
+    PW2_hold    = mission_H2.profile['Pa'][hold][-1]/(mission_H2.profile['mass'][hold][-1]*G_0)
+    WS2_hold    = mission_H2.profile['mass'][hold][-1]/mission_H2.ac.wing_area
+    
+    
+    loading_points = np.array([
+        [PW1_takeoff, WS1_takeoff, PW2_takeoff, WS2_takeoff],
+        [PW1_climb, WS1_climb, PW2_climb, WS2_climb],
+        [PW1_cruise, WS1_cruise, PW2_cruise, WS2_cruise],
+        [PW1_hold, WS1_hold, PW2_hold, WS2_hold]
+    ])
+    
     H2_burnt = (mission_H2.profile['mass'][0] - mission_H2.profile['mass'][-1])/(1 - E_SCALE)
     # print(f"Total H2 mass burnt: {H2_burnt:.2f} kg")
     
@@ -668,7 +702,7 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
     FC_outputs = dict(m_fc=fc_model.fc_mass,
                       V_fc=fc_model.fc_volume)
         
-    return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile
+    return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile, loading_points
 
 if __name__ == "__main__":
     from mpl_toolkits.mplot3d import Axes3D

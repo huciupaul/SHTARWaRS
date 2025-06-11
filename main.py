@@ -35,7 +35,14 @@ def main(minimum, maximum, no_of_splits, max_iter):
     len(fc_toga_percentages),
     len(fc_cruise_percentages),
     14  # Length of the tensor
-))
+    ))
+    
+    loading_tensor = np.zeros((
+        len(power_splits),
+        len(fc_toga_percentages),
+        len(fc_cruise_percentages),
+        4, 4
+    ))
 
     for i_split, split in enumerate(power_splits):
         
@@ -55,26 +62,19 @@ def main(minimum, maximum, no_of_splits, max_iter):
 
                 # Convergence of MTOW, stop if the change is less than 1% of the previous MTOW or reached max number of iterations
                 for i in range(max_iter):
-                    if ((MTOW-MTOW_prev)/MTOW_prev) < 0.01 and i > 0:
+                    if np.abs((MTOW-MTOW_prev)/MTOW_prev) < 0.01 and i > 0:
                         print(f"Converged after {i} iterations with MTOW: {MTOW:.2f} kg")
+                        print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}")
                         break
                     
-                    if i > 0:
-                        # Update the values based on the previous iteration
-                        m_eps_prev = m_eps
-                        m_fc_tms_prev = m_tms_aft + m_tms_front + m_tms_mid + m_fc
-                        m_h2_prev = m_h2
-                        m_sto_prev = m_sto
-                        m_cargo_prev = m_cargo
-                    
                     # FPP
-                    TMS_inputs, m_h2, FC_outputs, mission_profile = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, c_d_rad, delta_ap, 0.1)
+                    TMS_inputs, m_h2, FC_outputs, mission_profile, loading_vector = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, c_d_rad, delta_ap, 10)
                     m_fc = FC_outputs['m_fc']
                     V_fc = FC_outputs['V_fc']
-
+                    
                     # Storage
                     m_sto, V_sto, t1, dv, t2, length_sto, diameter_sto = main_storage(m_h2)
-
+                    
                     # Update delta_AP, c_D_rad based on the TMS code and get:
                     m_tms_front = 0
                     m_tms_aft = 0
@@ -85,15 +85,29 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     
                     #MTOW update
                     MTOW_prev = MTOW
-                    MTOW += ((m_eps - m_eps_prev) + (m_h2 - m_h2_prev) + (m_sto - m_sto_prev) + (m_tms_front + m_tms_aft + m_tms_mid + m_fc - m_fc_tms_prev))
+                    MTOW += ((m_eps - m_eps_prev) + (m_h2 - m_h2_prev) + (m_sto - m_sto_prev) + \
+                        (m_tms_front + m_tms_aft + m_tms_mid + m_fc - m_fc_tms_prev))
+                    # Update the values based on the previous iteration
+                    m_eps_prev = m_eps
+                    m_fc_tms_prev = m_tms_aft + m_tms_front + m_tms_mid + m_fc
+                    m_h2_prev = m_h2
+                    m_sto_prev = m_sto
+                    m_cargo_prev = m_cargo
 
                 # After convergence, store the results in the tensor, then in the 4D tensor
                 tensor = np.array([m_eps, m_fc, m_h2, m_sto,V_fc, V_sto, V_elmo, MTOW, length_sto, diameter_sto, m_cargo, m_tms_front, m_tms_aft, m_tms_mid])
                 result_tensor[i_split, i_toga, i_cruise, :] = tensor
+                loading_tensor[i_split, i_toga, i_cruise, :, :] = loading_vector
 
     # Save the result tensor to a pickle file
     with open("data/logs/result_tensor.pkl", "wb") as f:
         pickle.dump(result_tensor, f)
+    
+    with open("data/logs/loading_tensor.pkl", "wb") as f:
+        pickle.dump(loading_tensor, f)
+    
+    print("Result tensor saved to data/logs/result_tensor.pkl")
+    print("Loading tensor saved to data/logs/loading_tensor.pkl")
 
     return None       
     
@@ -107,15 +121,10 @@ def main(minimum, maximum, no_of_splits, max_iter):
 # print(loaded_tensor.shape)  # Print the shape of the tensor for verification
 
 
-# if __name__=="__main__":
-#     args = argparse.ArgumentParser(description="SHTARWaRS Design Tool")
-#     args.add_argument("--min", type=float, default=0.0, help="Minimum power split value")
-#     args.add_argument("--max", type=float, default=1.0, help="Maximum power split value")
-#     args.add_argument("--n_splits", type=int, default=10, help="Number of power splits")
-#     args.add_argument("--max_iter", type=int, default=100, help="Maximum number of iterations for optimization")
-#     args.add_argument("--overwrite", action='store_true', help="Overwrite existing results")
-#     args.add_argument("--plot", action='store_true', help="Plot the results")
-    
-#     args = args.parse_args()
-    
-#     main(args)
+if __name__=="__main__":
+    main(
+        minimum=0.1,
+        maximum=1.0,
+        no_of_splits=20,
+        max_iter=100
+    )

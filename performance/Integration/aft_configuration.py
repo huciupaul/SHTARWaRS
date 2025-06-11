@@ -1,10 +1,7 @@
-import sys
-sys.path.append("..")  # Add parent directory to path
-
 import numpy as np
 from typing import Tuple, Union
 
-from SHTARWaRS.global_constants import Beechcraft_1900D, seat_pitch, rho_cargo, l_aft_cyl, w_aft_cyl, h_aft_cyl_ave, d_aft_cone_beg, d_aft_cone_end, l_aft_cone, X_aft_cone_beg, X_aft_cone_end
+from global_constants import Beechcraft_1900D, seat_pitch, rho_cargo, l_aft_cyl, w_aft_cyl, h_aft_cyl_ave, d_aft_cone_beg, d_aft_cone_end, l_aft_cone, X_aft_cone_beg, X_aft_cone_end
 
 
 def determine_position_in_cone(
