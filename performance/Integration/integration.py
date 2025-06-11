@@ -9,10 +9,12 @@ from global_constants import Beechcraft_1900D, seat_pitch, rho_cargo, M_PAX, \
             X_wing, M_cargo_fwd
 from performance.Integration import aft_configuration as acfg
 
+@np.vectorize
 def X_PAX(num_PAX) -> float:
     """Calculate the center of gravity position of the passenger seats."""
     return ((num_PAX-3)*M_PAX * (X_first_seat + (num_PAX-5)/2 * seat_pitch / 2) + 3*M_PAX * (X_first_seat + (num_PAX-3)/2 * seat_pitch)) / (num_PAX*M_PAX)
 
+@np.vectorize
 def X_OEW(num_PAX, M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_TMS, X_tank_front) -> Tuple[float, float]:
     """Calculate the center of gravity position of the original aircraft's empty weight."""
     """Original aircraft OEW"""
@@ -34,6 +36,7 @@ def X_OEW(num_PAX, M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_
 
     return OEW_H2D2, X_OEW_H2D2
 
+@np.vectorize
 def __cargo(X_cargo_fwd: float,
             X_cargo_aft: float,
             M_cargo_fwd: float,
@@ -66,6 +69,7 @@ def __cargo(X_cargo_fwd: float,
 
     return X_cargo_front, W_cargo_front, X_cargo_back, W_cargo_back
 
+@np.vectorize
 def __passengers(X_cargo_front: float,
                  W_cargo_front: float,
                  num_PAX: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -108,6 +112,7 @@ def __passengers(X_cargo_front: float,
 
     return X_seat_front, W_seat_front, X_seat_back, W_seat_back
 
+@np.vectorize
 def __fuel(X_seat_front: float,
            W_seat_front: float,
            M_fuel: float) -> Tuple[np.ndarray, np.ndarray]:
@@ -122,6 +127,7 @@ def __fuel(X_seat_front: float,
 
     return X_fuel, W_fuel
 
+@np.vectorize
 def min_max_X_cg_positions(
     X_cargo_aft, M_cargo_aft,
     num_PAX, M_fuel, M_FC,
