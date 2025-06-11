@@ -79,6 +79,8 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     m_tms_aft = 0
                     m_tms_mid = 0
                     m_cargo = 0
+
+                    # --------- ADD INTEGRATION HERE ---------
                     
                     #MTOW update
                     MTOW_prev = MTOW
