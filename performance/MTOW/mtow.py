@@ -79,9 +79,4 @@ def power_and_wing_loading(
         (np.all(WS_2 >= _WS_stall))    # Stall speed check
     )
     
-    # Design vectors that do not meet the constraints are filled with NaN
-    de = np.full_like(design, np.nan, dtype=np.float64)
-    de[valid_design] = design[valid_design]
-    
-    
-    return de
+    return valid_design

@@ -147,39 +147,41 @@ mli_thickness = 0.03 *1e-3 * mli_layers                 #https://www.sciencedire
 ####################
 # From integration #
 ####################
-M_PAX = 84
-X_first_seat = 4.70
-X_front_of_first_seat = 4.38
 seat_pitch = 0.75
 rho_cargo = 161
+
+M_PAX = 84
+M_cargo_fwd = 1.01371425*rho_cargo
+
+X_most_fwd  = 7.51
+X_most_aft  = 6.79
+
+X_cargo_fwd = 3.87
+X_first_seat = 4.70
+X_front_of_first_seat = 4.38
+X_aft_cone_beg = 12.61
+X_aft_cone_end = 13.78
+X_wing = 7.29
+X_wing_end = 8.18
+
+V_cargo_fwd = 1.01371425
+V_wing      = 0.7508 # [m^2] space in one wing
+    
+l_aft_cyl  = 1.50
+w_aft_cyl  = 1.60
+h_aft_cyl_ave  = 1.92
+
+d_aft_cone_beg   = 1.60
+d_aft_cone_end   = 1.18
+l_aft_cone  = 1.18
 
 Beechcraft_1900D = dict(
     MTOW        = 7766,
     M_fuel      = 337,
     OEW         = 4894,
     M_cargo_aft = 4.8106*rho_cargo,
-    M_cargo_fwd = 1.01371425*rho_cargo,
     num_PAX     = 19,
 
-    X_MTOW_fwd  = 7.51,
-    X_MTOW_aft  = 6.79,
-    X_fuel      = 7.29,
-    X_cargo_fwd = 3.87,
-    X_cargo_aft = 12.64,    
-    X_PAX       = 7.74,
-
-    V_cargo_fwd = 1.01371425,
-    V_wing      = 1.144,
-    
-    l_aft_cyl  = 1.50,
-    w_aft_cyl  = 1.60,
-    h_aft_cyl_ave  = 1.92,
-
-    d_aft_cone_beg   = 1.60,
-    d_aft_cone_end   = 1.18,
-    l_aft_cone  = 1.18,
-
-    X_aft_cyl_beg = 11.22,
-    X_aft_cone_beg = 12.61,
-    X_aft_cone_end = 13.78
+    X_cargo_aft = 12.64,
+    X_aft_cyl_beg = 11.22
     )

@@ -4,37 +4,38 @@ sys.path.append("..")  # Add parent directory to path
 import numpy as np
 from typing import Tuple, Union
 
-from SHTARWaRS.global_constants import Beechcraft_1900D, rho_cargo, seat_pitch
+from SHTARWaRS.global_constants import Beechcraft_1900D, seat_pitch, rho_cargo, l_aft_cyl, w_aft_cyl, h_aft_cyl_ave, d_aft_cone_beg, d_aft_cone_end, l_aft_cone, X_aft_cone_beg, X_aft_cone_end
+
 
 def determine_position_in_cone(
     L_tank: Union[float, np.ndarray],
     d_tank: Union[float, np.ndarray]
 ) -> Tuple[np.ndarray, np.ndarray, float]:
     a = (
-        Beechcraft_1900D["X_aft_cone_beg"]
-        - Beechcraft_1900D["X_aft_cone_end"]
+        X_aft_cone_beg
+        - X_aft_cone_end
     ) / (
-        Beechcraft_1900D["d_aft_cone_beg"]
-        - Beechcraft_1900D["d_aft_cone_end"]
+        d_aft_cone_beg
+        - d_aft_cone_end
     )
-    b = Beechcraft_1900D["X_aft_cone_beg"] - a * Beechcraft_1900D["d_aft_cone_beg"]
+    b = X_aft_cone_beg - a * d_aft_cone_beg
 
     X_tank_back = a * d_tank + b
     X_tank_front = X_tank_back - L_tank
-    X_aft_cyl_beg = Beechcraft_1900D["X_aft_cyl_beg"]
-    return X_tank_front, X_tank_back, X_aft_cyl_beg
+
+    return X_tank_front, X_tank_back
 
 def determine_diameter_in_cone(
     X_position: Union[float, np.ndarray]
 ) -> Union[float, np.ndarray]:
     a = (
-        Beechcraft_1900D["X_aft_cone_beg"]
-        - Beechcraft_1900D["X_aft_cone_end"]
+        X_aft_cone_beg
+        - X_aft_cone_end
     ) / (
-        Beechcraft_1900D["d_aft_cone_beg"]
-        - Beechcraft_1900D["d_aft_cone_end"]
+        d_aft_cone_beg
+        - d_aft_cone_end
     )
-    b = Beechcraft_1900D["X_aft_cone_beg"] - a * Beechcraft_1900D["d_aft_cone_beg"]
+    b = X_aft_cone_beg - a * d_aft_cone_beg
     return (X_position - b) / a
 
 def check_for_seating_interference(
@@ -72,23 +73,24 @@ def shift_tank_fwd(
 
 def tank_and_TMS_positioning_specs(
     L_tank: Union[float, np.ndarray],
-    d_tank_TMS: Union[float, np.ndarray]
+    d_tank_TMS: Union[float, np.ndarray],
+    X_aft_cyl_beg: Union[float, np.ndarray]
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    Lc0 = Beechcraft_1900D["l_aft_cyl"]
+    Lc0 = l_aft_cyl
     L_tank_cyl = np.where(Lc0 >= L_tank, Lc0, L_tank)
     L_tank_cone = L_tank - L_tank_cyl
 
     # cylindrical part
     V_cyl = (
         L_tank_cyl
-        * Beechcraft_1900D["h_aft_cyl_ave"] / 2
-        * Beechcraft_1900D["w_aft_cyl"] / 2
+        * h_aft_cyl_ave / 2
+        * w_aft_cyl / 2
         * np.pi
     )
-    X_cyl = Beechcraft_1900D["X_aft_cyl_beg"] + L_tank_cyl / 2
+    X_cyl = X_aft_cyl_beg + L_tank_cyl / 2
 
     # conical part
-    d0 = Beechcraft_1900D["d_aft_cone_beg"]
+    d0 = d_aft_cone_beg
     V_cone = (
         1/3
         * np.pi
@@ -98,13 +100,13 @@ def tank_and_TMS_positioning_specs(
     X_cone = (
         L_tank_cone / 4
         * (
-            Beechcraft_1900D["X_aft_cone_beg"]**2
-            + 2 * Beechcraft_1900D["X_aft_cone_beg"] * d_tank_TMS
+            X_aft_cone_beg**2
+            + 2 * X_aft_cone_beg * d_tank_TMS
             + 3 * d_tank_TMS**2
           )
         / (
-            Beechcraft_1900D["X_aft_cone_beg"]**2
-            + Beechcraft_1900D["X_aft_cone_beg"] * d_tank_TMS
+            X_aft_cone_beg**2
+            + X_aft_cone_beg * d_tank_TMS
             + d_tank_TMS**2
           )
     )
@@ -118,9 +120,9 @@ def calculate_cargo_specs(
     L_tank_cone: Union[float, np.ndarray],
     d_cargo_front: Union[float, np.ndarray]
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    L0 = Beechcraft_1900D["l_aft_cone"]
+    L0 = l_aft_cone
     L_aft_cargo = L0 - L_tank_cone
-    d_end = Beechcraft_1900D["d_aft_cone_end"]
+    d_end = d_aft_cone_end
 
     V_aft_cargo = (
         1/3
@@ -133,13 +135,13 @@ def calculate_cargo_specs(
         L_aft_cargo / 4
         * (
             d_cargo_front**2
-            + 2 * d_cargo_front * Beechcraft_1900D["X_aft_cone_end"]
-            + 3 * Beechcraft_1900D["X_aft_cone_end"]**2
+            + 2 * d_cargo_front * X_aft_cone_end
+            + 3 * X_aft_cone_end**2
           )
         / (
             d_cargo_front**2
-            + d_cargo_front * Beechcraft_1900D["X_aft_cone_end"]
-            + Beechcraft_1900D["X_aft_cone_end"]**2
+            + d_cargo_front * X_aft_cone_end
+            + X_aft_cone_end**2
           )
     )
 
@@ -149,11 +151,11 @@ def main(
     L_tank: Union[float, np.ndarray],
     d_tank: Union[float, np.ndarray]
 ) -> dict:
-    Xf, Xb, Xc          = determine_position_in_cone(L_tank, d_tank)
-    Xc, num_PAX         = check_for_seating_interference(Xf)
-    Xf, Xb, d_tank_TMS  = shift_tank_fwd(Xf, Xb, Xc, L_tank, d_tank)
-    Lc, d_tank_TMS, Vt, Xt = tank_and_TMS_positioning_specs(L_tank, d_tank_TMS)
-    Va, Ma, Xa          = calculate_cargo_specs(Lc, d_tank_TMS)
+    Xf, Xb                  = determine_position_in_cone(L_tank, d_tank)
+    Xc, num_PAX             = check_for_seating_interference(Xf)
+    Xf, Xb, d_tank_TMS      = shift_tank_fwd(Xf, Xb, Xc, L_tank, d_tank)
+    Lc, d_tank_TMS, Vt, Xt  = tank_and_TMS_positioning_specs(L_tank, d_tank_TMS, Xc)
+    Va, Ma, Xa              = calculate_cargo_specs(Lc, d_tank_TMS)
 
     return {
         "X_tank_front": Xf,
