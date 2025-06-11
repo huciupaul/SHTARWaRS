@@ -76,6 +76,7 @@ class RamAirHeatExchanger():
         self.dyn_visc = fluid.dyn_visc
         self.mf_coolant = fluid.mf_given
         self.k_cool = fluid.k
+        self.fluid = fluid
 
         # To be determined during sizing:
         self.U_ra = None
@@ -123,6 +124,8 @@ class RamAirHeatExchanger():
     def size_exchanger(self, heat_w, T_air_in_K):
         self.U_rad()
 
+        coolant_temp_out = self.coolant_temp - heat_w / (self.fluid.cp * self.fluid.mf_given)  
+
         # Iteration for delta T
         deltaT_grid = np.linspace(1, 150, 100 )        
         tol = 0.1                                       # “almost 1” → ±1 %
@@ -130,7 +133,7 @@ class RamAirHeatExchanger():
         for T in deltaT_grid:
             print(T)
 
-            dT1 = self.coolant_temp - T_air_in_K                      
+            dT1 = coolant_temp_out - T_air_in_K                      
             dT2 = self.coolant_temp - (T_air_in_K + T)                
 
             dT_lm = (dT2 - dT1) / np.log(dT2 / dT1)
@@ -140,7 +143,13 @@ class RamAirHeatExchanger():
             vol_rad = self.required_area/beta
             front_area_rad = vol_rad/0.05
             length_rad = np.sqrt(front_area_rad)
-            mf_air = front_area_rad * ambient_conditions['V'] * ambient_conditions['rho']
+            if ambient_conditions['V'] < vel_fan:
+                mf_air = front_area_rad * vel_fan * ambient_conditions['rho']
+                fan = Fan(fan_eff=fan_eff, ra_mf=mf_air, ra_density=ambient_conditions['rho'], delta_pressure=delta_pressure)
+                power_fan = fan.power()
+            else:
+                mf_air = front_area_rad * ambient_conditions['V'] * ambient_conditions['rho']
+                power_fan = 0.0
 
             # --- ratio we want to drive to 1 -----------------------------------------
             ratio = (mf_air * cp_air * T) / (self.U_ra * dT_lm)
@@ -152,8 +161,10 @@ class RamAirHeatExchanger():
                 print("Volume of the radiator", vol_rad, "m³")
                 break
             
-
-        return self.required_area
+        cool_out = Fluid(name = "Coolant Out", T = coolant_temp_out, P = self.fluid.P, 
+                         mf = self.fluid.mf_given, fluid_type = self.fluid.fluid_type)
+        
+        return self.required_area, cool_out, power_fan
 
     # THRUST RECOVERY
     def thrust_ratio(
@@ -669,8 +680,8 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
     sources = np.array([Q_dot_fc, Q_dot_eps])
     Q_dot_rem = np.sum(sources)
 
-    h2_mf_fc = h2_mf_fc * 2  # Total H2 mass flow rate to fuel cell (both wings)
-    h2_mf_cc = h2_mf_cc * 2  # Total H2 mass flow rate to combustion chamber (both wings)
+    h2_mf_fc = h2_mf_fc   # Total H2 mass flow rate to fuel cell (both wings)
+    h2_mf_cc = h2_mf_cc   # Total H2 mass flow rate to combustion chamber (both wings)
 
     # Calculate pipe diameter for H2
     h2_test = Fluid(
@@ -872,13 +883,9 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
     Q_dot_rem -= Q_abs  
     print(Q_dot_rem)
     
-    #TODO: Fix if logic and add pipes,
     if Q_dot_rem > 0:
         Rad_1 = RamAirHeatExchanger(coolant_temp_K=ra_coolant_temp, fluid=cool_23)
-        radiator_area = Rad_1.size_exchanger(Q_dot_rem/2, T_amb)
-        #TODO: Coolant 24
-        cool_24 = Fluid(name="Cool_24", T=cool_23.T, P=cool_23.P, C=0, mf=cool_23.mf_given, fluid_type=coolant) 
-        cool_24.T -= Q_dot_rem / (cool_24.mf_given * cool_24.cp)
+        radiator_area, cool_24, power_fan = Rad_1.size_exchanger(Q_dot_rem/2, T_amb)
 
     else:
         # No need for radiator, all waste heat is absorbed

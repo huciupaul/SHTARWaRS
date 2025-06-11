@@ -109,6 +109,7 @@ efficiency_teg = 0.05
 # Fan
 fan_eff = 0.7
 delta_pressure = 1000  # Pa, pressure drop across the fan
+vel_fan = 120 * 0.9
 
 # Ram Air HX
 h_air = 250         # REF: Shah 
