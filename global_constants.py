@@ -117,6 +117,7 @@ cp_air = 1005.0
 
 # Skin HX
 area_wing = 2.3
+S_w = 28.79
 
 # -- Air
 prandtl_air = 0.71
