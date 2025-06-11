@@ -165,7 +165,7 @@ def mix_streams_const_HP(stream1, stream2, P):
     mdot_mix = stream1.mdot + stream2.mdot
 
     # Total enthalpy (J)
-    H_total = stream1.enthalpy + stream2.enthalpy
+    H_total = stream1.gas.enthalpy + stream2.gas.enthalpy
 
     # Mixture composition (mass-weighted)
     X1 = stream1.X

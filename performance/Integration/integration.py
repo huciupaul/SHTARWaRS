@@ -13,7 +13,7 @@ def X_PAX(num_PAX) -> float:
     """Calculate the center of gravity position of the passenger seats."""
     return ((num_PAX-3)*M_PAX * (X_first_seat + (num_PAX-5)/2 * seat_pitch / 2) + 3*M_PAX * (X_first_seat + (num_PAX-3)/2 * seat_pitch)) / (num_PAX*M_PAX)
 
-def X_OEW(num_PAX, M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_TMS, X_tank_front) -> float:
+def X_OEW(num_PAX, M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_TMS, X_tank_front) -> Tuple[float, float]:
     """Calculate the center of gravity position of the original aircraft's empty weight."""
     """Original aircraft OEW"""
     M_cargo_og = V_cargo_fwd * rho_cargo + Beechcraft_1900D['M_cargo_aft']
@@ -34,7 +34,12 @@ def X_OEW(num_PAX, M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_
 
     return OEW_H2D2, X_OEW_H2D2
 
-def __cargo(X_cargo_fwd, X_cargo_aft, M_cargo_fwd, M_cargo_aft, X_OEW, OEW):
+def __cargo(X_cargo_fwd: float,
+            X_cargo_aft: float,
+            M_cargo_fwd: float,
+            M_cargo_aft: float,
+            X_OEW: float,
+            OEW: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Calculate the center of gravity position and weight of OEW+cargo."""
     W_cargo_front = np.zeros(3)
     X_cargo_front = np.zeros(3)
@@ -42,6 +47,7 @@ def __cargo(X_cargo_fwd, X_cargo_aft, M_cargo_fwd, M_cargo_aft, X_OEW, OEW):
     X_cargo_back = np.zeros(3)
 
     """Initial point: OEW"""
+    print(OEW, type(OEW))
     W_cargo_front[0] = OEW
     X_cargo_front[0] = X_OEW
     W_cargo_back[0] = W_cargo_front[0]
@@ -61,7 +67,9 @@ def __cargo(X_cargo_fwd, X_cargo_aft, M_cargo_fwd, M_cargo_aft, X_OEW, OEW):
 
     return X_cargo_front, W_cargo_front, X_cargo_back, W_cargo_back
 
-def __passengers(X_cargo_front, W_cargo_front, num_PAX):
+def __passengers(X_cargo_front: float,
+                 W_cargo_front: float,
+                 num_PAX: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Calculate the center of gravity position and weight of OEW+cargo+PAX."""
     X_start = X_cargo_front[-1]
     W_start = W_cargo_front[-1]
@@ -101,7 +109,9 @@ def __passengers(X_cargo_front, W_cargo_front, num_PAX):
 
     return X_seat_front, W_seat_front, X_seat_back, W_seat_back
 
-def __fuel(X_seat_front, W_seat_front, X_wing, M_fuel):
+def __fuel(X_seat_front: float,
+           W_seat_front: float,
+           M_fuel: float) -> Tuple[np.ndarray, np.ndarray]:
     """Calculate the center of gravity position and weight of OEW+cargo+PAX+fuel."""
     X_fuel = np.zeros(2)
     W_fuel = np.zeros(2)
@@ -124,7 +134,7 @@ def min_max_X_cg_positions(
     OEW_H2D2, X_OEW_H2D2 = X_OEW(num_PAX, M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_TMS, X_tank_front) 
     X_cargo_front, W_cargo_front, X_cargo_back, W_cargo_back = __cargo(X_cargo_fwd, X_cargo_aft, M_cargo_fwd, M_cargo_aft, X_OEW_H2D2, OEW_H2D2)
     X_seat_front, W_seat_front, X_seat_back, W_seat_back = __passengers(X_cargo_front, W_cargo_front, num_PAX)
-    X_fuel, W_fuel = __fuel(X_seat_front, W_seat_front, X_wing, M_fuel)
+    X_fuel, W_fuel = __fuel(X_seat_front, W_seat_front, M_fuel)
 
     arrays = [X_cargo_front, X_cargo_back, X_seat_front, X_seat_back, X_fuel]
     array_names = ["X_cargo", "X_seat_front", "X_seat_back", "X_fuel"]
@@ -162,7 +172,7 @@ def min_max_X_cg_positions(
 # def plot_loading_diagram():
 #     X_cargo, W_cargo = __cargo(X_c, W_c, X_OEW, OEW)
 #     X_seat_front, W_seat_front, X_seat_back, W_seat_back = __passengers(X_cargo, W_cargo, W_s, num_seats, X_most_forward_seat, seat_spacing)
-#     X_fuel, W_fuel = __fuel(X_seat_back, W_seat_back, X_f, W_f)
+#     X_fuel, W_fuel = __fuel(X_seat_back, W_seat_back, W_f)
 #     min_cg, max_cg, min_cg_with_margin, max_cg_with_margin = __min_max_X_cg_positions(X_cargo, X_seat_front, X_seat_back, X_fuel)
 
 #     print(f'OEW CG: ', X_OEW)
