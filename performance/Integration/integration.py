@@ -3,7 +3,10 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 import matplotlib.pyplot as plt
 
-from SHTARWaRS.global_constants import Beechcraft_1900D, seat_pitch, rho_cargo, M_PAX, M_cargo_fwd, X_most_fwd, X_most_aft, X_cargo_fwd, X_first_seat, X_front_of_first_seat, X_wing_end, V_cargo_fwd, V_wing, l_aft_cyl, w_aft_cyl, h_aft_cyl_ave, d_aft_cone_beg, d_aft_cone_end, l_aft_cone, X_aft_cone_beg, X_aft_cone_end, X_wing
+from SHTARWaRS.global_constants import Beechcraft_1900D, seat_pitch, rho_cargo, M_PAX, \
+    X_most_fwd, X_most_aft, X_cargo_fwd, X_first_seat, \
+        X_wing_end, V_cargo_fwd, V_wing,\
+            X_wing
 from SHTARWaRS.performance.Integration import aft_configuration as acfg
 
 def X_PAX(num_PAX) -> float:
@@ -24,7 +27,7 @@ def X_OEW(num_PAX, M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_
 
     # CG position of the OEW of Beechcraft 1900D based on its most forward MTOW CG position
     # TODO: rethink this choice
-    X_OEW_og = (Beechcraft_1900D['MTOW'] * X_most_fwd - Beechcraft_1900D['M_fuel'] * X_wing - M_payload_og * X_payload_og) / Beechcraft_1900D['OEW']
+    X_OEW_og = (Beechcraft_1900D['MTOW'] * X_most_aft - Beechcraft_1900D['M_fuel'] * X_wing - M_payload_og * X_payload_og) / Beechcraft_1900D['OEW']
 
     OEW_H2D2 = Beechcraft_1900D['OEW'] + M_FC + M_EPS + M_TMS_fwd + M_TMS_aft + M_tank + M_TMS_mid
     X_OEW_H2D2 = (Beechcraft_1900D['OEW'] * X_OEW_og + (M_FC + M_EPS + M_TMS_fwd) * X_wing + (M_TMS_aft + M_tank) * X_tank_TMS + M_TMS_mid * (X_wing_end + X_tank_front) / 2) / OEW_H2D2
@@ -110,7 +113,13 @@ def __fuel(X_seat_front, W_seat_front, X_wing, M_fuel):
 
     return X_fuel, W_fuel
 
-def min_max_X_cg_positions(X_cargo_aft, M_cargo_aft, num_PAX, M_fuel):
+def min_max_X_cg_positions(
+    X_cargo_aft, M_cargo_aft,
+    num_PAX, M_fuel, M_FC,
+    M_TMS_fwd, M_TMS_aft,
+    M_TMS_mid, M_EPS, M_tank,
+    X_tank_TMS, X_tank_front
+    ):
     """Find the minimum and maximum center of gravity positions."""
     OEW_H2D2, X_OEW_H2D2 = X_OEW(num_PAX, M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_TMS, X_tank_front) 
     X_cargo_front, W_cargo_front, X_cargo_back, W_cargo_back = __cargo(Beechcraft_1900D['X_cargo_fwd'], X_cargo_aft, Beechcraft_1900D['M_cargo_fwd'], M_cargo_aft, X_OEW_H2D2, OEW_H2D2)
@@ -221,9 +230,9 @@ def main(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         Constrained design tensor, array of N_PAX, and array of m_cargo.    
     """
     # Create np.array of relevant design variables
-    var_idx = np.array([0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13])
+    var_idx = np.array([0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 13])
     m_EPS, m_FC, m_H2, m_storage, \
-        V_FC, V_storage, L_storage, D_storage, \
+        V_FC, L_storage, D_storage, \
             m_cargo, m_TMS_front, m_TMS_aft, m_TMS_mid = design[:, :, :, var_idx]
             
     # Apply volumetric constraints
@@ -240,20 +249,27 @@ def main(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     N_PAX = ac_config['num_PAX']
     m_cargo = ac_config['M_aft_cargo']
     X_aft_cargo = ac_config['X_aft_cargo']
+    X_tank_front = ac_config['X_tank_front']
+    X_tank_TMS = ac_config['X_tank_TMS']
     
     _, _, min_cg_with_margin, max_cg_with_margin = min_max_X_cg_positions(
         X_cargo_aft=X_aft_cargo,
         M_cargo_aft=m_cargo,
         num_PAX=N_PAX,
-        M_fuel=m_H2
+        M_fuel=m_H2,
+        M_FC=m_FC,
+        M_TMS_fwd=m_TMS_front,
+        M_TMS_aft=m_TMS_aft,
+        M_TMS_mid=m_TMS_mid,
+        M_EPS=m_EPS,
+        M_tank=m_storage,
+        X_tank_TMS=X_tank_TMS,
+        X_tank_front=X_tank_front
     )
     
     valid_design &= (
-        (X_most_fwd <= min_cg_with_margin <= X_most_aft) &
-        (X_most_fwd <= max_cg_with_margin <= X_most_aft) &
+        (X_most_fwd <= min_cg_with_margin <= X_most_aft) & 
+        (X_most_fwd <= max_cg_with_margin <= X_most_aft)
     )
     
-    
-    
-    # TODO: Implement integration mask logic
     return valid_design, N_PAX, m_cargo

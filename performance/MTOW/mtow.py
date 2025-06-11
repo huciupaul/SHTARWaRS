@@ -21,7 +21,6 @@ _PW_req_curve_cr = _cons["PW_req_curve_cr"]
 
 
 def power_and_wing_loading(
-    design: np.ndarray,
     loading: np.ndarray
     ) -> np.ndarray:
     """Check loading against original aircraft constraints analysis and return a mask.
