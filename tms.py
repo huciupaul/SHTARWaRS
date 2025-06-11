@@ -908,15 +908,22 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
     
     if Q_dot_rem > 0:
         Rad_1 = RamAirHeatExchanger(coolant_temp_K=ra_coolant_temp, fluid=cool_23)
-        radiator_area, cool_24, power_fan,eta_p,net_drag = Rad_1.size_exchanger(Q_dot_rem/2, T_amb)
-        
-        TR = Rad_1.thrust_ratio(
-            gamma = k_air,
-            R     = R_AIR,
-            M0    = ambient_conditions["M"],
-            T0    = ambient_conditions["T"],
-            eta_p07 = eta_p,  
-            CD_d_CD_sp = 0.11)  
+        tol = 0.1
+        rad_area_0 = 0
+        radiator_area = 1
+        rad_exists = False
+        while abs(radiator_area - rad_area_0)>tol:
+            if rad_exists:
+                rad_area_0 = radiator_area
+            radiator_area, cool_24, power_fan,eta_p,net_drag = Rad_1.size_exchanger(Q_dot_rem/2, T_amb)
+            Rad_1.TR = Rad_1.thrust_ratio(
+                gamma = k_air,
+                R     = R_AIR,
+                M0    = ambient_conditions["M"],
+                T0    = ambient_conditions["T"],
+                eta_p07 = eta_p,  
+                CD_d_CD_sp = 0.11)  
+            rad_exists = True 
     else:
         # No need for radiator, all waste heat is absorbed
         cool_24 = Fluid(name="Cool_24", T=cool_23.T, P=cool_23.P, C=0, mf=cool_23.mf_given, fluid_type=coolant)
@@ -946,7 +953,10 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
                 'pressure': var_value.P
             }
 
-    return fluids_dict
+    #output_list = [
+
+
+    return fluids_dict #, output_list
 
 # RUN -----------------------------------------------------------
 if __name__ == "__main__":
