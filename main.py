@@ -51,6 +51,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                 delta_ap, c_d_rad = 0.0, 0.0
                 m_eps_prev, m_fc_tms_prev, m_h2_prev, m_sto_prev, m_cargo_prev = 0.0, 326.63, 315.39, 141.38, 714.05 # from midterm
                 MTOW += (m_eps + m_fc_tms_prev + m_h2_prev + m_sto_prev)  # Initial MTOW
+                MTOW_prev = 0.0
 
                 # Convergence of MTOW, stop if the change is less than 1% of the previous MTOW or reached max number of iterations
                 for i in range(max_iter):
