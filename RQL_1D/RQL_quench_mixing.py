@@ -37,7 +37,7 @@ class gas_obj:
         self.gas.TPX = T, P, X
 
 
-def main():
+def main(dt: float = 0.01) -> Tuple[List[float], np.ndarray]:
     #----------Inputs----------
     rich_ex = gas_obj(
             mdot=0.23071218802678672,
@@ -48,7 +48,7 @@ def main():
 
     # Air bleeded, to be mixed with rich exhaust to create stoichiometric mixture
     air = gas_obj(
-            mdot=None,
+            mdot=1.0,
             X="N2:0.78084, O2:0.20946",
             T=603.0,
             P=rich_ex.P
@@ -56,7 +56,7 @@ def main():
 
     n_h2 = rich_ex.mdot * rich_ex.gas.X[1]
     n_o2 = 0.5 * n_h2  # stoichiometric ratio for H2 combustion, assuming no O2 in exhaust
-    air.mdot = n_o2 / air.gas.X[1]
+    air.mdot = n_o2 / air.gas.X[3]
 
     X_mix1, T_mix1, mdot_mix1 = mix_streams_const_HP(
         stream1=rich_ex,
@@ -71,53 +71,59 @@ def main():
             P=rich_ex.P
             )
 
-    # Liquid water injected
-    lh2o = gas_obj(
-            mdot=np.arange(0, 0.26, 1e-2),
-            X="H2O:1",
-            T=333.0,
-            P=rich_ex.P
-            )
-
     #----------Outputs----------
     times_to_reach_limit_NOx = []
 
-    NOx_limit = 25 * 1e-6 # mole fraction
+    mdot_h2o = np.arange(0, 0.2 + 1e-2, 1e-2)  # kg/s
+    NOx_limit = 2 * 1e-9 # mole fraction
     time_limit = 10.0
-    dt = 1e-2
 
     #----------Iteration----------
-    for m_dot_h2o_i in tqdm(lh2o.mdot):
+    for m_dot_h2o_i in tqdm(mdot_h2o):
         NOx_emitted = 0.0
         t = 0.0
+
+        # TODO: Liquid water injected
+        lh2o = gas_obj(
+                mdot=m_dot_h2o_i,
+                X="H2O:1",
+                T=333.0,
+                P=rich_ex.P
+                )
 
         X_mix, T_mix, mdot_mix = mix_streams_const_HP(
             stream1=stoich_mix,
             stream2=lh2o,
             P=rich_ex.P
         )
+
         stoich_with_water = gas_obj(
             mdot=mdot_mix,
             X=X_mix,
             T=T_mix,
             P=rich_ex.P
         )
+        print(f"m_dot_h2o_i = {m_dot_h2o_i:.3f} kg/s, T = {stoich_with_water.T:.2f} K, P = {stoich_with_water.P/ct.one_atm:.2f} atm, X = {stoich_with_water.X}")
 
         while NOx_emitted < NOx_limit and t < time_limit:
-            # Set up 0D reactor
-            reactor = ct.IdealGasConstPressureReactor(stoich_with_water.gas)
-            sim = ct.ReactorNet([reactor])
-            sim.advance(t)
-            NOx_emitted += reactor.thermo['NO'].X[0]
-            t += dt
+            try:
+                # Set up 0D reactor
+                reactor = ct.IdealGasConstPressureReactor(stoich_with_water.gas)
+                sim = ct.ReactorNet([reactor])
+                sim.advance(t)
+                NOx_emitted += reactor.thermo['NO'].X[0]
+                t += dt
+            except Exception as e:
+                print("Error at m_dot_h2o_i =", m_dot_h2o_i)
+                print("T =", stoich_with_water.gas.T)
+                print("P =", stoich_with_water.gas.P)
+                print("X =", stoich_with_water.gas.X)
+                raise
 
         times_to_reach_limit_NOx.append(t)
+    times_to_reach_limit_NOx = np.array(times_to_reach_limit_NOx)
 
-    # Convert lists to numpy arrays for plotting
-    times = np.array(times_to_reach_limit_NOx)
-    mdot_h2o = np.array(lh2o.mdot)
-
-    return times, mdot_h2o
+    return times_to_reach_limit_NOx, mdot_h2o
 
 def plot(mdot_h2o: np.ndarray,
     times: np.ndarray) -> None:
@@ -132,5 +138,5 @@ def plot(mdot_h2o: np.ndarray,
     plt.show()
 
 if __name__ == "__main__":
-    times, mdot_h2o = main()
+    times, mdot_h2o = main(dt=0.001)
     plot(mdot_h2o, times)
