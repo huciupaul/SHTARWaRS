@@ -94,7 +94,7 @@ def tank_and_TMS_positioning_specs(
         * L_tank_cone
         * (d0**2 + d_tank_TMS**2 + d0 * d_tank_TMS) / 4
     )
-    X_cone = (
+    X_cone = X_aft_cyl_beg + (
         L_tank_cone / 4
         * (
             X_aft_cone_beg**2
@@ -115,7 +115,8 @@ def tank_and_TMS_positioning_specs(
 
 def calculate_cargo_specs(
     L_tank_cone: Union[float, np.ndarray],
-    d_cargo_front: Union[float, np.ndarray]
+    d_cargo_front: Union[float, np.ndarray],
+    X_aft_cyl_beg: Union[float, np.ndarray]
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     L0 = l_aft_cone
     L_aft_cargo = L0 - L_tank_cone
@@ -128,7 +129,7 @@ def calculate_cargo_specs(
         * (d_cargo_front**2 + d_end**2 + d_cargo_front * d_end) / 4
     )
     M_aft_cargo = rho_cargo * V_aft_cargo
-    X_aft_cargo = (
+    X_aft_cargo = X_aft_cyl_beg + (
         L_aft_cargo / 4
         * (
             d_cargo_front**2
@@ -152,7 +153,7 @@ def cargo_main(
     Xc, num_PAX             = check_for_seating_interference(Xf)
     Xf, Xb, d_tank_TMS      = shift_tank_fwd(Xf, Xb, Xc, L_tank, d_tank)
     Lc, d_tank_TMS, Vt, Xt  = tank_and_TMS_positioning_specs(L_tank, d_tank_TMS, Xc)
-    Va, Ma, Xa              = calculate_cargo_specs(Lc, d_tank_TMS)
+    Va, Ma, Xa              = calculate_cargo_specs(Lc, d_tank_TMS, Xc)
 
     return {
         "X_tank_front": Xf,
