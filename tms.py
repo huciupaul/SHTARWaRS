@@ -25,7 +25,7 @@ ambient_conditions= {
     'T': 238.651,  # Ambient temperature in K
     'M': 0.4,  # Flight Mach number
     'V': 123.8644,  # Flight speed in m/s
-    'rho': 0.55  # Air density at cruise in kg/m^3
+    'rho': 0.550798  # Air density at cruise in kg/m^3
 }
 
  
@@ -150,6 +150,7 @@ class RamAirHeatExchanger():
             vol_rad = self.required_area/beta
             front_area_rad = vol_rad/0.05
             length_rad = np.sqrt(front_area_rad)
+            #front_area_rad = np.cos(70*np.pi/180)*length_rad
             if ambient_conditions['V'] < vel_fan:
                 mf_air = front_area_rad * vel_fan * ambient_conditions['rho']
                 fan = Fan(fan_eff=fan_eff, ra_mf=mf_air, ra_density=ambient_conditions['rho'], delta_pressure=delta_pressure)
@@ -175,7 +176,10 @@ class RamAirHeatExchanger():
                 print("C_D for the radiators:", C_D_rad, "-")
                 print("The net drag of the aircraft due to the radiators:", net_drag, "N")
                 break
+
         self.delta_t_air = T
+
+         # Pressure drop
         print(f"Air temperature rise: {self.delta_t_air:.2f} K")
         A_0 = front_area_rad
         P_air = ambient_conditions['rho'] * ambient_conditions['V']**2 * 0.5 + p_amb 
@@ -189,10 +193,10 @@ class RamAirHeatExchanger():
         Re = G * D_h / mu_air
         f = 0.046 * Re**-0.2
         t_w = f /( 2 * g_c * ambient_conditions['rho'] / G**2 )
-        pressure_drop = mu_air /(2* g_c * ambient_conditions['rho']) * (4 * L /D_h**2) * (mf_air**2/A_0) * (f * Re) 
+        pressure_drop = mu_air /(2* g_c * ambient_conditions['rho']) * (4 * L /D_h**2) * (mf_air/A_0) * (f * Re) 
         print(f"Pressure drop in the radiator: {pressure_drop:.2f} Pa")
         eta_p = 1 - pressure_drop / P_air 
-        print(f"Propulsive efficiency: {eta_p:.3f}")
+        print(f"Propulsive efficiency: {eta_p:.5f}")
 
         cool_out = Fluid(name = "Coolant Out", T = coolant_temp_out, P = self.fluid.P, 
                          mf = self.fluid.mf_given, fluid_type = self.fluid.fluid_type)
@@ -201,31 +205,7 @@ class RamAirHeatExchanger():
 
     # THRUST RECOVERY   
     def thrust_ratio(self,gamma, R, M0, T0, eta_p07, CD_d_CD_sp):
-        """
-        Vectorised thrust-ratio calculation.
 
-        Parameters
-        ----------
-        deltaT_HX0 : float or array-like
-            Heat-exchanger temperature rise(s) [K].
-        gamma      : float
-            Ratio of specific heats.
-        R          : float
-            Gas constant [J kg⁻¹ K⁻¹].
-        M0         : float
-            Flight Mach number.
-        T0         : float
-            Ambient static temperature [K].
-        eta_p07    : float
-            Propulsive efficiency term.
-        CD_d_CD_sp : float
-            Sum (C_D,d + C_D,sp).
-
-        Returns
-        -------
-        TR : ndarray
-            Thrust ratio(s) corresponding to `deltaT_HX0`.
-        """
         deltaT_HX0 = self.delta_t_air
         comp_ratio = (1.0 + 0.5 * (gamma - 1.0) * M0**2) * eta_p07 ** ((gamma - 1.0) / gamma)
 
