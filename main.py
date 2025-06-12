@@ -15,6 +15,7 @@ import pickle
 from eps.eps_sizing import eps_main  # Import EPS sizing function
 from fpp.flight import fpp_main  # Import FPP sizing function
 from storage.tank import main_storage  # Import storage sizing function
+from performance.Integration.aft_configuration import cargo_main  # Import cargo sizing function
 
 
 
@@ -75,27 +76,38 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     # Storage
                     m_sto, V_sto, t1, dv, t2, length_sto, diameter_sto = main_storage(m_h2)
                     
+                    # Cargo
+                    result = cargo_main(length_sto, diameter_sto)
+
+                    X_tank_front: float = result["X_tank_front"]
+                    X_tank_back:  float = result["X_tank_back"]
+                    X_tank_TMS:   float = result["X_tank_TMS"]
+                    V_tank_TMS:   float = result["V_tank_TMS"]
+                    X_aft_cargo:  float = result["X_aft_cargo"]
+                    M_aft_cargo:  float = result["M_aft_cargo"]
+                    V_aft_cargo:  float = result["V_aft_cargo"]
+                    num_PAX:      int   = result["num_PAX"]
+
                     # Update delta_AP, c_D_rad based on the TMS code and get:
                     m_tms_front = 0
                     m_tms_aft = 0
                     m_tms_mid = 0
-                    m_cargo = 0
 
                     # --------- ADD INTEGRATION HERE ---------
                     
                     #MTOW update
                     MTOW_prev = MTOW
                     MTOW += ((m_eps - m_eps_prev) + (m_h2 - m_h2_prev) + (m_sto - m_sto_prev) + \
-                        (m_tms_front + m_tms_aft + m_tms_mid + m_fc - m_fc_tms_prev))
+                        (m_tms_front + m_tms_aft + m_tms_mid + m_fc - m_fc_tms_prev) + (M_aft_cargo - m_cargo_prev))
                     # Update the values based on the previous iteration
                     m_eps_prev = m_eps
                     m_fc_tms_prev = m_tms_aft + m_tms_front + m_tms_mid + m_fc
                     m_h2_prev = m_h2
                     m_sto_prev = m_sto
-                    m_cargo_prev = m_cargo
+                    m_cargo_prev = M_aft_cargo
 
                 # After convergence, store the results in the tensor, then in the 4D tensor
-                tensor = np.array([m_eps, m_fc, m_h2, m_sto,V_fc, V_sto, V_elmo, MTOW, length_sto, diameter_sto, m_cargo, m_tms_front, m_tms_aft, m_tms_mid])
+                tensor = np.array([m_eps, m_fc, m_h2, m_sto,V_fc, V_sto, V_elmo, MTOW, length_sto, diameter_sto, M_aft_cargo, m_tms_front, m_tms_aft, m_tms_mid])
                 result_tensor[i_split, i_toga, i_cruise, :] = tensor
                 loading_tensor[i_split, i_toga, i_cruise, :, :] = loading_vector
 

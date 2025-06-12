@@ -144,7 +144,7 @@ def calculate_cargo_specs(
 
     return V_aft_cargo, M_aft_cargo, X_aft_cargo
 
-def main(
+def cargo_main(
     L_tank: Union[float, np.ndarray],
     d_tank: Union[float, np.ndarray]
 ) -> dict:
