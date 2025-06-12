@@ -90,6 +90,8 @@ def power_and_wing_loading(
         )
     )
     
+    
+    
     # Cruise phase
     mask_cr = np.logical_and(
         np.logical_and(
@@ -119,5 +121,5 @@ def power_and_wing_loading(
     
     # Combine the masks for both flight phases
     mask = np.logical_and(mask_TO, mask_cr)
-    print(mask)
-    return mask_cr
+
+    return mask_TO
