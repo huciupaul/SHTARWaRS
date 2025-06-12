@@ -28,7 +28,7 @@ def X_OEW(M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_TMS, X_ta
 
     # CG position of the OEW of Beechcraft 1900D based on its most forward MTOW CG position
     # TODO: rethink this choice
-    X_OEW_og = (Beechcraft_1900D['MTOW'] * X_most_aft - Beechcraft_1900D['M_fuel'] * X_wing - M_payload_og * X_payload_og) / Beechcraft_1900D['OEW']
+    X_OEW_og = (Beechcraft_1900D['MTOW'] * X_most_fwd - Beechcraft_1900D['M_fuel'] * X_wing - M_payload_og * X_payload_og) / Beechcraft_1900D['OEW']
 
     OEW_H2D2 = Beechcraft_1900D['OEW'] + M_FC + M_EPS + M_TMS_fwd + M_TMS_aft + M_tank + M_TMS_mid
     X_OEW_H2D2 = (Beechcraft_1900D['OEW'] * X_OEW_og + (M_FC + M_EPS + M_TMS_fwd) * X_wing + (M_TMS_aft + M_tank) * X_tank_TMS + M_TMS_mid * (X_wing_end + X_tank_front) / 2) / OEW_H2D2
@@ -267,8 +267,9 @@ def main(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         cg_ok = (
             (X_most_fwd <= MTOW_cg_position <= X_most_aft)
         )
-        # print(f"Design {i}: CG OK: {cg_ok}, "
-        #       f"min_cg: {min_cg_margin:.2f} m, max_cg: {max_cg_margin:.2f} m, ")
+        print(f"Design {i}: CG OK: {cg_ok}, "
+              f"CG: {MTOW_cg_position:.2f} m, X_most_fwd: {X_most_fwd:.2f} m, "
+              f"X_most_aft: {X_most_aft:.2f} m, ")
         
 
         # ---- 1.4   Store results

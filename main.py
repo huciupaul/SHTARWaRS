@@ -16,6 +16,7 @@ from eps.eps_sizing import eps_main  # Import EPS sizing function
 from fpp.flight import fpp_main  # Import FPP sizing function
 from storage.tank import main_storage  # Import storage sizing function
 from performance.Integration.aft_configuration import cargo_main  # Import cargo sizing function
+from tms import tms_main  # Import TMS sizing function
 
  # TODO: swap mdot_fuel and mdot_air in fpp model to the pickle Alvaro sends
 
@@ -88,9 +89,31 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     # num_PAX:      int   = result["num_PAX"]
 
                     # Update delta_AP, D_rad based on the TMS code and get:
-                    m_tms_front = 0
-                    m_tms_aft = 0
-                    m_tms_mid = 0
+
+                    _, tms_outputs = tms_main(
+                        TMS_inputs['Q_dot_fc'][0], #ok
+                        Qdot_eps, #ok
+                        mission_profile['P_fc'][0], #ok
+                        TMS_inputs['p_cc'][0], #ok
+                        TMS_inputs['h2_mf_fc'][0], #ok
+                        TMS_inputs['h2_mf_cc'][0], #ok
+                        T_FC[0],
+                        TMS_inputs['t_cc'][0], #ok
+                        TMS_inputs['air_mf_fc'][0], #ok
+                        TMS_inputs['t_amb'][0], #ok
+                        TMS_inputs['rho_amb'][0], #ok
+                        TMS_inputs['V_amb'][0], #ok
+                        mission_profile['P'][0], #ok
+                        TMS_inputs['h2_mf_fc_recirculated'][0], 
+                        TMS_inputs['air_mf_fc'][0],
+                        7e5,  # p_sto
+                        TMS_inputs['h2o_mf_fc'][0]
+                    )
+                    D_rad = tms_outputs[0]
+                    aux_power = tms_outputs[1]
+                    m_tms_front = tms_outputs[2]
+                    m_tms_aft = tms_outputs[4]
+                    m_tms_mid = tms_outputs[3]
 
                     # --------- ADD INTEGRATION HERE ---------
                     
