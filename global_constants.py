@@ -89,6 +89,13 @@ LHV_H2 = 120e6                                         # [J/kg] Lower Heating Va
 A_inlet = 2*0.038410516                                 # [m^2] Inlet area
 MAXC = 2*906e3                                          # [W] Max Continuous Power
 
+# Engine performance models
+with open('data/interpolants/engine2035_interpolators.pkl', 'rb') as f:
+    engine_interpolators = pickle.load(f)
+
+mdot_fuel = engine_interpolators['mf_fuel_from_power']  # [kg/s] Mass flow rate of fuel from power
+mdot_air = engine_interpolators['mf_air_from_power']   # [kg/s] Mass flow rate of air from power
+
 eff_prop   = 0.80
 mu_TO      = 0.04
 S_g, S_land = 1163, 851

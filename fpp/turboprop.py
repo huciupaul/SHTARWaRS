@@ -7,10 +7,10 @@ from typing import Tuple
 # Global imports
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-import global_constants
-from global_constants import R_AIR, MAXC
 
+from global_constants import R_AIR, MAXC
+from global_constants import mdot_air as mfa
+from global_constants import mdot_fuel as mff
 class Turboprop:
     """Full model of a turboprop engine. The model is based on the following
     assumptions:
@@ -248,7 +248,8 @@ class Turboprop:
         mdot_min: float
     ):
         """Linear model of the air mass flow rate."""
-        mdot_air = (Pa/Pa_TOGA)*delta_mdot + mdot_min
+        # mdot_air = (Pa/Pa_TOGA)*delta_mdot + mdot_min
+        mdot_air = mfa(Pa/1e3)
         return mdot_air
     
     #  COMPUTE
@@ -280,7 +281,8 @@ class Turboprop:
         C_p = self.__PSFC(M0, T0)
         
         # Fuel flow rate
-        mdot_fuel = C_p*R_LHV*Pa/(1-0.16) # Max engine installation losses
+        # mdot_fuel = C_p*R_LHV*Pa/(1-0.16) # Max engine installation losses
+        mdot_fuel = mff(Pa/1e3)
 
         # Station 5 (turbine exit)
         T05, P05 = self.__05(mdot_air, mdot_fuel, self.c_pa, self.c_pg, T02, T03, T04, P04,
