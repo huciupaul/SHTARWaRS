@@ -133,8 +133,7 @@ def min_max_X_cg_positions(
     X_tank_TMS, X_tank_front
     ):
     """Find the minimum and maximum center of gravity positions."""
-    # OEW_H2D2, X_OEW_H2D2 = X_OEW(M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_TMS, X_tank_front) 
-    OEW_H2D2, X_OEW_H2D2 = X_OEW(M_FC, 183, 46, 17, M_EPS, M_tank, X_tank_TMS, X_tank_front) 
+    OEW_H2D2, X_OEW_H2D2 = X_OEW(M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_TMS, X_tank_front) 
     X_cargo_front, W_cargo_front, X_cargo_back, W_cargo_back = __cargo(X_cargo_aft, M_cargo_aft, X_OEW_H2D2, OEW_H2D2)
     X_seat_front, W_seat_front, X_seat_back, W_seat_back = __passengers(X_cargo_front, W_cargo_front, num_PAX)
     X_fuel, W_fuel = __fuel(X_seat_front, W_seat_front, M_fuel, X_tank_TMS)

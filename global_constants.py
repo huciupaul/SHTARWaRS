@@ -155,9 +155,9 @@ mli_thickness = 0.03 *1e-3 * mli_layers                 #https://www.sciencedire
 # From integration #
 ####################
 seat_pitch = 0.75
-rho_cargo = 161
+rho_cargo = 161                                         # https://www.icao.int/MID/Documents/2024/Aviation%20Statistics%20Workshop/PPT-Session%203.pdf
 
-M_PAX = 84
+M_PAX = 84                                              # https://www.easa.europa.eu/en/light/topics/passenger-weight-and-why-it-matters-safe-and-efficient-air-operations
 M_cargo_fwd = 1.01371425*rho_cargo
 
 X_most_aft  = 7.51
