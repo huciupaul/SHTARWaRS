@@ -72,13 +72,11 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     TMS_inputs, m_h2, FC_outputs, mission_profile, loading_vector = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, D_rad, aux_power, 10)
                     m_fc = FC_outputs['m_fc']
                     V_fc = FC_outputs['V_fc']
-                    
                     # Storage
                     m_sto, V_sto, t1, dv, t2, length_sto, diameter_sto = main_storage(m_h2)
                     
                     # Cargo
                     result = cargo_main(length_sto, diameter_sto)
-                    
                     M_aft_cargo:  float = result["M_aft_cargo"]
                     # Uncomment the following if needed
                     # X_tank_front: float = result["X_tank_front"]
