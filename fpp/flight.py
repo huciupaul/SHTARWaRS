@@ -526,7 +526,7 @@ class FlightMission:
                            h2_mf_fc=mdot_fc_arr, h2_mf_cc=mdot_cc_arr,
                            t_cc=T_cc, air_mf_fc=mdot_fc_air_in,
                            t_amb=T_arr, rho_amb=rho_arr, V_amb=V_arr,
-                           h2o_mf_fc=mdot_fc_H2O
+                           h2o_mf_fc=mdot_fc_H2O, h2_mf_fc_recirculated=mdot_fc_H2_recirculation
                            )
         
         self._profile = dict(time=time_arr, V=V_arr, alt=h_arr,

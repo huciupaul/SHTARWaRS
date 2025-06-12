@@ -618,7 +618,7 @@ def size_pipes_h2(h2_mf_fc, h2_mf_cc, p_sto,fluid,diam_est):
 # ------------------------------ MAIN PROGRAM -----------------------------------
 
 
-def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf_fc, T_amb, rho_amb, V_amb, p_amb, h2_mf_rec, air_out_fc, p_sto,h2o_mf_fc):
+def tms_main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf_fc, T_amb, rho_amb, V_amb, p_amb, h2_mf_rec, air_out_fc, p_sto,h2o_mf_fc):
     
     ambient_conditions= {
         'T': T_amb,  # Ambient temperature in K
@@ -674,8 +674,8 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
         mf=h2_mf_fc + h2_mf_cc,
         fluid_type='ParaHydrogen'
     )
-    diam_est = 0.10
-    diam_est_cool = diam_est *1.7
+    diam_est = 0.20
+    diam_est_cool = diam_est * 1.5
     ratio_h2_to_fc = h2_mf_fc / (h2_mf_fc + h2_mf_cc)  
     size_pipes_h2(h2_mf_fc, h2_mf_cc, p_sto,h2_test, diam_est)
 
@@ -1111,7 +1111,7 @@ if __name__ == "__main__":
     h2o_mf_fc = 0.05
 
     
-    fluids, outputs = main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf_fc, T_amb, rho_amb, V_amb, p_amb, h2_mf_rec, air_out_fc, p_sto, h2o_mf_fc)
+    fluids, outputs = tms_main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf_fc, T_amb, rho_amb, V_amb, p_amb, h2_mf_rec, air_out_fc, p_sto, h2o_mf_fc)
     
 
     tms_plotting.csv_fluids(fluids)
