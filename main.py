@@ -78,15 +78,16 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     
                     # Cargo
                     result = cargo_main(length_sto, diameter_sto)
-
-                    X_tank_front: float = result["X_tank_front"]
-                    X_tank_back:  float = result["X_tank_back"]
-                    X_tank_TMS:   float = result["X_tank_TMS"]
-                    V_tank_TMS:   float = result["V_tank_TMS"]
-                    X_aft_cargo:  float = result["X_aft_cargo"]
+                    
                     M_aft_cargo:  float = result["M_aft_cargo"]
-                    V_aft_cargo:  float = result["V_aft_cargo"]
-                    num_PAX:      int   = result["num_PAX"]
+                    # Uncomment the following if needed
+                    # X_tank_front: float = result["X_tank_front"]
+                    # X_tank_back:  float = result["X_tank_back"]
+                    # X_tank_TMS:   float = result["X_tank_TMS"]
+                    # V_tank_TMS:   float = result["V_tank_TMS"]
+                    # X_aft_cargo:  float = result["X_aft_cargo"]
+                    # V_aft_cargo:  float = result["V_aft_cargo"]
+                    # num_PAX:      int   = result["num_PAX"]
 
                     # Update delta_AP, c_D_rad based on the TMS code and get:
                     m_tms_front = 0
@@ -122,15 +123,6 @@ def main(minimum, maximum, no_of_splits, max_iter):
     print("Loading tensor saved to data/logs/loading_tensor.pkl")
 
     return None       
-    
-
-#main()
-
-# with open("data/logs/result_tensor.pkl", "rb") as f:
-#     loaded_tensor = pickle.load(f)
-
-# print(loaded_tensor[0,0,1,:])
-# print(loaded_tensor.shape)  # Print the shape of the tensor for verification
 
 
 if __name__=="__main__":
