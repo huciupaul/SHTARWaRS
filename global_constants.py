@@ -34,7 +34,7 @@ k = 1 / (np.pi * AR * e)
 S = 28.79                                               # [m²]
 MTOW_orig = 7_765   * G_0                               # [N] Original Maximum Take-Off Weight
 
-# Modified Aircraft MTOW (requirement)
+# Modified Aircraft MTOW (requirement)PLACEHOLDER
 MTOW_mod  = 8_037.6 * G_0                               # [N] Modified Maximum Take-Off Weight  
 
 # Original aircraft performance constants
@@ -62,7 +62,7 @@ GWP_H2O = 0.0005                                         # [-] Global Warming Po
 mass_specific_power = 5000                              # [W/kg] Specific power of the fuel cell stack (FZO Roadmap-report)
 volume_specific_power = 4000000                         # [W/m^3] Volume specific power of the fuel cell stack (FZO Roadmap-report)
 stoic_ratio_A = 1.1                                     # [-] Stoichiometric ratio of the anode
-stoic_ratio_C = 1.8                                     # [-] Stoichiometric ratio of the cathode
+stoic_ratio_C = 1.6                                     # [-] Stoichiometric ratio of the cathode
 pickle_path = 'fc/spline_eta_of_P.pkl'                     # Path to the efficiency function file
 # Load efficiency function from file
 with open(pickle_path, 'rb') as f:
