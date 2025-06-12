@@ -35,7 +35,7 @@ S = 28.79                                               # [m²]
 MTOW_orig = 7_765   * G_0                               # [N] Original Maximum Take-Off Weight
 
 # Modified Aircraft MTOW (requirement)PLACEHOLDER
-MTOW_mod  = 8_037.6 * G_0                               # [N] Modified Maximum Take-Off Weight  
+MTOW_mod  = 9459.6* G_0                               # [N] Modified Maximum Take-Off Weight  
 
 # Original aircraft performance constants
 V_TO, V_L  = 54.0167, 54.0167
