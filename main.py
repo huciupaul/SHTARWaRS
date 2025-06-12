@@ -56,7 +56,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
 
                 # Initialize variables for the first iteration of convergence
                 MTOW = Beechcraft_1900D['OEW'] # Original OEW
-                delta_ap, c_d_rad = 0.0, 0.0
+                aux_power, D_rad = 0.0, 0.0
                 m_eps_prev, m_fc_tms_prev, m_h2_prev, m_sto_prev, m_cargo_prev = 0.0, 326.63, 315.39, 141.38, 714.05 # from midterm
                 MTOW += (m_eps + m_fc_tms_prev + m_h2_prev + m_sto_prev)  # Initial MTOW
                 MTOW_prev = 0.0
@@ -69,7 +69,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                         break
                     
                     # FPP
-                    TMS_inputs, m_h2, FC_outputs, mission_profile, loading_vector = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, c_d_rad, delta_ap, 10)
+                    TMS_inputs, m_h2, FC_outputs, mission_profile, loading_vector = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, D_rad, aux_power, 10)
                     m_fc = FC_outputs['m_fc']
                     V_fc = FC_outputs['V_fc']
                     
@@ -89,7 +89,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     # V_aft_cargo:  float = result["V_aft_cargo"]
                     # num_PAX:      int   = result["num_PAX"]
 
-                    # Update delta_AP, c_D_rad based on the TMS code and get:
+                    # Update delta_AP, D_rad based on the TMS code and get:
                     m_tms_front = 0
                     m_tms_aft = 0
                     m_tms_mid = 0
