@@ -25,6 +25,15 @@ class FuelCell:
     with open('fc/spline_eta_of_P.pkl', 'rb') as f:
         efficiency_per_throttle = pickle.load(f)
 
+
+    @staticmethod
+    def water_air_separator(m_air_FC_out, m_H20_FC):
+        """
+        Calculates volume of the water-air separator based on the mass flow rates of air and water.
+        """
+        
+        pass
+
     
     def __init__(self, name, power_req_max, throttle_TOGA = 0.85):
         """
@@ -101,6 +110,9 @@ class FuelCell:
 
         # Calculate the mass flow rate of water produced by the fuel cell
         self.m_H20_FC = self.m_H2_FC * 18.01528 / 2.01568  # [kg/s] Mass flow rate of water produced by the fuel cell
+        # Calculate the mass flow rate of water recuperated from the fuel cell
+        self.m_H20_FC_CC = self.m_H20_FC * 0.85  # Assuming 85% of water is recuperated
+
 
         # Calculate the recirculation mass flow rate of hydrogen
         self.m_H2_recirculation = self.m_H2_FC * (gc.stoic_ratio_A - 1)
