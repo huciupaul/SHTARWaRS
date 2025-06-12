@@ -17,7 +17,7 @@ from fpp.flight import fpp_main  # Import FPP sizing function
 from storage.tank import main_storage  # Import storage sizing function
 from performance.Integration.aft_configuration import cargo_main  # Import cargo sizing function
 
-
+ # TODO: swap mdot_fuel and mdot_air in fpp model to the pickle Alvaro sends
 
 def main(minimum, maximum, no_of_splits, max_iter):
     # Check if the output directory exists, if not create it
