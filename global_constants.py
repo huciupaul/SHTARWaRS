@@ -192,3 +192,32 @@ Beechcraft_1900D = dict(
     X_cargo_aft = 12.64,
     X_aft_cyl_beg = 11.22
     )
+
+######################
+# Thermal Management System
+######################
+
+# TEG
+efficiency_teg = 0.05
+
+# Fan
+fan_eff = 0.7
+delta_pressure = 1000  # Pa, pressure drop across the fan
+vel_fan = 120 * 0.9
+
+# Ram Air HX
+h_air = 250         # REF: Shah 
+cp_air = 1005.0
+
+# Skin HX
+area_wing = 2.3
+S_w = 28.79
+
+# -- Air
+prandtl_air = 0.71
+reynolds_air = 1e7  # depends on temperature?
+
+# HX
+# -- FC
+deltaT_fc = 20
+HEX_1_deltaT = 20 # Evaporator HX
