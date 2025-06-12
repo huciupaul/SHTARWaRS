@@ -109,7 +109,9 @@ def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
     # now prune
     design[~valid4d] = np.nan
     
-    print(f"Percentage pruned from design space: {np.sum(~valid4d) / np.prod(design.shape) * 100:.2f}%")
+    print(f"Percentage pruned by integration: {np.sum(~valid_integration) / np.prod(design.shape[:-1]) * 100:.2f}%")
+    print(f"Percentage pruned by mass loading: {np.sum(~valid_mass) / np.prod(design.shape[:-1]) * 100:.2f}%")
+    print(f"Total percentage pruned from design space: {np.sum(~valid4d) / np.prod(design.shape) * 100:.2f}%")
     
     # Calculate scores for each design configuration
     # scores = f_obj(design)

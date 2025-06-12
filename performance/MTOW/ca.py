@@ -63,4 +63,5 @@ def constraint_curves(C_d_0, MTOW):
                 WS_stall=WS_stall, WS_land=WS_land,
                 PW_stall_int=PW_stall_int,
                 WS_x=ws_x, PW_x=pw_x,
-                PW_req=PW_req)
+                PW_req=PW_req,
+                x_axis=WS)
