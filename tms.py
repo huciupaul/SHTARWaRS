@@ -1,12 +1,17 @@
 import abc
 import numpy as np
 from CoolProp.CoolProp import get_global_param_string
-from CoolProp.CoolProp import PropsSI
+from CoolProp.CoolProp import PropsSI as call_propssi
 import matplotlib.pyplot as plt
 import tms_plotting 
 import math
 from global_constants import *
+import time
+from functools import lru_cache
+import datetime
 
+
+start_time = time.time()
 # ------------------------------ PARAMETERS -----------------------------------
 # TODO: 
 # - Delete all parameters that are not used in the code
@@ -28,7 +33,7 @@ ambient_conditions= {
     'rho': 0.550798  # Air density at cruise in kg/m^3
 }
 
- 
+
 # Ram Air HX -------------------------------
 # Air properties
 T_air_in = ambient_conditions['T']
@@ -168,18 +173,16 @@ class RamAirHeatExchanger():
             net_drag = D_g - F_n
 
             if abs(ratio - 1.0) < tol:           # close enough
-                print(f"Converged: ΔT_air = {T:.3f} K  (ratio = {ratio:.4f})")
-                print("Heat area radiator", self.required_area, "W/m²K")
-                print("Length of the radiator", length_rad, "m")
-                print("Volume of the radiator", vol_rad, "m³")
-                print("Mass flow of air", mf_air, "kg/s")
-                print("C_D for the radiators:", C_D_rad, "-")
-                print("The net drag of the aircraft due to the radiators:", net_drag, "N")
+                # print(f"Converged: ΔT_air = {T:.3f} K  (ratio = {ratio:.4f})")
+                # print("Heat area radiator", self.required_area, "W/m²K")
+                # print("Length of the radiator", length_rad, "m")
+                # print("Volume of the radiator", vol_rad, "m³")
+                # print("Mass flow of air", mf_air, "kg/s")
+                # print("C_D for the radiators:", C_D_rad, "-")
+                # print("The net drag of the aircraft due to the radiators:", net_drag, "N")
                 break
 
         self.delta_t_air = T
-
-         # Pressure drop
         print(f"Air temperature rise: {self.delta_t_air:.2f} K")
         A_0 = front_area_rad
         P_air = ambient_conditions['rho'] * ambient_conditions['V']**2 * 0.5 + p_amb 
@@ -300,11 +303,11 @@ class HEX():
         D_coll = pipe_diam 
         drop_collector = 1.4 * n_passes * (fluid.mf_given / (np.pi * (D_coll**2/4)))**2 * 1/(2* fluid.rho) * 1
         
-        print(f"Mass flow rate: {fluid.mf_given:.2f} kg/s")
-        print(f"Pipe Diameter: {dh:.4f} m")
-        print(f"Re: {Re:.4e} (order of magnitude: 10^{int(np.floor(np.log10(Re)))})")
-        print(f"Pressure drop in channel: {drop_channel:.2f} Pa")
-        print(f"Pressure drop in collector: {drop_collector:.2f} Pa")
+        # print(f"Mass flow rate: {fluid.mf_given:.2f} kg/s")
+        # print(f"Pipe Diameter: {dh:.4f} m")
+        # print(f"Re: {Re:.4e} (order of magnitude: 10^{int(np.floor(np.log10(Re)))})")
+        # print(f"Pressure drop in channel: {drop_channel:.2f} Pa")
+        # print(f"Pressure drop in collector: {drop_collector:.2f} Pa")
 
         return drop_channel + drop_collector
     
@@ -403,11 +406,11 @@ class HEX():
             iteration += 1
             factor_exists = True
 
-        print(f"t_hot_in: {t_hot_in:.2f} K", f"t_hot_out: {t_hot_out:.2f} K")
-        print(f"t_cold_in: {t_cold_in:.2f} K", f"t_cold_out: {t_cold_out:.2f} K")
-        print(f"detla_t1: {delta_t1:.2f} K", f"detla_t2: {t_hot_in - t_cold_out:.2f} K")
+        # print(f"t_hot_in: {t_hot_in:.2f} K", f"t_hot_out: {t_hot_out:.2f} K")
+        # print(f"t_cold_in: {t_cold_in:.2f} K", f"t_cold_out: {t_cold_out:.2f} K")
+        # print(f"detla_t1: {delta_t1:.2f} K", f"detla_t2: {t_hot_in - t_cold_out:.2f} K")
 
-        print(f"Final Area: {area:.2f} m², Volume: {volume:.2f} m³, N_plates: {N_plates}, n_channels: {n_channels}")
+        # print(f"Final Area: {area:.2f} m², Volume: {volume:.2f} m³, N_plates: {N_plates}, n_channels: {n_channels}")
         w_plate = np.sqrt(area/2)
         L_plate = 2 * w_plate
         drop_h2 = self.pressure_drop(self.fluid_cold, Re_h2, L_plate, w_plate, gap_bt_plates, dh_h2, N_passes, pipe_diam)
@@ -422,11 +425,13 @@ class HEX():
                          mf = self.fluid_hot.mf_given * 0.5, fluid_type = self.fluid_hot.fluid_type)
         
         #H2 Out
-        self.fluid_cold.T = t_cold_out
-        self.fluid_cold.P -= drop_h2
-        cold_out = self.fluid_cold
+        if type_hx == 'sh':
+            H2_out = Fluid(name = "H2_5", T = t_cold_out, P = self.fluid_cold.P - drop_h2, mf = self.fluid_cold.mf_given, fluid_type = self.fluid_cold.fluid_type)
+        elif type_hx == 'evap':
+            H2_out = Fluid(name = "H2_3", T = t_cold_out_given, P = self.fluid_cold.P - drop_h2, mf = self.fluid_cold.mf_given, fluid_type = self.fluid_cold.fluid_type)
+        
 
-        return cool_in, cool_out, cold_out, area, volume   
+        return cool_in, cool_out, H2_out, area, volume   
 
 class Compressor():
     def __init__(self, comp_efficiency, pressure_ratio, fluid):
@@ -660,10 +665,10 @@ def size_pipes_h2(h2_mf_fc, h2_mf_cc, p_sto,fluid,diam_est):
     # Total pressure drop
     total_pressure_drop = pressure_drop1 + pressure_drop2
     press_err = total_pressure_drop - pressure_drop
-    if press_err < 0:
-        print(f"Selected pipe diameter {diam_est:.3f} m is adequate, pressure drop is {total_pressure_drop:.2f} Pa, with an estimated maximum allowed of {pressure_drop:.2f} Pa")
-    else: 
-        print(f"Increase pipe diameter, pressure drop is {total_pressure_drop:.2f} Pa, with an estimated maximum allowed of {pressure_drop:.2f} Pa")
+    # if press_err < 0:
+    #     print(f"Selected pipe diameter {diam_est:.3f} m is adequate, pressure drop is {total_pressure_drop:.2f} Pa, with an estimated maximum allowed of {pressure_drop:.2f} Pa")
+    # else: 
+    #     print(f"Increase pipe diameter, pressure drop is {total_pressure_drop:.2f} Pa, with an estimated maximum allowed of {pressure_drop:.2f} Pa")
 
 
     
@@ -671,6 +676,8 @@ def size_pipes_h2(h2_mf_fc, h2_mf_cc, p_sto,fluid,diam_est):
 
 
 def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf_fc, T_amb, rho_amb, V_amb, p_amb, h2_mf_rec, air_out_fc, p_sto):
+    
+    
     #coolant = 'INCOMP::MEG-60%'
     coolant = 'Water'
     p_cool = 5.7e5
@@ -727,10 +734,11 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
 
     # Vaporizer HEX
     Q_vap = (PropsSI('H', 'P', h2_2.P, 'T', t_cold_out_given, h2_2.fluid_type) - PropsSI('H', 'P', h2_2.P, 'Q', 0, h2_2.fluid_type)) * h2_2.mf_given   # Heat of vaporization
-    print(f"Q_vap: {Q_vap:.2f} W")
+    # print(f"Q_vap: {Q_vap:.2f} W")
     hx_vap = HEX(name="Vaporizer", fluid_cold=h2_2, fluid_hot=cool_1, Q_req=Q_vap)
     cool_1,cool_2,h2_3, hx_vap_area, hx_vap_volume = hx_vap.size(diam_est, t_cold_out_given=t_cold_out_given, type_hx='evap',alpha = alpha_evap)
     Q_dot_rem -= Q_vap
+    # print(h2_3.name, h2_3.T, h2_3.P, h2_3.mf_given)
 
     # Pipe h2 5-6
     pipe_h2_5_6 = Pipe(1, 0.05, h2_5)  # 1 m length, 50 mm diameter
@@ -738,7 +746,7 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
 
     # Intersection 6-11-7
     h2_7 = Fluid(name="H2_7", T=h2_6.T, P=h2_6.P, C=0, mf=h2_mf_fc, fluid_type='ParaHydrogen')  # H2 to fuel cell
-    h2_11 = Fluid(name="H2_7", T=h2_6.T, P=h2_6.P, C=0, mf=h2_mf_cc, fluid_type='ParaHydrogen')  # H2 to CC
+    h2_11 = Fluid(name="H2_11", T=h2_6.T, P=h2_6.P, C=0, mf=h2_mf_cc, fluid_type='ParaHydrogen')  # H2 to CC
     valve_6711 = Valve(fluid=h2_6, valve_efficiency=0.9)  # Valve for H2 to fuel cell
     valve_6711_mass = valve_6711.valve_mass()  # Mass of the valve
 
@@ -888,15 +896,22 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
     
     if Q_dot_rem > 0:
         Rad_1 = RamAirHeatExchanger(coolant_temp_K=ra_coolant_temp, fluid=cool_23)
-        radiator_area, cool_24, power_fan,eta_p,net_drag = Rad_1.size_exchanger(Q_dot_rem/2, T_amb)
-        
-        TR = Rad_1.thrust_ratio(
-            gamma = k_air,
-            R     = R_AIR,
-            M0    = ambient_conditions["M"],
-            T0    = ambient_conditions["T"],
-            eta_p07 = eta_p,  
-            CD_d_CD_sp = 0.11)  
+        tol = 0.1
+        rad_area_0 = 0
+        radiator_area = 1
+        rad_exists = False
+        while abs(radiator_area - rad_area_0)>tol:
+            if rad_exists:
+                rad_area_0 = radiator_area
+            radiator_area, cool_24, power_fan,eta_p,net_drag = Rad_1.size_exchanger(Q_dot_rem/2, T_amb)
+            Rad_1.TR = Rad_1.thrust_ratio(
+                gamma = k_air,
+                R     = R_AIR,
+                M0    = ambient_conditions["M"],
+                T0    = ambient_conditions["T"],
+                eta_p07 = eta_p,  
+                CD_d_CD_sp = 0.11)  
+            rad_exists = True 
     else:
         # No need for radiator, all waste heat is absorbed
         cool_24 = Fluid(name="Cool_24", T=cool_23.T, P=cool_23.P, C=0, mf=cool_23.mf_given, fluid_type=coolant)
@@ -926,11 +941,20 @@ def main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf
                 'pressure': var_value.P
             }
 
-    return fluids_dict
+    #output_list = [
+
+
+    return fluids_dict #, output_list
 
 # RUN -----------------------------------------------------------
 if __name__ == "__main__":
-    
+
+    prop_counter = 0
+    @lru_cache(maxsize=128)
+    def PropsSI(*args):
+        global prop_counter
+        prop_counter += 1
+        return call_propssi(*args)
     # Dummy values for main function inputs
     Q_dot_fc = 500000         # Waste heat from fuel cell [W]
     Q_dot_eps = 20000        # Waste heat from EPS [W]
@@ -949,6 +973,23 @@ if __name__ == "__main__":
     air_out_fc = 1         # Air out of FC [kg/s]
     p_sto = 7e5              # Storage pressure [Pa]
 
-    fluids = main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf_fc, T_amb, rho_amb, V_amb, p_amb, h2_mf_rec, air_out_fc, p_sto)
+    time_taken = []
+    for i in range(1000):
+        start_time = time.time()
+        fluids = main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf_fc, T_amb, rho_amb, V_amb, p_amb, h2_mf_rec, air_out_fc, p_sto)
+        end_time = time.time()
+        time_taken.append(end_time - start_time)
+        PropsSI.cache_clear()
+    
+    print(np.mean(time_taken), np.std(time_taken))
+    plt.figure(figsize=(8, 5))
+    plt.hist(time_taken, bins=30, color='skyblue', edgecolor='black')
+    plt.xlabel('Time taken per run (s)')
+    plt.ylabel('Frequency')
+    plt.title('Distribution of Time Taken per main() Run')
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.show()
 
-    #tms_plotting.csv_fluids(fluids)
+    # tms_plotting.csv_fluids(fluids)
+    # tms_plotting.plot(pdf_path = 'Diagrams\H2D2 P&ID.pdf', fluids = fluids, positions = positions, page_number=0, dpi=300)
+    print(f"Number of PropsSI calls: {prop_counter}")
