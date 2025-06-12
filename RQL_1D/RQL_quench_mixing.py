@@ -74,17 +74,12 @@ def main(time_limit: float = 10.0, dt: float = 0.01, hdot_h2o_step: float = 1e-3
     #----------Outputs----------
     times_to_reach_limit_NOx = []
     NOx = []
-    NOx_tot_final = []
     water_content = []
 
     mdot_h2o = np.arange(0, 0.2 + 1e-2, hdot_h2o_step)  # kg/s
     NOx_limit = 2.5 * 1e-5 # mole fraction equivalent to 25 ppm
 
-    #----------Iteration----------
     for m_dot_h2o_i in tqdm(mdot_h2o):
-        NOx_emitted = 0.0
-        t = 0.0
-
         lh2o = gas_obj(
                 mdot=m_dot_h2o_i,
                 X="H2O:1",
@@ -118,38 +113,124 @@ def main(time_limit: float = 10.0, dt: float = 0.01, hdot_h2o_step: float = 1e-3
             P=rich_ex.P
         )
 
-        while t < time_limit and NOx_emitted < NOx_limit:
-            try:
-                # Set up 0D reactor
-                reactor = ct.IdealGasConstPressureReactor(stoich_with_water.gas)
-                sim = ct.ReactorNet([reactor])
-                sim.advance(t)
-                NOx_emitted += reactor.thermo['NO'].X[0]
-                NOx_final = reactor.thermo['NO'].X[0]
-                # print(f"Time: {t:.2f} s, NOx Emitted: {NOx_emitted:.2e} mole fraction")
-                # print(reactor.thermo['NO'].X[0])
-                t += dt
-            except Exception as e:
-                print("Error at m_dot_h2o_i =", m_dot_h2o_i)
-                print("T =", stoich_with_water.gas.T)
-                print("P =", stoich_with_water.gas.P)
-                print("X =", stoich_with_water.gas.X)
-                raise
-        
+        # Create the reactor
+        reactor = ct.IdealGasConstPressureReactor(stoich_with_water.gas)
+        sim = ct.ReactorNet([reactor])
+
+        # Advance until steady state (change in NOx < tol or max time reached)
+        NO_index = stoich_with_water.gas.species_index('NO')
+        NOx_prev = 0.0
+        t = 0.0
+        tol = 1e-9
+
+        while t < time_limit:
+            sim.advance(t + dt)
+            NOx_now = reactor.thermo.X[NO_index]
+            if abs(NOx_now - NOx_prev) < tol or NOx_now >= NOx_limit:
+                break
+            NOx_prev = NOx_now
+            t += dt
+
+        NOx.append(reactor.thermo.X[NO_index]) # This is the NOx produced (mole fraction)
         times_to_reach_limit_NOx.append(t)
-        NOx.append(NOx_emitted)
-        NOx_tot_final.append(NOx_final)
+    return np.array(times_to_reach_limit_NOx), np.array(mdot_h2o), np.array(NOx), np.array(water_content)
 
-    times_to_reach_limit_NOx = np.array(times_to_reach_limit_NOx)
-    NOx = np.array(NOx)
-    water_content = np.array(water_content)
-    NOx_tot_final = np.array(NOx_tot_final)
-
-    return times_to_reach_limit_NOx, mdot_h2o, NOx, water_content, NOx_tot_final
 
 if __name__ == "__main__":
-    times, mdot_h2o, NOx, water_content, NOx_tot_final = main(time_limit=5.0, dt=1e-10, hdot_h2o_step=1e-2)
-    #plot(water_content, times, 'Water percentage', 'Time to reach NOx limit [s]')
-    plt.figure()
-    plt.plot(water_content, times)
-    plt.show()
+    times, mdot_h2o, NOx, water_content = main(time_limit=15.0, dt=1e-20, hdot_h2o_step=1e-2)
+    print("Times to reach NOx limit:", times)
+    print("NOx emissions:", NOx)
+
+    # plt.figure()
+    # plt.plot(water_content, NOx)
+    # plt.show()
+
+
+
+
+
+
+
+
+        # #----------Iteration----------
+    # for m_dot_h2o_i in tqdm(mdot_h2o):
+    #     NOx_emitted = 0.0
+    #     t = 0.0
+
+    #     lh2o = gas_obj(
+    #             mdot=m_dot_h2o_i,
+    #             X="H2O:1",
+    #             T=333.0,
+    #             P=rich_ex.P
+    #             )
+        
+    #     # # Liquid water properties
+    #     # water = ct.Water()
+    #     # # Set to saturated liquid at 12.1 atm
+    #     # water.set_sat_p(lh2o.P, x=0.0)
+    #     # h_liq = water.enthalpy_mass
+    #     # # Set to saturated vapor at 12.1 atm
+    #     # water.set_sat_p(lh2o.P, x=1.0)
+    #     # h_vap = water.enthalpy_mass
+    #     # h_fg = h_vap - h_liq
+    #     # lh2o.gas.enthalpy_mass -= h_fg
+        
+    #     X_mix, T_mix, mdot_mix = mix_streams_const_HP(
+    #         stream1=stoich_mix,
+    #         stream2=lh2o,
+    #         P=rich_ex.P
+    #     )
+
+    #     water_content.append(lh2o.mdot/mdot_mix)
+
+    #     stoich_with_water = gas_obj(
+    #         mdot=mdot_mix,
+    #         X=X_mix,
+    #         T=T_mix,
+    #         P=rich_ex.P
+    #     )
+
+    #     l = 0.1
+    #     d = 0.001
+
+    #     reactor = ct.NewReactor("IdealGasConstPressureReactor",
+    #                          gas=stoich_with_water.gas)
+    #     reactor.volume = np.pi * (d / 2) ** 2 * l
+    #     reactor.initialize()
+    #     NOx_prev = 0.0  # mole fraction of NO in the initial gas mixture
+
+
+    #     # # Set up the Cantera gas object
+    #     # reactor = ct.IdealGasConstPressureReactor(stoich_with_water.gas)
+    #     # l = 0.1
+    #     # d = 0.001
+    #     # reactor.volume = np.pi * (d / 2) ** 2 * l
+    #     # sim = ct.ReactorNet([reactor])
+    #     # sim.initialize()
+
+    #     while t < time_limit and reactor.thermo['NO'].X[0] < NOx_limit and reactor.thermo['NO'].X[0] != NOx_prev:
+    #         try:
+    #             # sim.advance(t + dt)
+
+    #             # n_NO = reactor.thermo.X[NO_index] * reactor.thermo.density_mole * reactor.volume
+    #             # NOx_emitted += max(n_NO - n_NO_prev, 0.0)
+    #             # n_NO_prev = n_NO
+    #             reactor.advance(t + dt)
+    #             NOx_prev = reactor.thermo['NO'].X[0]  # mole fraction of NO in the gas mixture
+    #             t += dt
+    #         except Exception as e:
+    #             print("Error at m_dot_h2o_i =", m_dot_h2o_i)
+    #             print("T =", stoich_with_water.gas.T)
+    #             print("P =", stoich_with_water.gas.P)
+    #             print("X =", stoich_with_water.gas.X)
+    #             raise
+        
+    #     times_to_reach_limit_NOx.append(t)
+    #     NOx.append(reactor.thermo['NO'].X[0])  # mole fraction of NO in the final gas mixture
+    #     # NOx.append(NOx_emitted)
+
+    # times_to_reach_limit_NOx = np.array(times_to_reach_limit_NOx)
+    # NOx = np.array(NOx)
+    # water_content = np.array(water_content)
+
+    # return times_to_reach_limit_NOx, mdot_h2o, NOx, water_content
