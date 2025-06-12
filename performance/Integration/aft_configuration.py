@@ -94,7 +94,7 @@ def tank_and_TMS_positioning_specs(
         * L_tank_cone
         * (d0**2 + d_tank_TMS**2 + d0 * d_tank_TMS) / 4
     )
-    X_cone = X_aft_cyl_beg + (
+    X_cone = X_aft_cone_beg + (
         L_tank_cone / 4
         * (
             X_aft_cone_beg**2
