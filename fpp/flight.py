@@ -702,67 +702,80 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
     TMS_inputs = mission_H2.TMS_inputs
     FC_outputs = dict(m_fc=fc_model.fc_mass,
                       V_fc=fc_model.fc_volume)
+    
+    # mission_H2.quicklook()  # Show quicklook plots
         
     return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile, loading_points
 
 if __name__ == "__main__":
-    from mpl_toolkits.mplot3d import Axes3D
-    from matplotlib.animation import FuncAnimation, FFMpegWriter
     
-    from storage import tank
-
-    TOGA_vals   = np.linspace(0.1, 1.0, 51)
-    cruise_vals = np.linspace(0.1, 1.0, 51)
-    Tg, Cg      = np.meshgrid(TOGA_vals, cruise_vals)
-    mH2_grid    = np.zeros_like(Tg)
-
-    splits = np.linspace(0.0, 1.0, 51)
-
-    fig = plt.figure(figsize=(8,6))
-    ax  = fig.add_subplot(111, projection='3d')
-    ax.set_xlabel('TOGA throttle')
-    ax.set_ylabel('Cruise throttle')
-    ax.set_zlabel(r'H$_2$ \+ Tank \+ FC mass [kg]')
-    
-    # ax.set_zlim(0, 1000)
-    
-    ax.view_init(elev=30, azim=135)   # elevation=30deg, azimuth=135deg
-
-    def update(frame):
-        s = splits[frame]
-        # recompute mH2 for each (TOGA, cruise) at this split
-        for i in range(Tg.shape[0]):
-            for j in range(Tg.shape[1]):
-                _, mH2, mFC, _ = fpp_main(
-                    fc_split=s,
-                    throttle_TOGA=Tg[i,j],
-                    throttle_cruise=Cg[i,j],
-                    MTOW=8037.6,
-                    CD_HEX=0.0,
-                    delta_AP=0.0,
-                    dt=10
-                )
-                Mt, _, _, _, _, _, _ = tank.main_storage(mH2)
-                mH2_grid[i, j] = mH2 + mFC['m_fc'] + Mt # Total mass of H2 + FC + tank mass
-        ax.clear()
-        ax.plot_surface(Tg, Cg, mH2_grid, cmap='viridis', edgecolor='none')
-        ax.set_title(f"Power split = {s:.2f}")
-        ax.set_xlabel('TOGA throttle')
-        ax.set_ylabel('Cruise throttle')
-        ax.set_zlabel(r'H$_2$ \+ Tank \+ FC mass [kg]')
-        # ax.set_zlim(0, 1000)
-
-        return []
-
-    ani = FuncAnimation(
-        fig, update,
-        frames=len(splits),
-        interval=100,
-        blit=False,
+    mission_H2 = fpp_main(
+        fc_split=0.0,
+        throttle_TOGA=0.3,
+        throttle_cruise=0.3,
+        MTOW=8037.6,
+        # CD_HEX=0.0,
+        # delta_AP=0.0,
+        dt=0.1
     )
+    print(mission_H2[1])
+    # from mpl_toolkits.mplot3d import Axes3D
+    # from matplotlib.animation import FuncAnimation, FFMpegWriter
     
-    writer = FFMpegWriter(fps=10, bitrate=1800)
-    ani.save('figs/mh2_vs_split.mp4', writer=writer)
+    # from storage import tank
+
+    # TOGA_vals   = np.linspace(0.1, 1.0, 21)
+    # cruise_vals = np.linspace(0.1, 1.0, 21)
+    # Tg, Cg      = np.meshgrid(TOGA_vals, cruise_vals)
+    # mH2_grid    = np.zeros_like(Tg)
+
+    # splits = np.linspace(0.0, 1.0, 21)
+
+    # fig = plt.figure(figsize=(8,6))
+    # ax  = fig.add_subplot(111, projection='3d')
+    # ax.set_xlabel('TOGA throttle')
+    # ax.set_ylabel('Cruise throttle')
+    # ax.set_zlabel(r'H$_2$ \+ Tank \+ FC mass [kg]')
+    
+    # # ax.set_zlim(0, 1000)
+    
+    # ax.view_init(elev=30, azim=135)   # elevation=30deg, azimuth=135deg
+
+    # def update(frame):
+    #     s = splits[frame]
+    #     # recompute mH2 for each (TOGA, cruise) at this split
+    #     for i in range(Tg.shape[0]):
+    #         for j in range(Tg.shape[1]):
+    #             _, mH2, mFC, _ = fpp_main(
+    #                 fc_split=s,
+    #                 throttle_TOGA=Tg[i,j],
+    #                 throttle_cruise=Cg[i,j],
+    #                 MTOW=8037.6,
+    #                 CD_HEX=0.0,
+    #                 delta_AP=0.0,
+    #                 dt=10
+    #             )
+    #             Mt, _, _, _, _, _, _ = tank.main_storage(mH2)
+    #             mH2_grid[i, j] = mH2 + mFC['m_fc'] + Mt # Total mass of H2 + FC + tank mass
+    #     ax.clear()
+    #     ax.plot_surface(Tg, Cg, mH2_grid, cmap='viridis', edgecolor='none')
+    #     ax.set_title(f"Power split = {s:.2f}")
+    #     ax.set_xlabel('TOGA throttle')
+    #     ax.set_ylabel('Cruise throttle')
+    #     ax.set_zlabel(r'H$_2$ \+ Tank \+ FC mass [kg]')
+    #     # ax.set_zlim(0, 1000)
+
+    #     return []
+
+    # ani = FuncAnimation(
+    #     fig, update,
+    #     frames=len(splits),
+    #     interval=100,
+    #     blit=False,
+    # )
+    
+    # writer = FFMpegWriter(fps=10, bitrate=1800)
+    # ani.save('figs/mh2_vs_split.mp4', writer=writer)
 
     # plt.tight_layout()
     # plt.show()
