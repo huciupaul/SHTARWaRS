@@ -3,7 +3,7 @@ import numpy as np
 import re
 import pandas as pd
 from matplotlib.colors import to_rgba
-import fitz
+
 import json
 
 
