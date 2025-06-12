@@ -165,6 +165,8 @@ def min_max_X_cg_positions(
     min_cg_with_margin = min_cg*0.98
     max_cg_with_margin = max_cg*1.02
 
+    MTOW_cg_position = X_fuel[-1]
+
     # print(f"Min value with 2% margin: {min_cg*0.98}, found in {min_source} at index {min_array_index}")
     # print(f"Max value with 2% margin: {max_cg*1.02}, found in {max_source} at index {max_array_index}")
 
@@ -177,7 +179,7 @@ def min_max_X_cg_positions(
     # plt.legend()
     # plt.show()
 
-    return min_cg, max_cg, min_cg_with_margin, max_cg_with_margin        
+    return min_cg, max_cg, min_cg_with_margin, max_cg_with_margin, MTOW_cg_position   
 
 def main(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
@@ -247,7 +249,7 @@ def main(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         X_tank_TMS     = ac_conf['X_tank_TMS']
 
         # ---- 1.3   CG envelope check
-        _, _, min_cg_margin, max_cg_margin = min_max_X_cg_positions(
+        _, _, min_cg_margin, max_cg_margin, MTOW_cg_position = min_max_X_cg_positions(
             X_cargo_aft = X_aft_cargo,
             M_cargo_aft = m_cargo_aft,
             num_PAX     = N_PAX,
@@ -263,8 +265,7 @@ def main(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         )
 
         cg_ok = (
-            (X_most_fwd <= min_cg_margin <= X_most_aft) and
-            (X_most_fwd <= max_cg_margin <= X_most_aft)
+            (X_most_fwd <= MTOW_cg_position <= X_most_aft)
         )
         # print(f"Design {i}: CG OK: {cg_ok}, "
         #       f"min_cg: {min_cg_margin:.2f} m, max_cg: {max_cg_margin:.2f} m, ")
