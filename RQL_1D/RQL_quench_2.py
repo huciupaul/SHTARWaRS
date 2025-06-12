@@ -87,7 +87,7 @@ def main(time_limit: float = 10.0, dt: float = 0.01, hdot_h2o_step: float = 1e-3
         lh2o = gas_obj(
                 mdot=m_dot_h2o_i,
                 X="H2O:1",
-                T=333.0,
+                T=353.0,
                 P=rich_ex.P
                 )
         
@@ -96,6 +96,7 @@ def main(time_limit: float = 10.0, dt: float = 0.01, hdot_h2o_step: float = 1e-3
             stream2=lh2o,
             P=rich_ex.P
         )
+        print(f'temp: ', T_mix)
 
         water_content.append(lh2o.mdot/mdot_mix)
 
@@ -110,29 +111,35 @@ def main(time_limit: float = 10.0, dt: float = 0.01, hdot_h2o_step: float = 1e-3
         reactor = ct.IdealGasConstPressureReactor(stoich_with_water.gas)
         sim = ct.ReactorNet([reactor])
         times = []
+        temp = []
 
         print(stoich_with_water.gas['NO'].X[0])
 
-        while t < time_limit and NOx_emitted < NOx_limit:
-            try:
-                sim.advance(t + dt)
+        #while t < time_limit and NOx_emitted < NOx_limit:
+        try:
+            #sim.advance(t + dt)
+            print(f"mole fraction H2 before: ", reactor.thermo['H2'].X[0])
 
-                NOx.append(reactor.thermo['NO'].X[0])
-                times.append(t + dt)
+            sim.advance_to_steady_state()
+            print(f"mole fraction H2: ", reactor.thermo['H2'].X[0])
 
-                NOx_emitted = reactor.thermo['NO'].X[0]  # mole fraction of NO in the gas mixture
-                
-                t += dt
-            except Exception as e:
-                print("Error at m_dot_h2o_i =", m_dot_h2o_i)
-                print("T =", stoich_with_water.gas.T)
-                print("P =", stoich_with_water.gas.P)
-                print("X =", stoich_with_water.gas.X)
-                raise
+            # NOx.append(reactor.thermo['NO'].X[0])
+            # temp.append(reactor.thermo.T)
+            # times.append(t + dt)
+
+            # NOx_emitted = reactor.thermo['NO'].X[0]  # mole fraction of NO in the gas mixture
+            
+            # t += dt
+        except Exception as e:
+            print("Error at m_dot_h2o_i =", m_dot_h2o_i)
+            print("T =", stoich_with_water.gas.T)
+            print("P =", stoich_with_water.gas.P)
+            print("X =", stoich_with_water.gas.X)
+            raise
         
-        plt.figure()
-        plt.plot(times, NOx)
-        plt.show()
+        # plt.figure()
+        # plt.plot(times, temp)
+        # plt.show()
         times_to_reach_limit_NOx.append(t)
         NOx.append(reactor.thermo['NO'].X[0])  # mole fraction of NO in the final gas mixture
         # NOx.append(NOx_emitted)
@@ -145,7 +152,7 @@ def main(time_limit: float = 10.0, dt: float = 0.01, hdot_h2o_step: float = 1e-3
 
 
 if __name__ == "__main__":
-    times, mdot_h2o, NOx, water_content = main(time_limit=50.0, dt=1e-3, hdot_h2o_step=1e-2)
+    times, mdot_h2o, NOx, water_content = main(time_limit=50.0, dt=1e-10, hdot_h2o_step=1e-2)
     print("Times to reach NOx limit:", times)
     print("NOx emissions:", NOx)
 
