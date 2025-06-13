@@ -115,8 +115,22 @@ class RamAirHeatExchanger():
             dT_lm = (dT2 - dT1) / np.log(dT2 / dT1)
 
             self.required_area = heat_w / (self.U_ra * dT_lm)
+
+            # radiator dimensions    
             beta  = 1100
             vol_rad = self.required_area/beta
+            area_rad = vol_rad/0.05
+            length_rad = np.sqrt(area_rad)
+            front_length_rad = np.cos(70*np.pi/180)*length_rad
+
+            # duct - radiator - nozzle
+            AR = 4
+            duct_length = front_length_rad/AR     
+
+
+            if ambient_conditions['V'] < vel_fan:
+                mf_air = area_rad * vel_fan * ambient_conditions['rho']
+                fan = Fan(fan_eff=fan_eff, ra_mf=mf_air, ra_density=ambient_conditions['rho'], delta_pressure=delta_pressure)
             front_area_rad = vol_rad/0.05
             length_rad = np.sqrt(front_area_rad)
             if self.ambient_conditions['V'] < vel_fan:
@@ -139,14 +153,19 @@ class RamAirHeatExchanger():
                 break
 
         self.delta_t_air = T
+        print(f"Air temperature rise: {self.delta_t_air:.2f} K")
+        A_0 = area_rad
+        A_0_2 = duct_length**2
+        P_air = ambient_conditions['rho'] * ambient_conditions['V']**2 * 0.5 + p_amb 
+        mu_air = PropsSI('VISCOSITY', 'P', P_air, 'T', ambient_conditions['T'], 'Air')
         A_0 = front_area_rad
         P_air = self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * 0.5 + p_amb 
         mu_air = PropsSI('VISCOSITY', 'P', P_air, 'T', self.ambient_conditions['T'], 'Air')
         g_c = 1  
-        L = length_rad
-        P = A_0 * L
-        G = mf_air / A_0 
-        r_h = A_0/P
+        L_tot = 4.8 * 0.6868 # cm * m/cm (conversion of technical drawing)
+        P = A_0_2 * L_tot
+        G = mf_air / A_0_2 
+        r_h = A_0_2/P
         D_h = 4 * r_h
         Re = G * D_h / mu_air
         f = 0.046 * Re**-0.2
