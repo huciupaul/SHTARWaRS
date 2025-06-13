@@ -113,7 +113,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     _, tms_outputs = tms_main(
                         TMS_inputs['Q_dot_fc'][0], #ok
                         Qdot_eps, #ok
-                        mission_profile['P_fc'][0], #ok
+                        P_A[0], #ok
                         TMS_inputs['p_cc'][0], #ok
                         TMS_inputs['h2_mf_fc'][0], #ok
                         TMS_inputs['h2_mf_cc'][0], #ok
@@ -123,7 +123,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                         TMS_inputs['t_amb'][0], #ok
                         TMS_inputs['rho_amb'][0], #ok
                         TMS_inputs['V_amb'][0], #ok
-                        mission_profile['P'][0], #ok
+                        TMS_inputs['P_amb'][0], #ok
                         TMS_inputs['h2_mf_fc_recirculated'][0], 
                         TMS_inputs['air_mf_fc'][0],
                         7e5,  # p_sto
