@@ -383,7 +383,7 @@ class Compressor():
     def power(self):
         inlet_temperature = self.fluid.T  
         gamma = self.fluid.gamma 
-        print(f"Pressure ratio: {self.pressure_ratio}, FLuid: {self.fluid.name}")
+        #print(f"Pressure ratio: {self.pressure_ratio}, FLuid: {self.fluid.name}")
         T_out = inlet_temperature * (1 + 1 / self.efficiency * (self.pressure_ratio ** ((gamma - 1) / gamma) - 1))  # Isentropic relation
 
         cp = self.fluid.cp  
@@ -794,15 +794,15 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         T_tank = PropsSI('T', 'P', p_sto, 'Q', 0, 'ParaHydrogen')  # Initial temperature of LH2 tank
         h2_1 = Fluid(name="H2_1", T=T_tank, P=p_sto, C = None, mf = h2_mf_fc + h2_mf_cc, fluid_type='ParaHydrogen')
 
-        print(f"Initial H2_1: {h2_1.name}, T: {h2_1.T}, P: {h2_1.P}, mf: {h2_1.mf_given}, fluid_type: {h2_1.fluid_type}")
-        print(f"mf_h2_fc: {h2_mf_fc}, mf_h2_cc: {h2_mf_cc}, p_sto: {p_sto}, diam_est: {diam_est}")
+        # print(f"Initial H2_1: {h2_1.name}, T: {h2_1.T}, P: {h2_1.P}, mf: {h2_1.mf_given}, fluid_type: {h2_1.fluid_type}")
+        # print(f"mf_h2_fc: {h2_mf_fc}, mf_h2_cc: {h2_mf_cc}, p_sto: {p_sto}, diam_est: {diam_est}")
         # Pipe h2 12
         pipe_h2_12 = Pipe(1.42, diam_est, h2_1, cryo=True) 
         m_pipe_h2_12.append(pipe_h2_12.mass())
         h2_2 = pipe_h2_12.analyze_heat_pipe('H2_2')
 
         # Pipe h2 34
-        print(f"Pipe h2 12: {h2_2.name}, T: {h2_2.T}, P: {h2_2.P}, mf: {h2_2.mf_given}, fluid_type: {h2_2.fluid_type}")
+        #print(f"Pipe h2 12: {h2_2.name}, T: {h2_2.T}, P: {h2_2.P}, mf: {h2_2.mf_given}, fluid_type: {h2_2.fluid_type}")
         T_sat_h2 = PropsSI('T', 'P', h2_2.P, 'Q', 0, h2_2.fluid_type)  # Saturation temperature of H2 at pressure P
         h2_3 = Fluid(name="H2_3", T=T_sat_h2 + HEX_1_deltaT, P=p_sto, C = None, mf = h2_mf_fc + h2_mf_cc, fluid_type='ParaHydrogen')
         pipe_h2_34 = Pipe(1.42, diam_est, h2_3) 

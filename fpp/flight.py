@@ -729,15 +729,15 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
 if __name__ == "__main__":
     
     mission_H2 = fpp_main(
-        fc_split=1.0,
-        throttle_TOGA=0.3,
-        throttle_cruise=0.3,
+        fc_split=0.1,
+        throttle_TOGA=0.5,
+        throttle_cruise=0.1,
         MTOW=8037.6,
         # CD_HEX=0.0,
         # delta_AP=0.0,
         dt=0.1
     )
-    print(mission_H2[1])
+    print(mission_H2[0])
     # from mpl_toolkits.mplot3d import Axes3D
     # from matplotlib.animation import FuncAnimation, FFMpegWriter
     
