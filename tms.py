@@ -383,7 +383,6 @@ class Compressor():
     def power(self):
         inlet_temperature = self.fluid.T  
         gamma = self.fluid.gamma 
-        #print(f"Pressure ratio: {self.pressure_ratio}, FLuid: {self.fluid.name}")
         T_out = inlet_temperature * (1 + 1 / self.efficiency * (self.pressure_ratio ** ((gamma - 1) / gamma) - 1))  # Isentropic relation
 
         cp = self.fluid.cp  
@@ -940,7 +939,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         fc_press_drop_h2 = 0.06e5
         h2_22 = Fluid(name="H2_22", T=T_fc, P=p_fc - fc_press_drop_h2 , C=0, mf=h2_mf_rec, fluid_type='ParaHydrogen')  
         # Pipe h2 22-23
-        pipe_h2_22_23 = Pipe(0.57, diam_est * ratio_h2_to_fc * 0.5, h2_22)  
+        pipe_h2_22_23 = Pipe(0.57, diam_est, h2_22)  
         m_pipe_h2_2223.append(pipe_h2_22_23.mass() * 2)
         h2_23 = pipe_h2_22_23.analyze_heat_pipe("H2_23")
 
