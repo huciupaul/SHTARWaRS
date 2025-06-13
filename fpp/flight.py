@@ -526,6 +526,7 @@ class FlightMission:
                            h2_mf_fc=mdot_fc_arr, h2_mf_cc=mdot_cc_arr,
                            t_cc=T_cc, air_mf_fc=mdot_fc_air_in,
                            t_amb=T_arr, rho_amb=rho_arr, V_amb=V_arr,
+                           P_amb=P_arr,
                            h2o_mf_fc=mdot_fc_H2O, h2_mf_fc_recirculated=mdot_fc_H2_recirculation
                            )
         
@@ -657,7 +658,7 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
         eng=turboprop_H2,
         fc=fc_model,
         MTOW=MTOW,
-        P_cc_min=0.28285 * MAXC,  # [W] Minimum combustion chamber power
+        P_cc_min=0.056 * TOGA,  # [W] Minimum combustion chamber power
         delta_AP=delta_AP,  # [W] Thermal Management System power
         D_RAD=D_RAD,  # [N] Radiator drag penalty
     )
@@ -703,6 +704,20 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
     H2_burnt = (mission_H2.profile['mass'][0] - mission_H2.profile['mass'][-1])/(1 - E_SCALE)
     # print(f"Total H2 mass burnt: {H2_burnt:.2f} kg")
     
+    # Find the four most constraining TMS power points:
+    # 1) Start of IDLE phase
+    # 2) Start of TOGA phase
+    # 3) Start of CRUISE phase
+    # 4) Start of HOLD phase
+    indexes = [
+        np.where(mission_H2.profile['phase'] == 'taxi\\TO')[0][0],
+        np.where(mission_H2.profile['phase'] == 'takeoff')[0][0],
+        np.where(mission_H2.profile['phase'] == 'cruise')[0][0],
+        np.where(mission_H2.profile['phase'] == 'hold')[0][0]
+    ]
+    # Reshape the TMS inputs to match the indexes
+    TMS_inputs = {key: np.array([mission_H2.TMS_inputs[key][i] for i in indexes]) for key in mission_H2.TMS_inputs.keys()}
+        
     # Determine the maximum fuel cell power across the three splits
     TMS_inputs = mission_H2.TMS_inputs
     FC_outputs = dict(m_fc=fc_model.fc_mass,
@@ -715,7 +730,7 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
 if __name__ == "__main__":
     
     mission_H2 = fpp_main(
-        fc_split=0.0,
+        fc_split=1.0,
         throttle_TOGA=0.3,
         throttle_cruise=0.3,
         MTOW=8037.6,

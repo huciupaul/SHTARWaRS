@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from global_constants import Beechcraft_1900D, seat_pitch, rho_cargo, M_PAX, \
     X_most_fwd, X_most_aft, X_cargo_fwd, X_first_seat, \
         X_wing_end, V_cargo_fwd, V_wing,\
-            X_wing, M_cargo_fwd
+            X_wing, M_cargo_fwd, M_cargo_per_PAX
 from performance.Integration import aft_configuration as acfg
 
 def X_PAX(num_PAX) -> float:
@@ -267,13 +267,22 @@ def main(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         cg_ok = (
             (X_most_fwd <= MTOW_cg_position <= X_most_aft)
         )
-        print(f"Design {i}: CG OK: {cg_ok}, "
-              f"CG: {MTOW_cg_position:.2f} m, X_most_fwd: {X_most_fwd:.2f} m, "
-              f"X_most_aft: {X_most_aft:.2f} m, ")
-        
+        N_PAX_ok = N_PAX >= 15 # Beechcraft 1900D has 19 seats, so we require at least 15
+        # print(f"Design {i}: CG OK: {cg_ok}, "
+        #       f"CG: {MTOW_cg_position:.2f} m, "
+        #       f"X_most_fwd: {X_most_fwd:.2f} m, "
+        #       f"X_most_aft: {X_most_aft:.2f} m, "
+        #       f"min_cg_margin: {min_cg_margin:.2f} m, "
+        #       f"max_cg_margin: {max_cg_margin:.2f} m, "
+        #       f"N_PAX: {N_PAX}, N_PAX_ok: {N_PAX_ok}, "
+        #       f"m_cargo_aft: {m_cargo_aft:.2f} kg")
+        # print(f"Design {i}: CG OK: {cg_ok}, "
+        #       f"CG: {MTOW_cg_position:.2f} m, X_most_fwd: {X_most_fwd:.2f} m, "
+        #       f"X_most_aft: {X_most_aft:.2f} m, ")
+        m_cargo_ok = m_cargo_aft >= N_PAX*M_cargo_per_PAX
 
         # ---- 1.4   Store results
-        valid_vec[i]   = volume_ok and cg_ok
+        valid_vec[i]   = volume_ok and N_PAX_ok #and m_cargo_ok # and cg_ok
         N_PAX_vec[i]   = N_PAX
         m_cargo_vec[i] = m_cargo_aft
 

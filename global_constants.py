@@ -159,6 +159,7 @@ rho_cargo = 161                                         # https://www.icao.int/M
 
 M_PAX = 84                                              # https://www.easa.europa.eu/en/light/topics/passenger-weight-and-why-it-matters-safe-and-efficient-air-operations
 M_cargo_fwd = 1.01371425*rho_cargo
+M_cargo_per_PAX = 17.5                                  # [kg] Cargo mass per passenger, based on original aircraft design
 
 X_most_aft  = 7.51
 X_most_fwd  = 6.79
