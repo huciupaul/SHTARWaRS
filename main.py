@@ -74,7 +74,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     # FPP
                     TMS_inputs, m_h2, FC_outputs, _, loading_vector = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, D_rad, aux_power, 10)
                     # Also get m_nox, nox_max_ppm, co2_fc from fpp_main
-                    m_nox, nox_max_ppm = 0.0, 0.0
+                    m_nox, mdot_nox_max_takeoff, mdot_nox_max_cruise = 0.0, 0.0, 0.0
                     m_fc = FC_outputs['m_fc']
                     V_fc = FC_outputs['V_fc']
                     co2_fc = FC_outputs['co2_fc']
@@ -160,7 +160,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
 
                 # After convergence, store the results in the tensor, then in the 4D tensor
                 tensor = np.array([m_eps, m_fc, m_h2, m_sto,V_fc, V_sto, V_elmo, MTOW, length_sto, diameter_sto, M_aft_cargo, m_tms_front, m_tms_aft, m_tms_mid, \
-                                   m_nox, nox_max_ppm, P_elmo, co2_fc, co2_sto, co2_eps])
+                                   m_nox, mdot_nox_max_takeoff, mdot_nox_max_cruise, P_elmo, co2_fc, co2_sto, co2_eps])
                 result_tensor[i_split, i_toga, i_cruise, :] = tensor
                 loading_tensor[i_split, i_toga, i_cruise, :, :] = loading_vector
 
