@@ -197,6 +197,17 @@ Beechcraft_1900D = dict(
 ######################
 # Thermal Management System
 ######################
+from propsi import _load_all_props
+props_tms = _load_all_props()
+T_list = props_tms['T']  # Kelvin
+P_list = props_tms['P']  # Pa
+cp_meg = props_tms['CP']  # J/(kg·K)
+k_meg = props_tms['K_k']  # W/(m·K)
+dyn_visc_meg = props_tms['DYN_VISC']  # Pa·s
+gamma_meg = props_tms['GAMMA']  # Specific heat ratio
+Pr_meg = props_tms['PR']  # Prandtl number
+rho_meg = props_tms['RHO']  # kg/m³
+
 
 # TEG
 efficiency_teg = 0.05
