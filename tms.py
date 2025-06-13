@@ -824,7 +824,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         Q_dot_rem -= Q_h2_heat 
 
         # Pipe cool 20-1
-        ratio_to_hex = (cool_20_new.mf_given/(2*cool_mf_per_fc))
+        ratio_to_hex = (cool_20_new.mf_given/(2*cool_mf_per_fc)) * 2
         pipe_cool_20_1 = Pipe(1.42, diam_est_cool *ratio_to_hex, cool_20_new)  
         m_pipe_cool_201.append(pipe_cool_20_1.mass())
         cool_1 = pipe_cool_20_1.analyze_heat_pipe("Cool_1")
