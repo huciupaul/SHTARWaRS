@@ -155,10 +155,52 @@ def air_mass_flow_for_phi(
 
     return mdot_H2/(phi*0.0292)
 
+def mixture_properties_with_temp(stream1, stream2, MECH) -> Tuple[str, float, float]:
+    if stream1.mdot < 0 or stream2.mdot < 0:
+        raise ValueError("Mass‑flow rates must be non‑negative.")
+
+    # Molar flow rates (mol/s)
+    n1_total = stream1.mdot / stream1.gas.mean_molecular_weight
+    n2_total = stream2.mdot / stream2.gas.mean_molecular_weight
+
+    # Molar composition vectors
+    n1_vec = n1_total * stream1.gas.X
+    n2_vec = n2_total * stream2.gas.X
+
+    # Total mole vector and mixture composition
+    n_mix = n1_vec + n2_vec
+    n_tot = n_mix.sum()
+    if n_tot == 0.0:
+        raise ZeroDivisionError("Both mass-flow rates are zero – undefined mixture.")
+
+    X_mix = n_mix / n_tot  # New composition
+
+    # -------------------------------
+    # Create a new gas object
+    # -------------------------------
+    mix = ct.Solution(MECH)
+
+    # -------------------------------
+    # Energy balance to get T_mix
+    # -------------------------------
+    h1 = stream1.gas.enthalpy_mass
+    h2 = stream2.gas.enthalpy_mass
+    mdot_mix = stream1.mdot + stream2.mdot
+    h_mix = (stream1.mdot * h1 + stream2.mdot * h2) / mdot_mix
+
+    # Set composition first
+    mix.X = X_mix
+
+    # Now find temperature corresponding to the enthalpy and composition
+    mix.HP = h_mix, stream1.gas.P
+    T_mix = mix.T
+    P_mix = mix.P
+
+    return mdot_mix, T_mix, P_mix, X_mix.tolist()
 
 def mix_streams_const_HP(stream1, stream2, P):
     """
-    Mix two Cantera Quantity streams at constant enthalpy and pressure.
+    Mix two Cantera streams at constant enthalpy and pressure.
     Returns the mixture composition (X), temperature (T), and mass flow rate (mdot).
     """
     # Total mass flow
