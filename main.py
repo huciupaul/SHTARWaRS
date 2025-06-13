@@ -111,23 +111,23 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     # break
                     print("ITER", i)
                     _, tms_outputs = tms_main(
-                        TMS_inputs['Q_dot_fc'][0], #ok
-                        Qdot_eps, #ok
-                        P_A[0], #ok
-                        TMS_inputs['p_cc'][0], #ok
-                        TMS_inputs['h2_mf_fc'][0], #ok
-                        TMS_inputs['h2_mf_cc'][0], #ok
-                        T_FC[0],
-                        TMS_inputs['t_cc'][0], #ok
-                        TMS_inputs['air_mf_fc'][0], #ok
-                        TMS_inputs['t_amb'][0], #ok
-                        TMS_inputs['rho_amb'][0], #ok
-                        TMS_inputs['V_amb'][0], #ok
-                        TMS_inputs['P_amb'][0], #ok
-                        TMS_inputs['h2_mf_fc_recirculated'][0], 
-                        TMS_inputs['air_mf_fc'][0],
-                        7e5,  # p_sto
-                        TMS_inputs['h2o_mf_fc'][0]
+                        TMS_inputs['Q_dot_fc'], #ok
+                        np.full(4, Qdot_eps), #ok
+                        np.full(4, P_A[0]), #ok
+                        TMS_inputs['p_cc'], #ok
+                        TMS_inputs['h2_mf_fc'], #ok
+                        TMS_inputs['h2_mf_cc'], #ok
+                        np.full(4, T_FC[0]),
+                        TMS_inputs['t_cc'], #ok
+                        TMS_inputs['air_mf_fc'], #ok
+                        TMS_inputs['t_amb'], #ok
+                        TMS_inputs['rho_amb'], #ok
+                        TMS_inputs['V_amb'], #ok
+                        TMS_inputs['P_amb'], #ok
+                        TMS_inputs['h2_mf_fc_recirculated'], 
+                        TMS_inputs['air_mf_fc'],
+                        np.full(4, MAWP_global),  # p_sto
+                        TMS_inputs['h2o_mf_fc']
                     )
                     D_rad = tms_outputs[0]
                     aux_power = tms_outputs[1]
@@ -135,6 +135,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     m_tms_aft = tms_outputs[4]
                     m_tms_mid = tms_outputs[3]
 
+                    print(type(TMS_inputs['V_amb']))
                     # --------- ADD INTEGRATION HERE ---------
                     
                     #MTOW update

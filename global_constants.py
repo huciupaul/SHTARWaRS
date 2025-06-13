@@ -116,8 +116,8 @@ q_c     = 0.5 * rho_cruise * V_cruise**2
 dormancy = 24                                           #[hours]
 stratification_factor = 2
 k_str = 1.9                                             #[W/mK]
-MAWP_global = 600000                                    #[Pa]
-p_vent_global = 600000                                  #[Pa]
+MAWP_global = 700000                                    #[Pa]
+p_vent_global = 700000                                  #[Pa]
 p_sl = 101325                                           #[Pa]
 
 r_in = 0.74                                             #[m]
