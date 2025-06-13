@@ -82,6 +82,9 @@ def eps_main(powersplit):
     motor_vol = motor_volume(radius, length)
     inverter_vol = inverter_volume(P_req)
 
-    return (motor_w + inverter_w + cable_w), (heat_motor + heat_inverter), motor_vol
+    co2_per_kg = 40
+    motor_co2 = motor_w * co2_per_kg
+
+    return (motor_w + inverter_w + cable_w), (heat_motor + heat_inverter), motor_vol, motor_co2
 
 #print(eps_main(0.5))  
