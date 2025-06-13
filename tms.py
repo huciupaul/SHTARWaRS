@@ -268,7 +268,7 @@ class HEX():
 
         # Pipe Properties
         N_passes = 1
-        dh_coolant = 2*gap_bt_plates / size_factor  # diameter of coolant pipes
+        dh_coolant = 4*gap_bt_plates / size_factor  # diameter of coolant pipes
         dh_h2 = dh_coolant                          # diameter of hydrogen pipes
         
 
