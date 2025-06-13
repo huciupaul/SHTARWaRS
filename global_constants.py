@@ -189,7 +189,6 @@ Beechcraft_1900D = dict(
     OEW         = 7766-2022,
     M_cargo_aft = 4.8106*rho_cargo,
     num_PAX     = 19,
-
     X_cargo_aft = 12.64,
     X_aft_cyl_beg = 11.22
     )

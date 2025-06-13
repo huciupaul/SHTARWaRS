@@ -146,6 +146,18 @@ def min_max_X_cg_positions(
 
     min_index = np.argmin(np.hstack(arrays))
     max_index = np.argmax(np.hstack(arrays))
+    
+    # delta = ((M_tank + M_TMS_aft) * X_tank_TMS
+    #      - (M_FC + M_EPS + M_TMS_fwd) * X_wing) / OEW_H2D2
+    
+    # print(f"Delta: {delta:.2f} m")
+    back_loading = M_cargo_aft + M_TMS_aft + M_tank
+    original_loading = Beechcraft_1900D['M_cargo_aft']
+    
+    delta = back_loading - original_loading
+    print(f"Delta: {delta:.2f} kg")
+    
+    
 
     cumulative_lengths = np.cumsum([len(arr) for arr in arrays])
 
@@ -235,7 +247,7 @@ def main(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
          m_TMS_front,
          m_TMS_aft,
          m_TMS_mid) = flat_vars[i]
-
+        
         # ---- 1.1   Volume constraint
         volume_ok = V_FC * margin / 2 <= V_wing
         # print(f"Design {i}: Volume OK: {volume_ok}, V_FC: {V_FC/2:.2f} m^3, V_wing: {V_wing:.2f} m^3")

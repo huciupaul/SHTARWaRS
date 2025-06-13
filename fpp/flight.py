@@ -717,9 +717,8 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
     ]
     # Reshape the TMS inputs to match the indexes
     TMS_inputs = {key: np.array([mission_H2.TMS_inputs[key][i] for i in indexes]) for key in mission_H2.TMS_inputs.keys()}
-        
+    
     # Determine the maximum fuel cell power across the three splits
-    TMS_inputs = mission_H2.TMS_inputs
     FC_outputs = dict(m_fc=fc_model.fc_mass,
                       V_fc=fc_model.fc_volume)
     
