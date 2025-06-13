@@ -1,0 +1,182 @@
+"""
+01_setup_cases.py
+-----------------
+Pre‑processing script that interpolates the validated engine map
+(E2035 running line) to a user‑defined list of shaft‑power settings,
+computes the compressor exit state on a standard (ISA) day using the
+map pressure ratio and polytropic efficiency, and derives the rich‑
+combustor air/fuel split for an equivalence ratio of φ₁ = 5.
+
+Outputs
+-------
+cases_setup.json   # persistent list containing the operating points
+
+Execution
+---------
+$ python 01_setup_cases.py   # no CLI options; edit POWERS_TARGET below
+
+The script is deliberately self‑contained, requiring only *NumPy*,
+*SciPy*, and the helper functions shipped in *mixture_properties.py*.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from datetime import datetime
+
+import numpy as np
+from scipy.interpolate import PchipInterpolator
+
+# ---------------------------------------------------------------------------
+# 0 – USER INPUTS
+# ---------------------------------------------------------------------------
+# Shaft‑power settings [kW] for which maps will be generated in the rich and
+# lean combustion simulations.  Replace this list programmatically or edit
+# here as required.
+POWERS_TARGET = [200,1200] #np.linspace(100,1223, 100)   # kW
+PHI_RICH = 5.0                                  # equivalence ratio in rich stage
+
+# ---------------------------------------------------------------------------
+# 1 – ENGINE MAP DATA  (E2035 running line)
+# ---------------------------------------------------------------------------
+# The arrays below are strictly monotone w.r.t. shaft power and therefore
+# suitable for one‑to‑one interpolation.
+
+power_2035 = np.array([
+     64.45787192,  74.99710015,  86.47285163,  99.10713429, 112.5426231 ,
+    127.5447829 , 143.969777  , 161.8004458 , 181.2453985 , 202.4695257 ,
+    225.9043489 , 251.9885357 , 279.8460616 , 309.0363858 , 339.4744961 ,
+    371.2467173 , 404.6948126 , 440.2128138 , 478.0419658 , 517.0705368 ,
+    555.5816044 , 593.9815974 , 631.8744591 , 668.783453  , 704.7509341 ,
+    740.1071729 , 774.5020922 , 807.9496775 , 841.0299305 , 874.3391429 ,
+    908.4599427 , 943.3175445 , 978.6373879 ,1014.045563  ,1049.352952  ,
+   1084.324008  ,1120.319197  ,1155.806762  ,1190.362816  ,1223.658297  ],
+    dtype=float)
+
+mass_flow_2035 = np.array([
+    1.586374162, 1.640687542, 1.698119775, 1.758859848, 1.82557457 ,
+    1.896737462, 1.971378849, 2.048189681, 2.12759554 , 2.209774715,
+    2.294602328, 2.381972903, 2.472104628, 2.563686299, 2.655612491,
+    2.747019714, 2.839345834, 2.932771402, 3.025633912, 3.116685512,
+    3.204875717, 3.29064919 , 3.375000047, 3.457223985, 3.536678351,
+    3.612856961, 3.685425705, 3.754969127, 3.822414016, 3.888487629,
+    3.953793594, 4.019685995, 4.085705221, 4.149768197, 4.209900387,
+    4.264201001, 4.31277052 , 4.356961931, 4.396790633, 4.432261637],
+    dtype=float)                                            # kg s⁻¹ (air)
+
+fuel_flow_2035 = np.array([
+    0.006304423, 0.006531417, 0.0067704  , 0.007026612, 0.007278046,
+    0.007552317, 0.007845778, 0.008161051, 0.008503743, 0.008876254,
+    0.009289427, 0.009753076, 0.010248724, 0.010776143, 0.011335336,
+    0.011923665, 0.012558167, 0.013239646, 0.01396084 , 0.014703327,
+    0.015435328, 0.016166056, 0.016885862, 0.017587023, 0.018275476,
+    0.018958557, 0.019628603, 0.020284575, 0.020941457, 0.021617392,
+    0.022329667, 0.023062735, 0.02380872 , 0.024575739, 0.02536967 ,
+    0.026196992, 0.027041687, 0.027905225, 0.028780112, 0.029651039],
+    dtype=float)                                            # kg s⁻¹ (kerosene)
+
+comp_eff_2035 = np.array([
+    0.80386997 ,0.809100103,0.814893651,0.82128438 ,0.828722288,0.836817356,
+    0.845034574,0.85288527 ,0.860469727,0.867829534,0.875018277,0.882080893,
+    0.888939968,0.89531849 ,0.900992606,0.905796631,0.909847437,0.913246596,
+    0.91604669 ,0.918370606,0.920371432,0.922247702,0.924010928,0.925547548,
+    0.926758149,0.92754736 ,0.928030995,0.928348785,0.928444147,0.928241656,
+    0.927661752,0.927068463,0.926535585,0.925573755,0.923731104,0.920608767,
+    0.916326376,0.911311333,0.905668406,0.899493985], dtype=float)
+
+comp_pr_2035 = np.array([
+    4.253139929, 4.406755484, 4.570037863, 4.744768899, 4.930836909,
+    5.131013425, 5.342715512, 5.564007419, 5.796154012, 6.040153487,
+    6.297213767, 6.568764231, 6.852239519, 7.144719411, 7.443766033,
+    7.74748032 , 8.060924865, 8.384825607, 8.714051782, 9.042671347,
+    9.363414103, 9.678327509, 9.988773016,10.29169879 ,10.58653665 ,
+   10.87325873 ,11.14981264 ,11.41729921 ,11.68008798 ,11.94231114 ,
+   12.20776584 ,12.47777527 ,12.74959632 ,13.01959916 ,13.28427676 ,
+   13.54000683 ,13.78475002 ,14.02149943 ,14.24921102 ,14.46570382 ],
+    dtype=float)
+
+# ---------------------------------------------------------------------------
+# 2 – BUILD MONOTONE INTERPOLATORS (shape‑preserving)
+# ---------------------------------------------------------------------------
+_air_from_P       = PchipInterpolator(power_2035, mass_flow_2035, extrapolate=False)
+_fuel_from_P      = PchipInterpolator(power_2035, fuel_flow_2035, extrapolate=False)
+_PR_from_P        = PchipInterpolator(power_2035, comp_pr_2035,   extrapolate=False)
+_eta_c_from_P     = PchipInterpolator(power_2035, comp_eff_2035,  extrapolate=False)
+
+# ---------------------------------------------------------------------------
+# 3 – AMBIENT REFERENCE STATE (ISA sea‑level)
+# ---------------------------------------------------------------------------
+T_STD = 288.15       # K   (15 °C)
+P_STD = 101_325.0    # Pa
+GAMMA_AIR = 1.4
+X_AIR = "N2:0.78084, O2:0.20946"
+# isentropic‑to‑actual compressor exit temperature helper
+_cp_ratio = (GAMMA_AIR - 1.0) / GAMMA_AIR
+
+def compressor_exit_temperature(T1: float, PR: float, eta_c: float) -> float:
+    """Return static compressor exit temperature [K]."""
+    T2s = T1 * PR ** _cp_ratio
+    return T1 + (T2s - T1) / eta_c
+
+# ---------------------------------------------------------------------------
+# 4 – HELPER FUNCTIONS FROM mixture_properties ------------------------------
+# ---------------------------------------------------------------------------
+# The project ships a custom *mixture_properties.py* helper collection that
+# already defines stoichiometric functions consistently with the mechanism
+# file used throughout the project.  Re‑use it here!
+
+from mixture_properties import air_mass_flow_for_phi, kerosene_to_h2, MECH  # noqa: E402
+
+# ---------------------------------------------------------------------------
+# 5 – BUILD THE CASE LIST
+# ---------------------------------------------------------------------------
+cases: dict[str, object] = {
+    "created": datetime.utcnow().isoformat() + "Z",
+    "phi_rich": PHI_RICH,
+    "ambient": {"T_K": T_STD, "P_Pa": P_STD},
+    "MECH": MECH,
+    "cases": []
+}
+
+for P_req in POWERS_TARGET:
+    # --- 5.1 – base map look‑ups -------------------------------------------
+    m_air  = float(_air_from_P(P_req))     # kg/s (corrected)
+    m_fuel = float(_fuel_from_P(P_req))    # kg/s (kerosene)
+    PR     = float(_PR_from_P(P_req))
+    eta_c  = float(_eta_c_from_P(P_req))
+
+    # --- 5.2 – compressor exit state --------------------------------------
+    T2 = compressor_exit_temperature(T_STD, PR, eta_c)   # K
+    P2 = P_STD * PR                                      # Pa
+
+    # --- 5.3 – convert kerosene budget to H2 equivalent -------------------
+    m_H2 = kerosene_to_h2(m_fuel)                        # kg/s hydrogen
+
+    # --- 5.4 – air split for rich flame at φ = 5 --------------------------
+    mdot_air_rich = air_mass_flow_for_phi(m_H2, PHI_RICH,X_air=X_AIR)
+    mdot_air_lean = m_air - mdot_air_rich
+    if mdot_air_lean < 0:
+        raise RuntimeError(
+            f"At {P_req:.1f} kW the total air ({m_air:.3f} kg/s) is insufficient "
+            f"to sustain φ₁ = {PHI_RICH} (needs {mdot_air_rich:.3f} kg/s).")
+
+    # --- 5.5 – store the case --------------------------------------------
+    cases["cases"].append({
+        "power_kW":        P_req,
+        "m_air":           m_air,
+        "m_kerosene":     m_fuel,
+        "m_H2":           m_H2,
+        "mdot_air_rich":  mdot_air_rich,
+        "mdot_air_lean":  mdot_air_lean,
+        "PR":             PR,
+        "eta_c":          eta_c,
+        "T_inlet_K":      T2,
+        "P_inlet_Pa":     P2
+    })
+
+# ---------------------------------------------------------------------------
+# 6 – SERIALISE TO DISK
+# ---------------------------------------------------------------------------
+outfile = Path("cases_setup.json")
+outfile.write_text(json.dumps(cases, indent=2))
+print(f"[setup] Wrote {len(cases['cases'])} operating points → {outfile.resolve()}")
