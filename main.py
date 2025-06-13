@@ -129,13 +129,13 @@ def main(minimum, maximum, no_of_splits, max_iter):
                         np.full(4, MAWP_global),  # p_sto
                         TMS_inputs['h2o_mf_fc']
                     )
+
                     D_rad = tms_outputs[0]
                     aux_power = tms_outputs[1]
                     m_tms_front = tms_outputs[2]
                     m_tms_aft = tms_outputs[4]
                     m_tms_mid = tms_outputs[3]
 
-                    print(type(TMS_inputs['V_amb']))
                     # --------- ADD INTEGRATION HERE ---------
                     
                     #MTOW update

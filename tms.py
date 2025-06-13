@@ -302,7 +302,7 @@ class HEX():
             #t_cold_out = t_cold_in + (self.fluid_cold.mf_given/self.fluid_hot.mf_given )*(L_h2/self.fluid_hot.cp)
             if type_hx == 'sh':
                 t_cold_out = t_hot_in - 20
-                t_hot_out =  t_hot_in - 150
+                t_hot_out =  t_hot_in - 100
 
             elif type_hx == 'evap':
                 t_cold_out = t_cold_out_given
@@ -383,6 +383,7 @@ class Compressor():
     def power(self):
         inlet_temperature = self.fluid.T  
         gamma = self.fluid.gamma 
+        print(f"Compressor inlet temperature: {inlet_temperature} K, Pressure ratio: {self.pressure_ratio}, Efficiency: {self.efficiency},  Fluid: {self.fluid.name}")
         T_out = inlet_temperature * (1 + 1 / self.efficiency * (self.pressure_ratio ** ((gamma - 1) / gamma) - 1))  # Isentropic relation
 
         cp = self.fluid.cp  
@@ -704,25 +705,27 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
     water_turbine_mass_list = []
     air_comp_mass_list = []
     air_turbine_mass_list = []
+    p_comp_2324 = []
     pump_water_power_list = []
+    p_comp_1415 = []
     
-    for i in range(len(h2_mf_fc)): 
+    for i in range(len(h2_mf_fc_l)): 
         Q_dot_fc = Q_dot_fc_l[i]  # W
         Q_dot_eps = Q_dot_eps_l[i]
         p_fc = p_fc_l[i]  # Pa
         p_cc = p_cc_l[i]  # Pa
         h2_mf_fc = h2_mf_fc_l[i]  # kg/s
         h2_mf_cc = h2_mf_cc_l[i]  # kg/s
-        T_fc = T_fc_l[i] + 273.15  # K
-        T_cc = T_cc_l[i] + 273.15  # K
+        T_fc = T_fc_l[i]   # K
+        T_cc = T_cc_l[i]   # K
         air_mf_fc = air_mf_fc_l[i]
-        T_amb = T_amb_l[i] + 273.15
+        T_amb = T_amb_l[i] 
         rho_amb = rho_amb_l[i]  # kg/m³
         V_amb = V_amb_l[i]
         p_amb = p_amb_l[i]
         h2_mf_rec = h2_mf_rec_l[i]
         air_out_fc = air_out_fc_l[i]
-        p_sto = p_sto_l  # Pa, storage pressure
+        p_sto = p_sto_l[i]  # Pa, storage pressure
         h2o_mf_fc = h2o_mf_fc_l[i]  # kg/s, water mass flow rate to fuel cell
         
         
@@ -755,6 +758,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         # coolant = 'Water'
         p_cool = 5.7e5
         fc_press_drop_cool = 100000
+        print(T_fc)
         cool_0 = Fluid_Coolant(name="FuelCellCoolantGeneric", T=T_fc, P=p_cool, C=None, mf=10, fluid_type=coolant)  # Coolant to FC
         cool_mf_per_fc = Q_dot_fc / (cool_0.cp * deltaT_fc * 2)
         cool_0.mf_given = cool_mf_per_fc  # Mass flow rate of coolant to FC
@@ -779,9 +783,9 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
             mf=h2_mf_fc + h2_mf_cc,
             fluid_type='ParaHydrogen'
         )
-        diam_est = 0.05
-        diam_est_cool = diam_est *1.7
-        ratio_h2_to_fc = h2_mf_fc / (h2_mf_fc + h2_mf_cc)  
+        diam_est = 0.10
+        diam_est_cool = diam_est *2
+        ratio_h2_to_fc = h2_mf_fc / (h2_mf_fc + h2_mf_cc)   
         size_pipes_h2(h2_mf_fc, h2_mf_cc, p_sto,h2_test, diam_est)
 
         # Initialize -----------------------------
@@ -870,6 +874,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         # Compressor 14-15
         comp_14_15 = Compressor(comp_efficiency=0.9, pressure_ratio=comp_14_15_PI, fluid=h2_14)
         comp14_15_power = comp_14_15.power()
+        p_comp_1415.append(comp14_15_power)
         comp_14_15_mass = comp_14_15.mass(comp14_15_power)
         m_comp_1415.append(comp_14_15_mass)
         h2_15 = Fluid(name="H2_15", T=h2_14.T, P=h2_14.P * comp_14_15_PI, C=0, mf=h2_14.mf_given, fluid_type='ParaHydrogen')
@@ -903,7 +908,6 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         pipe_h2_7_8 = Pipe(1.56, diam_est * ratio_h2_to_fc, h2_7) 
         m_pipe_h2_78.append(pipe_h2_7_8.mass()) 
         h2_8 = pipe_h2_7_8.analyze_heat_pipe("H2_8")
-        h2_8_copy = Fluid(name="H2_8_copy", T=h2_8.T, P=h2_8.P, C=0, mf=h2_mf_fc/2, fluid_type='ParaHydrogen')
         
         valve_8_9 = Valve(fluid=h2_8, valve_efficiency=0.9)  # Valve for H2 to fuel cell
         valve_8_9_mass = valve_8_9.valve_mass()  # Mass of the valve
@@ -918,18 +922,27 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
 
         # FC Circulation 
         fc_press_drop_h2 = 0.06e5
+        print("Pressure drop in FC for H2:", fc_press_drop_h2)
+        print(f"Pressure in FC before circulation: {p_fc} Pa")
         h2_22 = Fluid(name="H2_22", T=T_fc, P=p_fc - fc_press_drop_h2 , C=0, mf=h2_mf_rec, fluid_type='ParaHydrogen')  
-
+        print("Pressure in h2_22:", h2_22.P)
         # Pipe h2 22-23
         pipe_h2_22_23 = Pipe(0.57, diam_est * ratio_h2_to_fc * 0.5, h2_22)  
         m_pipe_h2_2223.append(pipe_h2_22_23.mass() * 2)
         h2_23 = pipe_h2_22_23.analyze_heat_pipe("H2_23")
+        print("pressure in h2_23:", h2_23.P)
 
         # Compressor 23-24
-        comp_23_24_PI = p_fc / h2_23.P
-        comp_23_24 = Compressor(comp_efficiency=0.9, pressure_ratio=comp_23_24_PI, fluid=h2_23)
-        comp23_24_power = comp_23_24.power()
-        comp_23_24_mass = comp_23_24.mass(comp23_24_power)
+        if h2_23.P < p_fc:
+            comp_23_24_PI = p_fc / h2_23.P
+            comp_23_24 = Compressor(comp_efficiency=0.9, pressure_ratio=comp_23_24_PI, fluid=h2_23)
+            comp23_24_power = comp_23_24.power()
+            comp_23_24_mass = comp_23_24.mass(comp23_24_power)
+        else:
+            comp23_24_power = 0
+            comp_23_24_mass = 0
+        
+        p_comp_2324.append(comp23_24_power)
         m_comp_2324.append( comp_23_24_mass * 2)
         h2_24 = Fluid(name="H2_24", T=h2_23.T, P=h2_23.P * comp_23_24_PI, C=0, mf=h2_mf_fc/2, fluid_type='ParaHydrogen')
 
@@ -1003,6 +1016,8 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         m_pipe_cool_1718.append(pipe_cool_17_18.mass() * 2)
         cool_18 = pipe_cool_17_18.analyze_heat_pipe("Cool_18")
 
+        print(f"Cool 18 Temperature: {cool_18.T:.2f} K")
+        print(f"Cool 18 Gamma: {cool_18.gamma:.2f} kg/s")
 
         # Skin Heat Exchanger
         # -------------------------------------------------------------------------------------------------
@@ -1062,6 +1077,12 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         pipe_cool_16_24 = Pipe(1.28, diam_est_cool * ratio_to_wing, cool_16)
         m_pipe_cool_16_24.append(pipe_cool_16_24.mass() * 2)
         cool_24_prime = pipe_cool_16_24.analyze_heat_pipe("Cool_24_prime")
+        print(f"Cool 24 Out Temperature: {cool_24_out.T:.2f} K")
+        print(f"Cool 24 Prime Temperature: {cool_24_prime.T:.2f} K")
+        print(f"Cool 24 Out Pressure: {cool_24_out.P:.2f} Pa")
+        print(f"Cool 24 Prime Pressure: {cool_24_prime.P:.2f} Pa")
+        print(f"Cool 24 Out Mass Flow Rate: {cool_24_out.mf_given:.2f} kg/s")
+        print(f"Cool 24 Prime Mass Flow Rate: {cool_24_prime.mf_given:.2f} kg/s")
 
         cool_24_new = Fluid_Coolant(name="Cool_24", 
                         T=(cool_24_prime.T * cool_24_prime.mf_given + cool_24_out.T * cool_24_out.mf_given) / (cool_24_out.mf_given + cool_24_prime.mf_given), 
@@ -1189,7 +1210,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
                     'pressure': var_value.P
                 }
 
-    power_required = water_turb_p_list.max() + air_turb_p_list.max() + fan_powers.max() + pump_26_27_power_list.max() + air_comp_power_list.max() + fan_powers_1.max() + pump_water_power_list.max()
+    power_required = water_turb_p_list.max() + air_turb_p_list.max() + fan_powers.max() + pump_26_27_power_list.max() + air_comp_power_list.max() + fan_powers_1.max() + pump_water_power_list.max() + p_comp_2324.max() + p_comp_1415.max() 
     m_front = m_valve_6711.max() + m_pipe_h2_1112.max() + m_valve_121326.max() + m_pipe_h2_1314.max() + m_pipe_h2_2618.max() + m_comp_1415.max() + m_pipe_h2_1516.max() + m_pipe_h2_1719.max() + m_valve_1920.max() + m_pipe_2021.max() + m_pipe_h2_78.max() + m_pipe_valve89.max() + m_pipe_h2_910.max() + m_pipe_h2_2223.max() + m_comp_2324.max() + m_pipe_h2_2425.max() + m_pipe_cool_4_5.max() + m_pipe_cool_2120.max() + m_pipe_cool_12_13.max() \
     + m_valve_132014.max() + m_pipe_cool_1415.max() + m_valve_151617.max() + m_pipe_cool_1718.max() + m_skin_hx.max() + m_pipe_cool_23.max() + m_fans_rad.max() + m_rads.max() + m_pipe_cool_24.max() + m_pipe_cool_16_24.max() + m_pipe_cool_25.max() + m_pipe_cool_26.max() + m_pump_2627.max() + m_pipe_cool_27.max() + m_fans_1.max() + air_comp_mass_list.max() + air_turbine_mass_list.max() \
     + water_turbine_mass_list.max() + m_was_list.max() + m_pump_water.max() + m_valve_water.max()

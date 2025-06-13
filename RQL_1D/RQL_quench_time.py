@@ -35,7 +35,7 @@ class gas_obj:
         self.gas.TPX = T, P, X
 
 
-def main(hdot_h2o_step: float = 1e-3) -> Tuple[List[float], np.ndarray]:
+def main(M_cc: float = 0.3, l_cc: float = 0.1) -> Tuple[List[float], np.ndarray]:
     #----------Inputs----------
     # Exhaust of the rich zone
     rich_ex = gas_obj(
@@ -44,6 +44,88 @@ def main(hdot_h2o_step: float = 1e-3) -> Tuple[List[float], np.ndarray]:
             T=734.22,
             P=12.1 * ct.one_atm
             )
+    
+    air = gas_obj(
+            mdot=1.0,
+            X="N2:0.78084, O2:0.20946",
+            T=603.0,
+            P=rich_ex.P
+            )
+    
+    cut_off_time = l_cc / (M_cc * )
+
+    #----------Iteration----------
+    for mdot_air2_i in tqdm(mdot_air):
+        for mdot_h2o_i in mdot_h2o:
+            t = 0.0
+            dt = 1e-2
+            NOx_tot = 0.0
+            m_air2_step = mdot_air2_i * (dt / t_end)
+            m_h2o_step = mdot_h2o_i * (dt / t_end)
+
+            # Create three separate gas objects for each stream to avoid overwriting state
+            gas_rich_ex = ct.Solution(MECH)
+            gas_rich_ex.TPX = T_rich_ex, P_rich_ex, X_rich_ex
+            stream1 = ct.Quantity(gas_rich_ex, mass=mdot_rich_ex)
+
+            gas_air = ct.Solution(MECH)
+            gas_air.TPX = T_air, P_rich_ex, X_air
+            stream2 = ct.Quantity(gas_air, mass=m_air2_step)
+
+            gas_h2o = ct.Solution(MECH)
+            gas_h2o.TPX = T_h2o, P_rich_ex, X_h2o
+            gas_h2o.HP = gas_h2o.enthalpy_mass + 1.9871*1e6, P_rich_ex
+            stream3 = ct.Quantity(gas_h2o, mass=m_h2o_step)
+
+            while t <= t_end and NOx_tot <= NOx_limit:
+                # Set up gas object
+                gas = ct.Solution(MECH)                
+
+                # Mix the streams at constant pressure and enthalpy
+                X_mix, T_mix, mdot_mix = mix_streams_const_HP(stream1, stream2, stream3, P_rich_ex)
+                gas.TPX = T_mix, P_rich_ex, X_mix
+                stream1 = ct.Quantity(gas, mass=mdot_mix)
+
+                # Set up 0D reactor
+                reactor = ct.IdealGasConstPressureReactor(gas)
+                sim = ct.ReactorNet([reactor])
+                sim.advance(t)
+                NOx_tot += reactor.thermo['NO'].X[0] + reactor.thermo['NO2'].X[0]
+                t += dt
+
+                if t >= t_end or NOx_tot >= NOx_limit:
+                    times_to_mix.append(t)
+                    NOx.append(NOx_tot)
+                    temps.append(reactor.T)
+                    break
+                try:
+                    # Continue simulation as normal
+                    pass
+                except Exception as e:
+                    times_to_mix.append(t)
+                    NOx.append(NOx_tot)
+                    temps.append(reactor.T if 'reactor' in locals() else np.nan)
+                    break
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     # Air bleeded, to be mixed with rich exhaust to create stoichiometric mixture
     air = gas_obj(
