@@ -978,7 +978,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         cool_5 = pipe_cool_4_5.analyze_heat_pipe("Cool_5")
 
         # Pipe 19-22
-        pipe_cool_19_22 = Pipe(4.96, diam_est_cool*ratio_to_hex, cool_19, type ='inv')  
+        pipe_cool_19_22 = Pipe(4.96, diam_est_cool, cool_19, type ='inv')  
         m_pipe_cool_1922.append(pipe_cool_19_22.mass())
         cool_22 = pipe_cool_19_22.analyze_heat_pipe("Cool_22")
 
