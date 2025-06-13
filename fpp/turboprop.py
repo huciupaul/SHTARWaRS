@@ -249,7 +249,7 @@ class Turboprop:
     ):
         """Linear model of the air mass flow rate."""
         # mdot_air = (Pa/Pa_TOGA)*delta_mdot + mdot_min
-        mdot_air = mfa(Pa/1e3)
+        mdot_air = mfa(Pa/2e3)
         return mdot_air
     
     #  COMPUTE
@@ -282,7 +282,7 @@ class Turboprop:
         
         # Fuel flow rate
         # mdot_fuel = C_p*R_LHV*Pa/(1-0.16) # Max engine installation losses
-        mdot_fuel = mff(Pa/1e3)
+        mdot_fuel = 2*mff(Pa/2e3)
 
         # Station 5 (turbine exit)
         T05, P05 = self.__05(mdot_air, mdot_fuel, self.c_pa, self.c_pg, T02, T03, T04, P04,
@@ -294,4 +294,4 @@ class Turboprop:
                                self.c_pg,
                                self.k_gas)
         
-        return mdot_fuel, eta_th, eta_prop, mdot_air, T03, P03
+        return mdot_fuel, eta_th, eta_prop, 2*mdot_air, T03, P03
