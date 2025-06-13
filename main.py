@@ -27,7 +27,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
         os.makedirs(output_dir)
 
     # Define the power splits and fuel cell percentages
-    power_splits = np.linspace(minimum, maximum, no_of_splits)  # 10 splits from 0 to 1
+    power_splits = np.linspace(0.6, 1.0, 5)  # 10 splits from 0 to 1
     fc_toga_percentages = np.linspace(minimum, maximum, no_of_splits)  # Example percentages of TOGA power for the fuel cell
     fc_cruise_percentages = np.linspace(minimum, maximum, no_of_splits)  # Example percentages of CRUISE power for the fuel cell
 
