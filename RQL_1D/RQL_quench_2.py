@@ -76,11 +76,11 @@ def main(hdot_h2o_step: float = 1e-3) -> Tuple[List[float], np.ndarray]:
     temps_before_reaction = []
     temps_after_reaction = []
 
-    mdot_h2o = np.arange(0, 0.2 + 1e-2, hdot_h2o_step)  # kg/s
+    mdot_h2o = np.arange(0, 0.1 + 1e-2, hdot_h2o_step)  # kg/s
 
 
     lh2o = gas_obj(
-            mdot=0.15,
+            mdot=0.0,
             X="H2O:1",
             T=353.0,
             P=rich_ex.P
@@ -95,7 +95,7 @@ def main(hdot_h2o_step: float = 1e-3) -> Tuple[List[float], np.ndarray]:
     stoich_with_water = gas_obj(
         mdot=mdot_mix,
         X=X_mix,
-        T=T_mix,
+        T=1200,
         P=P_mix
     )
 
@@ -107,18 +107,26 @@ def main(hdot_h2o_step: float = 1e-3) -> Tuple[List[float], np.ndarray]:
     times = []
     NOx_formed = []
     temp_evolution = []
-    
-    for t in tqdm(np.arange(1e-2, 100.0, 1e-5)):
-        sim.advance(t)
 
+    O2 = []
+    N2 = []
+    
+    for t in tqdm(np.arange(1e-4, 5.0, 1e-4)):
+        sim.advance(t)
         times.append(t)
-        NOx_formed.append(reactor.thermo['NO'].X[0] * 1e4)
+        NOx_formed.append(reactor.thermo['NO'].X[0] * 1e6)
+        # O2.append(reactor.thermo['O2'].X[0])
+        # N2.append(reactor.thermo['N2'].X[0])
         temp_evolution.append(reactor.thermo.T)
+
+    print(np.array(NOx_formed))
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
     # Ensure water_content matches the length of NOx and temperature arrays
 
-    ax1.plot(np.array(times), np.array(NOx_formed))
+    ax1.plot(np.array(times), np.array(NOx_formed), color='r')
+    # ax1.plot(np.array(times), np.array(O2), color='b')
+    # ax1.plot(np.array(times), np.array(N2), color='g')
     ax1.set_title('NOx emissions')
     ax1.set_xlabel('Time')
     ax1.set_ylabel('NOx [ppm]')
@@ -162,7 +170,9 @@ def main(hdot_h2o_step: float = 1e-3) -> Tuple[List[float], np.ndarray]:
     #     temps_before_reaction.append(reactor.thermo.T)
 
     #     try:
-    #         sim.advance_to_steady_state()
+    #         res = sim.advance_to_steady_state(max_steps=1e3, return_residuals=True)
+    #         # advance_to_steady_state(self, max_steps=10000, residual_threshold=0.0, atol=0.0, return_residuals=False)
+    #         # print(res)
     #         print(f"Temp after reaction: ", reactor.thermo.T)
 
     #     except Exception as e:
@@ -176,8 +186,7 @@ def main(hdot_h2o_step: float = 1e-3) -> Tuple[List[float], np.ndarray]:
     #             print(f"Reactor state before failure:\nT = {reactor.thermo.T}, Y = {reactor.thermo.Y}")
     #             print(f"Sum(Y) = {sum(reactor.thermo.Y)}")
 
-    #             continue
-
+                
     #     temps_after_reaction.append(reactor.thermo.T)
     #     NOx.append(reactor.thermo['NO'].X[0] * 1e4) # ppm
 
