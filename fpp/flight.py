@@ -720,7 +720,8 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
         
     # Determine the maximum fuel cell power across the three splits
     FC_outputs = dict(m_fc=fc_model.fc_mass,
-                      V_fc=fc_model.fc_volume)
+                      V_fc=fc_model.fc_volume,
+                      co2_fc=fc_model.fc_gwp)
     # mission_H2.quicklook()  # Show quicklook plots
         
     return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile, loading_points

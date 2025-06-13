@@ -73,9 +73,10 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     # FPP
                     TMS_inputs, m_h2, FC_outputs, _, loading_vector = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, D_rad, aux_power, 10)
                     # Also get m_nox, nox_max_ppm, co2_fc from fpp_main
-                    m_nox, nox_max_ppm, co2_fc = 0.0, 0.0, 0.0
+                    m_nox, nox_max_ppm = 0.0, 0.0
                     m_fc = FC_outputs['m_fc']
                     V_fc = FC_outputs['V_fc']
+                    co2_fc = FC_outputs['co2_fc']
 
                     # Storage
                     m_sto, V_sto, _, _, _, length_sto, diameter_sto, co2_sto = main_storage(m_h2)
