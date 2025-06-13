@@ -119,21 +119,54 @@ if PLOT_RICH:
     major = ("O2", "H2", "H2O")
     states = flame_rich.to_array()
     plt.figure()
+    plt.plot(flame_rich.grid, flame_rich.T, color="red")
     for sp in major:
         plt.plot(states.grid*1e3, states(sp).X, label=sp)
     plt.xlabel("distance [mm]"); plt.ylabel("mole fraction")
     plt.legend(); plt.tight_layout()
     plt.show()
 
-    major = ("N2O", "NO"   )#   , "NO2")
-    states = flame_rich.to_array()
-    plt.figure()
-    for sp in major:
-        plt.plot(states.grid*1e3, states(sp).X, label=sp)
-    plt.xlabel("distance [mm]"); plt.ylabel("mole fraction")
-    plt.legend(); plt.tight_layout()
-    plt.show()
+# ---------------------------------------------------------------------------
+# 3 – SINGLE-FIGURE SUMMARY:  mole fractions (left axis) + temperature (right)
+# ---------------------------------------------------------------------------
+import numpy as np
+import matplotlib.pyplot as plt
 
+# pick the species whose chemistry you care about ---------------------------
+major = ("H2", "O2", "H2O")          # tweak / reorder as you like
+
+x_mm = flame_rich.grid * 1e3               # convert m → mm for nicer ticks
+fig, ax_X = plt.subplots(figsize=(6, 4))
+
+# ---- ❶ mole-fraction traces (left y-axis) ---------------------------------
+for sp in major:
+    i = gas.species_index(sp)
+    ax_X.plot(x_mm, flame_rich.X[i, :], label=sp)
+
+ax_X.set_xlabel("distance $x$ [mm]")
+ax_X.set_ylabel("mole fraction $X_i$")
+ax_X.set_xlim(x_mm[0], x_mm[-1])
+
+# put **exactly five** ticks on the distance axis
+ax_X.set_xticks(np.linspace(x_mm[0], x_mm[-1], 5))
+
+# ---- ❷ temperature trace + shaded area (right y-axis) ---------------------
+ax_T = ax_X.twinx()                        # second axis shares x-axis :contentReference[oaicite:0]{index=0}
+ax_T.plot(x_mm, flame_rich.T, color="red", label="T")
+ax_T.fill_between(x_mm, flame_rich.T, color="red", alpha=0.05)  # shade under curve :contentReference[oaicite:1]{index=1}
+ax_T.set_ylabel("temperature $T$ [K]", color="red")
+ax_T.tick_params(axis="y", labelcolor="red")
+ax_T.set_ylim(500,1700)
+# ---- legend: combine handles from both axes --------------------------------
+lines, labels = ax_X.get_legend_handles_labels()
+lines2, labels2 = ax_T.get_legend_handles_labels()
+ax_X.legend(lines + lines2, labels + labels2, loc="center left", fontsize=8)
+
+plt.tight_layout()
+plt.show()
+
+
+quit()
 # ---------------------------------------------------------------------------
 # 3 – QUENCH: MIX EXHAUST + REMAINING AIR + WATER
 # ---------------------------------------------------------------------------
@@ -190,19 +223,7 @@ mixed_gas = ct.Solution(MECH)
 mixed_gas.X = X_mix_final
 mixed_gas.HP = h_mix, P_mix
 
-export = dict(
-    MECH      = MECH,
-    P_mix     = P_mix,
-    X_exh     = X_exh,
-    mdot_exh  = mdot_rich_burn,          # or mdot_gas_exh
-    h_exh     = h_exh,
-    h_air2    = h_air2,
-    TOTAL_AIR = TOTAL_AIR,
-    mdot_air1 = mdot_air1,
-)
-with open("BLEED_AIR_VS_EQ RATIO_2/rich_to_lean.json", "w") as fp:
-    json.dump(export, fp)
-quit()
+
 
 print("----- MIXER RESULTS -----")
 print(f"mixed-gas temperature : {mixed_gas.T:10.2f} K")
