@@ -253,6 +253,7 @@ def main_storage(m_h2):
         Vt, L_out, R_out = tankh2.total_volume(L_cyl, dv, t1, t2, t_mli)
         mass_inner, mass_outer, mass_mli = tankh2.total_mass(L_in, dv, t1, t2, t_mli, dens_mli)
         Mt = mass_inner + mass_outer + mass_mli + mass_h2 + str_mass
+        co2_storage = tankh2.kg_co2(mass_inner, mass_outer, mass_mli, str_mass, mli_co2, co2_kevlar)
 
         V_init = Vt
         L_init = L_out
@@ -279,7 +280,7 @@ def main_storage(m_h2):
 
         L_out = L_cyl + 2 * h
         
-        return Mt, Vt, t1, dv, t2, L_out, R_out
+        return Mt, Vt, t1, dv, t2, L_out, R_out, co2_storage
 
     # --- Main ---
     V_in, fill_ratio = fA(mass_h2, P_vent)
@@ -292,22 +293,8 @@ def main_storage(m_h2):
     str_mass = estimated_mass * ratio
     Q_str = Q_og_str
     Qmax = 100  # Use a fixed Qmax for speed, or precompute if needed
-    Mt, Vt, t1, dv, t2, L_out, R_out = compute_tank(material, material2, mat_property, MAWP, mass_h2, Q_str, mat2_property, str_mass, fill_ratio, V_in, P_vent, Qmax)
+    Mt, Vt, t1, dv, t2, L_out, R_out, co2_storage = compute_tank(material, material2, mat_property, MAWP, mass_h2, Q_str, mat2_property, str_mass, fill_ratio, V_in, P_vent, Qmax)
     Mt = Mt - mass_h2
-
-    # --- N_PAX ---
-    N_PAX = None
-    if L_out < 4.52 and L_out >= 3.76:
-        N_PAX = 11
-    elif L_out < 3.76 and L_out >= 3.0:
-        N_PAX = 13
-    elif L_out < 3.0 and L_out >= 2.24:
-        N_PAX = 15
-    elif L_out < 2.24 and L_out >= 1.48:
-        N_PAX = 17
-    elif L_out < 1.48 and L_out >= 0.72:
-        N_PAX = 19
-    
     d_out = 2 * R_out
 
-    return Mt, Vt, t1, dv, t2, L_out, d_out
+    return Mt, Vt, t1, dv, t2, L_out, d_out, co2_storage

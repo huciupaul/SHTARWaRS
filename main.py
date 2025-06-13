@@ -18,7 +18,6 @@ from storage.tank import main_storage  # Import storage sizing function
 from performance.Integration.aft_configuration import cargo_main  # Import cargo sizing function
 from tms import tms_main  # Import TMS sizing function
 
- # TODO: swap mdot_fuel and mdot_air in fpp model to the pickle Alvaro sends
 
 def main(minimum, maximum, no_of_splits, max_iter):
     # Check if the output directory exists, if not create it
@@ -49,7 +48,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
     for i_split, split in enumerate(power_splits):
         
         # EPS
-        m_eps, Qdot_eps, V_elmo = eps_main(split)
+        m_eps, Qdot_eps, V_elmo, co2_eps, P_elmo = eps_main(split)
 
         for i_toga, fc_toga_percentage in enumerate(fc_toga_percentages):
 
@@ -57,24 +56,29 @@ def main(minimum, maximum, no_of_splits, max_iter):
 
                 # Initialize variables for the first iteration of convergence
                 MTOW = Beechcraft_1900D['OEW'] # Original OEW
-                aux_power, D_rad = 0.0, 0.0
                 m_eps_prev, m_fc_tms_prev, m_h2_prev, m_sto_prev, m_cargo_prev = 0.0, 326.63, 315.39, 141.38, 714.05 # from midterm
                 MTOW += (m_eps + m_fc_tms_prev + m_h2_prev + m_sto_prev)  # Initial MTOW
                 MTOW_prev = 0.001
 
+                aux_power, D_rad = 0.0, 0.0
+
                 # Convergence of MTOW, stop if the change is less than 1% of the previous MTOW or reached max number of iterations
                 for i in range(max_iter):
+                    print("ITER", i)
                     if np.abs((MTOW-MTOW_prev)/MTOW_prev) < 0.01 and i > 0:
                         print(f"Converged after {i} iterations with MTOW: {MTOW:.2f} kg")
                         print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}")
                         break
                     
                     # FPP
-                    TMS_inputs, m_h2, FC_outputs, mission_profile, loading_vector = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, D_rad, aux_power, 10)
+                    TMS_inputs, m_h2, FC_outputs, _, loading_vector = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, D_rad, aux_power, 10)
+                    # Also get m_nox, nox_max_ppm, co2_fc from fpp_main
+                    m_nox, nox_max_ppm, co2_fc = 0.0, 0.0, 0.0
                     m_fc = FC_outputs['m_fc']
                     V_fc = FC_outputs['V_fc']
+
                     # Storage
-                    m_sto, V_sto, t1, dv, t2, length_sto, diameter_sto = main_storage(m_h2)
+                    m_sto, V_sto, _, _, _, length_sto, diameter_sto, co2_sto = main_storage(m_h2)
                     
                     # Cargo
                     result = cargo_main(length_sto, diameter_sto)
@@ -88,7 +92,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     # V_aft_cargo:  float = result["V_aft_cargo"]
                     # num_PAX:      int   = result["num_PAX"]
 
-                    # Update delta_AP, D_rad based on the TMS code and get:
+                    # TMS
 
                     # print("START",TMS_inputs['Q_dot_fc'][0], #ok
                     #     Qdot_eps, #ok
@@ -109,7 +113,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     #     TMS_inputs['h2o_mf_fc'][0], "END")
                     # m_tms_front, m_tms_aft, m_tms_mid, D_rad, aux_power = 0.0, 0.0, 0.0, 0.0, 0.0
                     # break
-                    print("ITER", i)
+                    
                     _, tms_outputs = tms_main(
                         TMS_inputs['Q_dot_fc'], #ok
                         np.full(4, Qdot_eps), #ok
@@ -150,7 +154,8 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     m_cargo_prev = M_aft_cargo
 
                 # After convergence, store the results in the tensor, then in the 4D tensor
-                tensor = np.array([m_eps, m_fc, m_h2, m_sto,V_fc, V_sto, V_elmo, MTOW, length_sto, diameter_sto, M_aft_cargo, m_tms_front, m_tms_aft, m_tms_mid])
+                tensor = np.array([m_eps, m_fc, m_h2, m_sto,V_fc, V_sto, V_elmo, MTOW, length_sto, diameter_sto, M_aft_cargo, m_tms_front, m_tms_aft, m_tms_mid, \
+                                   m_nox, nox_max_ppm, P_elmo, co2_fc, co2_sto, co2_eps])
                 result_tensor[i_split, i_toga, i_cruise, :] = tensor
                 loading_tensor[i_split, i_toga, i_cruise, :, :] = loading_vector
 
