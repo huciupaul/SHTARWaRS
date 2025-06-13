@@ -29,7 +29,7 @@ def _generate_and_save_all_props():
             Pr[i, j] = PropsSI('PRANDTL', 'P', P, 'T', T, fluid_type)
             rho[i, j] = PropsSI('D', 'P', P, 'T', T, fluid_type)
 
-    T_fine = np.linspace(273-48, 273+200, 1000)   # Kelvin
+    T_fine = np.linspace(273-48, 273+250, 1000)   # Kelvin
     P_fine = np.linspace(1e2, 60e5, 1000)   # Pa
 
     def interp_on_fine_grid(data):

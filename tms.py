@@ -50,11 +50,10 @@ class SkinHeatExchanger():
         if Q_absorbed < heat_w:
             return Q_absorbed, t_coolant_out
         else:
-            print("No need for Radiator")
             return Q_absorbed, t_coolant_out
     
 class RamAirHeatExchanger():
-    def __init__(self, coolant_temp_K, fluid, ambient_conditions):
+    def __init__(self, coolant_temp_K, fluid, ambient_conditions,p_amb):
         #self.U = U_W_per_m2K
         self.coolant_temp = coolant_temp_K
         self.Pr = fluid.Pr
@@ -72,7 +71,8 @@ class RamAirHeatExchanger():
         self.TR = 0.0
         #self.drag_N = 0.0           # N, raw drag before Meredith effect
         self.net_drag_N = 0.0       # N, after Meredith recovery
-        self.ambient_conditions = ambient_conditions  
+        self.ambient_conditions = ambient_conditions
+        self.p_amb = p_amb
     
     def U_rad(self):
 
@@ -140,7 +140,7 @@ class RamAirHeatExchanger():
 
         self.delta_t_air = T
         A_0 = front_area_rad
-        P_air = self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * 0.5 + p_amb 
+        P_air = self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * 0.5 + self.p_amb 
         mu_air = PropsSI('VISCOSITY', 'P', P_air, 'T', self.ambient_conditions['T'], 'Air')
         g_c = 1  
         L = length_rad
@@ -193,7 +193,7 @@ class RamAirHeatExchanger():
         )
         # plt.plot(deltaT, TR, label=f"ηₚ,07 = {eta:.3f}")
 
-    # print(TR[-1])
+    # # # # # # print(TR[-1])
     # -- plot ---------------------------------------------------------------
     #plt.plot(deltaT, TR, marker="o")
     
@@ -293,7 +293,7 @@ class HEX():
             while t_hot_out < 273 - 48:
                 self.fluid_hot.mf_given *= 1.2
                 t_hot_out = -self.Q_req / (self.fluid_hot.mf_given * self.fluid_hot.cp) + self.fluid_hot.T
-                print(f"Iteration {iteration}: t_hot_out = {t_hot_out}, mf_hot = {self.fluid_hot.mf_given}")
+                # # # # # print(f"Iteration {iteration}: t_hot_out = {t_hot_out}, mf_hot = {self.fluid_hot.mf_given}")
             '''
             #t_hot_out = -self.Q_req / (self.fluid_hot.mf_given * self.fluid_hot.cp) + self.fluid_hot.T
             t_hot_in = self.fluid_hot.T
@@ -383,7 +383,7 @@ class Compressor():
     def power(self):
         inlet_temperature = self.fluid.T  
         gamma = self.fluid.gamma 
-        print(f"Compressor inlet temperature: {inlet_temperature} K, Pressure ratio: {self.pressure_ratio}, Efficiency: {self.efficiency},  Fluid: {self.fluid.name}")
+        print(f"Pressure ratio: {self.pressure_ratio}, FLuid: {self.fluid.name}")
         T_out = inlet_temperature * (1 + 1 / self.efficiency * (self.pressure_ratio ** ((gamma - 1) / gamma) - 1))  # Isentropic relation
 
         cp = self.fluid.cp  
@@ -640,9 +640,9 @@ def size_pipes_h2(h2_mf_fc, h2_mf_cc, p_sto,fluid,diam_est):
     press_err = total_pressure_drop - pressure_drop
     '''
     if press_err < 0:
-        print(f"Selected pipe diameter {diam_est:.3f} m is adequate, pressure drop is {total_pressure_drop:.2f} Pa, with an estimated maximum allowed of {pressure_drop:.2f} Pa")
+        # # # # # print(f"Selected pipe diameter {diam_est:.3f} m is adequate, pressure drop is {total_pressure_drop:.2f} Pa, with an estimated maximum allowed of {pressure_drop:.2f} Pa")
     else: 
-        print(f"Increase pipe diameter, pressure drop is {total_pressure_drop:.2f} Pa, with an estimated maximum allowed of {pressure_drop:.2f} Pa")
+        # # # # # print(f"Increase pipe diameter, pressure drop is {total_pressure_drop:.2f} Pa, with an estimated maximum allowed of {pressure_drop:.2f} Pa")
     '''
 
     
@@ -650,64 +650,65 @@ def size_pipes_h2(h2_mf_fc, h2_mf_cc, p_sto,fluid,diam_est):
 
 
 def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_fc_l, T_cc_l, air_mf_fc_l, T_amb_l, rho_amb_l, V_amb_l, p_amb_l, h2_mf_rec_l, air_out_fc_l, p_sto_l,h2o_mf_fc_l):
-    m_pipe_h2_12 = []
-    m_pipe_h2_34 = []
-    m_sh = []
-    m_pipe_cool_201 = []
-    m_vap = []
-    m_pipe_h2_56 = []
-    m_valve_6711 = []
-    m_pipe_h2_1112 = []
-    m_valve_121326 = []
-    m_pipe_h2_1314 = []
-    m_pipe_h2_2618 = []
-    m_comp_1415 = []
-    m_pipe_h2_1516 = []
-    m_pipe_h2_1719 = []
-    m_valve_1920 = []
-    m_pipe_2021 = []
-    m_pipe_h2_78 = []
-    m_pipe_valve89 = []
-    m_pipe_h2_2223 = []
-    m_pipe_h2_910 = []
-    m_comp_2324 = []
-    m_pipe_h2_2425 = []
-    m_pipe_cool_2_3 = []
-    m_pipe_cool_4_5 = []
-    m_was_list = []
-    m_pipe_cool_1922 = []
-    m_pipe_cool_2120 = []
-    m_pipe_cool_12_13 = []
-    m_valve_132014 = []
-    m_pipe_cool_1415 = []
-    m_pump_water = []
-    water_turb_p_list = []
-    m_valve_151617 = []
-    m_pipe_cool_1718 = []
-    m_skin_hx = []
-    m_pipe_cool_23 = []
-    m_rads = []
-    m_pipe_cool_26 = []
-    m_pipe_cool_25 = []
-    m_fans_rad = []
-    air_turb_p_list = []
-    m_pipe_cool_27 = []
-    drags = []
-    fan_powers = []
-    m_valve_water = []
-    m_pipe_cool_24 = []
-    pump_26_27_power_list = []
-    m_pipe_cool_16_24 = []
-    m_fans_1 = []
-    air_comp_power_list = []
-    m_pump_2627 = []
-    fan_powers_1 = []
-    water_turbine_mass_list = []
-    air_comp_mass_list = []
-    air_turbine_mass_list = []
-    p_comp_2324 = []
-    pump_water_power_list = []
-    p_comp_1415 = []
+    m_pipe_h2_12 = [0]
+    m_pipe_h2_34 = [0]
+    m_sh = [0]
+    m_pipe_cool_201 = [0]
+    m_vap = [0]
+    m_pipe_h2_56 = [0]
+    m_valve_6711 = [0]
+    m_pipe_h2_1112 = [0]
+    m_valve_121326 = [0]
+    m_pipe_h2_1314 = [0]
+    m_pipe_h2_2618 = [0]
+    m_comp_1415 = [0]
+    m_pipe_h2_1516 = [0]
+    m_pipe_h2_1719 = [0]
+    m_valve_1920 = [0]
+    m_pipe_2021 = [0]
+    m_pipe_h2_78 = [0]
+    m_pipe_valve89 = [0]
+    m_pipe_h2_2223 = [0]
+    m_pipe_h2_910 = [0]
+    m_comp_2324 = [0]
+    m_pipe_h2_2425 = [0]
+    m_pipe_cool_2_3 = [0]
+    m_pipe_cool_4_5 = [0]
+    m_was_list = [0]
+    m_pipe_cool_1922 = [0]
+    m_pipe_cool_2120 = [0]
+    m_pipe_cool_12_13 = [0]
+    m_valve_132014 = [0]
+    m_pipe_cool_1415 = [0]
+    m_pump_water = [0]
+    water_turb_p_list = [0]
+    m_valve_151617 = [0]
+    m_pipe_cool_1718 = [0]
+    m_skin_hx = [0]
+    m_pipe_cool_23 = [0]
+    m_rads = [0]
+    m_pipe_cool_26 = [0]
+    m_pipe_cool_25 = [0]
+    m_fans_rad = [0]
+    air_turb_p_list = [0]
+    m_pipe_cool_27 = [0]
+    drags = [0]
+    fan_powers = [0]
+    m_valve_water = [0]
+    m_pipe_cool_24 = [0]
+    pump_26_27_power_list = [0]
+    m_pipe_cool_16_24 = [0]
+    m_fans_1 = [0]
+    air_comp_power_list = [0]
+    m_pump_2627 = [0]
+    fan_powers_1 = [0]
+    water_turbine_mass_list = [0]
+    air_comp_mass_list = [0]
+    air_turbine_mass_list = [0]
+    p_comp_2324 = [0]
+    pump_water_power_list = [0]
+    p_comp_1415 = [0]
+    Q_heater = np.zeros(len(Q_dot_fc_l)) 
     
     for i in range(len(h2_mf_fc_l)): 
         Q_dot_fc = Q_dot_fc_l[i]  # W
@@ -758,7 +759,6 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         # coolant = 'Water'
         p_cool = 5.7e5
         fc_press_drop_cool = 100000
-        print(T_fc)
         cool_0 = Fluid_Coolant(name="FuelCellCoolantGeneric", T=T_fc, P=p_cool, C=None, mf=10, fluid_type=coolant)  # Coolant to FC
         cool_mf_per_fc = Q_dot_fc / (cool_0.cp * deltaT_fc * 2)
         cool_0.mf_given = cool_mf_per_fc  # Mass flow rate of coolant to FC
@@ -769,6 +769,8 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         m_front = 0
         m_mid = 0
         m_rear = 0
+
+        
 
         Q_dot_rem = Q_dot_fc + Q_dot_eps  
 
@@ -784,7 +786,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
             fluid_type='ParaHydrogen'
         )
         diam_est = 0.10
-        diam_est_cool = diam_est *2
+        diam_est_cool = diam_est *3
         ratio_h2_to_fc = h2_mf_fc / (h2_mf_fc + h2_mf_cc)   
         size_pipes_h2(h2_mf_fc, h2_mf_cc, p_sto,h2_test, diam_est)
 
@@ -792,12 +794,15 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         T_tank = PropsSI('T', 'P', p_sto, 'Q', 0, 'ParaHydrogen')  # Initial temperature of LH2 tank
         h2_1 = Fluid(name="H2_1", T=T_tank, P=p_sto, C = None, mf = h2_mf_fc + h2_mf_cc, fluid_type='ParaHydrogen')
 
+        print(f"Initial H2_1: {h2_1.name}, T: {h2_1.T}, P: {h2_1.P}, mf: {h2_1.mf_given}, fluid_type: {h2_1.fluid_type}")
+        print(f"mf_h2_fc: {h2_mf_fc}, mf_h2_cc: {h2_mf_cc}, p_sto: {p_sto}, diam_est: {diam_est}")
         # Pipe h2 12
         pipe_h2_12 = Pipe(1.42, diam_est, h2_1, cryo=True) 
         m_pipe_h2_12.append(pipe_h2_12.mass())
         h2_2 = pipe_h2_12.analyze_heat_pipe('H2_2')
 
         # Pipe h2 34
+        print(f"Pipe h2 12: {h2_2.name}, T: {h2_2.T}, P: {h2_2.P}, mf: {h2_2.mf_given}, fluid_type: {h2_2.fluid_type}")
         T_sat_h2 = PropsSI('T', 'P', h2_2.P, 'Q', 0, h2_2.fluid_type)  # Saturation temperature of H2 at pressure P
         h2_3 = Fluid(name="H2_3", T=T_sat_h2 + HEX_1_deltaT, P=p_sto, C = None, mf = h2_mf_fc + h2_mf_cc, fluid_type='ParaHydrogen')
         pipe_h2_34 = Pipe(1.42, diam_est, h2_3) 
@@ -808,12 +813,15 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         cool_19 = Fluid_Coolant(name="Cool_19", T=T_fc, P=p_cool-fc_press_drop_cool, C=None, mf = cool_mf_per_fc * 2, fluid_type=coolant) 
         t_cold_out_given = T_sat_h2 + HEX_1_deltaT
         Q_h2_heat = (PropsSI('H', 'P', h2_2.P, 'T', T_fc-10, h2_2.fluid_type) - PropsSI('H', 'P', h2_2.P, 'T', t_cold_out_given, h2_2.fluid_type)) * h2_2.mf_given   # Heat of vaporization
+        if Q_h2_heat > Q_dot_rem:
+            Q_heater[i] += Q_h2_heat - Q_dot_rem
+
+        Q_h2_heat = min(Q_h2_heat, Q_dot_rem)
         hx_heat = HEX(name="SuperHeater", fluid_cold=h2_4, fluid_hot=cool_19, Q_req=Q_h2_heat)
         _,cool_20,h2_5, hx_heat_area, hx_heat_n_plates = hx_heat.size(diam_est, type_hx='sh',alpha=alpha_sh) 
         cool_20_new = Fluid_Coolant(name="Cool_20_new", T=cool_20.T, P=cool_20.P, C=None, mf=cool_19.mf_given, fluid_type=cool_19.fluid_type)  # Coolant out of Superheater
         mass_superheater_hx = hx_heat_n_plates * hx_heat_area * hx_heat.density * 3.6 * 1e-3
         m_sh.append(mass_superheater_hx)
-        print(f"Mass of Superheater HEX: {mass_superheater_hx:.2f} kg")
         Q_dot_rem -= Q_h2_heat 
 
         # Pipe cool 20-1
@@ -823,16 +831,24 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         cool_1 = pipe_cool_20_1.analyze_heat_pipe("Cool_1")
         cool_1_keep = Fluid_Coolant(name="Cool_1_keep", T=cool_1.T, P=cool_1.P, C=None, mf=cool_1.mf_given, fluid_type=cool_1.fluid_type)  # Coolant out of Superheater
         
+        if Q_dot_rem > 0:
+            # Vaporizer HEX
+            Q_vap = (PropsSI('H', 'P', h2_2.P, 'T', t_cold_out_given, h2_2.fluid_type) - PropsSI('H', 'P', h2_2.P, 'Q', 0, h2_2.fluid_type)) * h2_2.mf_given   # Heat of vaporization
+            if Q_vap > Q_dot_rem:
+                Q_heater[i] += Q_vap - Q_dot_rem
+            Q_vap = min(Q_vap, Q_dot_rem) 
+            hx_vap = HEX(name="Vaporizer", fluid_cold=h2_2, fluid_hot=cool_1_keep, Q_req=Q_vap)
+            _,cool_2,h2_3, hx_vap_area, hx_vap_n_plates = hx_vap.size(diam_est, t_cold_out_given=t_cold_out_given, type_hx='evap',alpha = alpha_evap)
+            cool_2 = Fluid_Coolant(name="Cool_2", T=cool_2.T, P=cool_2.P, C=None, mf=cool_1_keep.mf_given, fluid_type=cool_1.fluid_type)  
+            mass_vap_hx = hx_vap_n_plates * hx_vap_area * hx_vap.density * 3.6 * 1e-3
+            Q_dot_rem -= Q_vap
+        
+        else:
+            h2_3 = Fluid(name="H2_3", T=h2_2.T, P=h2_2.P, C=0, mf=h2_2.mf_given, fluid_type='ParaHydrogen')  # No vaporization needed
+            cool_2 = Fluid_Coolant(name="Cool_2", T=cool_1.T, P=cool_1.P, C=0, mf=cool_1.mf_given, fluid_type=cool_1.fluid_type)  # No vaporization needed
+            mass_vap_hx = 0
 
-        # Vaporizer HEX
-        Q_vap = (PropsSI('H', 'P', h2_2.P, 'T', t_cold_out_given, h2_2.fluid_type) - PropsSI('H', 'P', h2_2.P, 'Q', 0, h2_2.fluid_type)) * h2_2.mf_given   # Heat of vaporization
-        hx_vap = HEX(name="Vaporizer", fluid_cold=h2_2, fluid_hot=cool_1_keep, Q_req=Q_vap)
-        _,cool_2,h2_3, hx_vap_area, hx_vap_n_plates = hx_vap.size(diam_est, t_cold_out_given=t_cold_out_given, type_hx='evap',alpha = alpha_evap)
-        cool_2 = Fluid_Coolant(name="Cool_2", T=cool_2.T, P=cool_2.P, C=None, mf=cool_1_keep.mf_given, fluid_type=cool_1.fluid_type)  
-        mass_vap_hx = hx_vap_n_plates * hx_vap_area * hx_vap.density * 3.6 * 1e-3
-        Q_dot_rem -= Q_vap
         m_vap.append(mass_vap_hx)
-        print(f"Mass of Vaporizer HEX: {mass_vap_hx:.2f} kg")
 
         # Pipe h2 5-6
         pipe_h2_5_6 = Pipe(4.96, diam_est, h2_5)  
@@ -922,15 +938,11 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
 
         # FC Circulation 
         fc_press_drop_h2 = 0.06e5
-        print("Pressure drop in FC for H2:", fc_press_drop_h2)
-        print(f"Pressure in FC before circulation: {p_fc} Pa")
         h2_22 = Fluid(name="H2_22", T=T_fc, P=p_fc - fc_press_drop_h2 , C=0, mf=h2_mf_rec, fluid_type='ParaHydrogen')  
-        print("Pressure in h2_22:", h2_22.P)
         # Pipe h2 22-23
         pipe_h2_22_23 = Pipe(0.57, diam_est * ratio_h2_to_fc * 0.5, h2_22)  
         m_pipe_h2_2223.append(pipe_h2_22_23.mass() * 2)
         h2_23 = pipe_h2_22_23.analyze_heat_pipe("H2_23")
-        print("pressure in h2_23:", h2_23.P)
 
         # Compressor 23-24
         if h2_23.P < p_fc:
@@ -1004,90 +1016,90 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         
         # Calculate bypass flow rate:
         T_not_HEX = (cool_12.mf_given * (cool_12.T - deltaT_fc) - cool_20.mf_given * cool_5.T) / (cool_12.mf_given - cool_20.mf_given)  # Temperature of coolant to FC without HEX
-        cool_17_mf_minimum = Q_dot_rem / (cool_15.cp * (cool_15.T - T_amb))  
+        cool_17_mf_minimum = Q_dot_rem / (cool_15.cp * (cool_15.T - T_amb)) 
         cool_mf_bypass = (T_not_HEX * cool_14.mf_given - cool_17_mf_minimum * T_amb) / cool_15.T
         cool_17_mf = np.maximum(cool_17_mf_minimum, cool_15.mf_given - cool_mf_bypass)  # Minimum mass flow rate of coolant to FC
-
-        cool_17 = Fluid_Coolant(name="Cool_17", T=cool_15.T, P=cool_15.P, C=0, mf=cool_17_mf, fluid_type=coolant)  # Coolant to FC
         cool_16 = Fluid_Coolant(name="Cool_16", T=cool_15.T, P=cool_15.P, C=0, mf=cool_15.mf_given - cool_17_mf, fluid_type=coolant)  # Coolant to FC
-        
-        # Pipe 17-18
-        pipe_cool_17_18 = Pipe(0.43, diam_est_cool * ratio_to_wing, cool_17)   
-        m_pipe_cool_1718.append(pipe_cool_17_18.mass() * 2)
-        cool_18 = pipe_cool_17_18.analyze_heat_pipe("Cool_18")
 
-        print(f"Cool 18 Temperature: {cool_18.T:.2f} K")
-        print(f"Cool 18 Gamma: {cool_18.gamma:.2f} kg/s")
 
-        # Skin Heat Exchanger
-        # -------------------------------------------------------------------------------------------------
-        skin_hx = SkinHeatExchanger(area = area_wing*2, fluid = cool_18, U = 80)
-        skin_hx.set_ambient(T_ambient_K = ambient_conditions['T'])
-        Q_abs, t_cool_out = skin_hx.absorb_heat(Q_dot_rem)
-        skin_hx_mass = area_wing * 2 * 7900 * 1e-3
-        m_skin_hx.append(skin_hx_mass * 2)
-        cool_23 = Fluid_Coolant(name="Cool_23", T=t_cool_out, P=cool_18.P, C=0, mf=cool_18.mf_given, fluid_type=coolant)  
-        Q_dot_rem -= Q_abs  
+        if cool_17_mf > 0.0001:
+            cool_17 = Fluid_Coolant(name="Cool_17", T=cool_15.T, P=cool_15.P, C=0, mf=cool_17_mf, fluid_type=coolant)  # Coolant to FC
+            # Pipe 17-18
+            pipe_cool_17_18 = Pipe(0.43, diam_est_cool * ratio_to_wing, cool_17)   
+            m_pipe_cool_1718.append(pipe_cool_17_18.mass() * 2)
+            cool_18 = pipe_cool_17_18.analyze_heat_pipe("Cool_18")
 
-        # Pipe cool 23
-        pipe_cool_23 = Pipe(0.43, diam_est_cool * ratio_to_wing, cool_23)
-        m_pipe_cool_23.append(pipe_cool_23.mass() * 2)
-        cool_23_out = pipe_cool_23.analyze_heat_pipe("Cool_23_prime")
-        
-        if Q_dot_rem > 0:
-            Rad_1 = RamAirHeatExchanger(coolant_temp_K=ra_coolant_temp, fluid=cool_23_out, ambient_conditions=ambient_conditions)
-            tol = 0.1
-            rad_area_0 = 0
-            radiator_area = 1
-            rad_exists = False
-            while abs(radiator_area - rad_area_0)>tol:
-                if rad_exists:
-                    rad_area_0 = radiator_area
-                radiator_area, cool_24, power_fan,eta_p,net_drag,length_rad,A_0,mf_air = Rad_1.size_exchanger(Q_dot_rem/2, T_amb)
-                Rad_1.TR = Rad_1.thrust_ratio(
-                    gamma = k_air,
-                    R     = R_AIR,
-                    M0    = ambient_conditions["M"],
-                    T0    = ambient_conditions["T"],
-                    eta_p07 = eta_p,  
-                    CD_d_CD_sp = 0.11)  
-                rad_exists = True
-            A_in = A_0 * (3.28084**2)
-            st_pressure = p_amb * (0.0001450377)
-            l_inlet = length_rad * (3.28084)
-            radiator_mass = 0.32 * 0.4535924 * l_inlet * A_in ** 0.65 * st_pressure**0.6 + 1.735*(l_inlet * A_in**0.5 * st_pressure * 1.33)**0.7331
-            m_rads.append(radiator_mass * 2)
-            fan_mass = 2.959 * power_fan**0.707
-            m_fans_rad.append(fan_mass * 2)
+
+            # Skin Heat Exchanger
+            # -------------------------------------------------------------------------------------------------
+            skin_hx = SkinHeatExchanger(area = area_wing*2, fluid = cool_18, U = 80)
+            skin_hx.set_ambient(T_ambient_K = ambient_conditions['T'])
+            Q_abs, t_cool_out = skin_hx.absorb_heat(Q_dot_rem)
+            skin_hx_mass = area_wing * 2 * 7900 * 1e-3
+            m_skin_hx.append(skin_hx_mass * 2)
+            cool_23 = Fluid_Coolant(name="Cool_23", T=t_cool_out, P=cool_18.P, C=0, mf=cool_18.mf_given, fluid_type=coolant)  
+            Q_dot_rem -= Q_abs  
+
+            # Pipe cool 23
+            pipe_cool_23 = Pipe(0.43, diam_est_cool * ratio_to_wing, cool_23)
+            m_pipe_cool_23.append(pipe_cool_23.mass() * 2)
+            cool_23_out = pipe_cool_23.analyze_heat_pipe("Cool_23_prime")
+            if Q_dot_rem > 0:
+                Rad_1 = RamAirHeatExchanger(coolant_temp_K=ra_coolant_temp, fluid=cool_23_out, ambient_conditions=ambient_conditions,p_amb = p_amb)
+                tol = 0.1
+                rad_area_0 = 0
+                radiator_area = 1
+                rad_exists = False
+                while abs(radiator_area - rad_area_0)>tol:
+                    if rad_exists:
+                        rad_area_0 = radiator_area
+                    radiator_area, cool_24, power_fan,eta_p,net_drag,length_rad,A_0,mf_air = Rad_1.size_exchanger(Q_dot_rem/2, T_amb)
+                    Rad_1.TR = Rad_1.thrust_ratio(
+                        gamma = k_air,
+                        R     = R_AIR,
+                        M0    = ambient_conditions["M"],
+                        T0    = ambient_conditions["T"],
+                        eta_p07 = eta_p,  
+                        CD_d_CD_sp = 0.11)  
+                    rad_exists = True
+                A_in = A_0 * (3.28084**2)
+                st_pressure = p_amb * (0.0001450377)
+                l_inlet = length_rad * (3.28084)
+                radiator_mass = 0.32 * 0.4535924 * l_inlet * A_in ** 0.65 * st_pressure**0.6 + 1.735*(l_inlet * A_in**0.5 * st_pressure * 1.33)**0.7331
+                m_rads.append(radiator_mass * 2)
+                fan_mass = 2.959 * (power_fan/1000)**0.707
+                m_fans_rad.append(fan_mass * 2)
+            else:
+                # No need for radiator, all waste heat is absorbed
+                cool_24 = Fluid_Coolant(name="Cool_24", T=cool_23_out.T, P=cool_23_out.P, C=0, mf=cool_23_out.mf_given, fluid_type=coolant)
+                power_fan = 0
+                net_drag = 0
+
+            drags.append(net_drag)
+            fan_powers.append(power_fan*2)
+
+            # Pipe 24
+            pipe_cool_24 = Pipe(0.43, diam_est_cool * ratio_to_wing, cool_24)
+            m_pipe_cool_24.append(pipe_cool_24.mass() * 2)
+            cool_24_out = pipe_cool_24.analyze_heat_pipe("Cool_24_Out")
+
+            # Pipe 16-24
+            pipe_cool_16_24 = Pipe(1.28, diam_est_cool * ratio_to_wing, cool_16)
+            m_pipe_cool_16_24.append(pipe_cool_16_24.mass() * 2)
+            cool_24_prime = pipe_cool_16_24.analyze_heat_pipe("Cool_24_prime")
+
+            cool_24_new = Fluid_Coolant(name="Cool_24", 
+                            T=(cool_24_prime.T * cool_24_prime.mf_given + cool_24_out.T * cool_24_out.mf_given) / (cool_24_out.mf_given + cool_24_prime.mf_given), 
+                            P=(cool_24_prime.P * cool_24_prime.mf_given + cool_24_out.P * cool_24_out.mf_given) / (cool_24_out.mf_given + cool_24_prime.mf_given), 
+                            C=0, mf=cool_24_out.mf_given + cool_24_prime.mf_given, fluid_type=coolant)  
         else:
-            # No need for radiator, all waste heat is absorbed
-            cool_24 = Fluid_Coolant(name="Cool_24", T=cool_23.T, P=cool_23.P, C=0, mf=cool_23.mf_given, fluid_type=coolant)
-            power_fan = 0
-            net_drag = 0
+            # Pipe 16-24
+            pipe_cool_16_24 = Pipe(1.28, diam_est_cool * ratio_to_wing, cool_16)
+            m_pipe_cool_16_24.append(pipe_cool_16_24.mass() * 2)
+            cool_24_prime = pipe_cool_16_24.analyze_heat_pipe("Cool_24_prime")
 
-        drags.append(net_drag)
-        fan_powers.append(power_fan)
-
-        # Pipe 24
-        pipe_cool_24 = Pipe(0.43, diam_est_cool * ratio_to_wing, cool_24)
-        m_pipe_cool_24.append(pipe_cool_24.mass() * 2)
-        cool_24_out = pipe_cool_24.analyze_heat_pipe("Cool_24_Out")
-
-        # Pipe 16-24
-        pipe_cool_16_24 = Pipe(1.28, diam_est_cool * ratio_to_wing, cool_16)
-        m_pipe_cool_16_24.append(pipe_cool_16_24.mass() * 2)
-        cool_24_prime = pipe_cool_16_24.analyze_heat_pipe("Cool_24_prime")
-        print(f"Cool 24 Out Temperature: {cool_24_out.T:.2f} K")
-        print(f"Cool 24 Prime Temperature: {cool_24_prime.T:.2f} K")
-        print(f"Cool 24 Out Pressure: {cool_24_out.P:.2f} Pa")
-        print(f"Cool 24 Prime Pressure: {cool_24_prime.P:.2f} Pa")
-        print(f"Cool 24 Out Mass Flow Rate: {cool_24_out.mf_given:.2f} kg/s")
-        print(f"Cool 24 Prime Mass Flow Rate: {cool_24_prime.mf_given:.2f} kg/s")
-
-        cool_24_new = Fluid_Coolant(name="Cool_24", 
-                        T=(cool_24_prime.T * cool_24_prime.mf_given + cool_24_out.T * cool_24_out.mf_given) / (cool_24_out.mf_given + cool_24_prime.mf_given), 
-                        P=(cool_24_prime.P * cool_24_prime.mf_given + cool_24_out.P * cool_24_out.mf_given) / (cool_24_out.mf_given + cool_24_prime.mf_given), 
-                        C=0, mf=cool_24_out.mf_given + cool_24_prime.mf_given, fluid_type=coolant)  
+            cool_24_new = Fluid_Coolant(name="Cool_24_new", T = cool_24_prime.T,
+                            P = cool_24_prime.P, C=0, mf=cool_24_prime.mf_given, fluid_type=coolant)
         
         # Intersection 24-5-25
         cool_25 = Fluid_Coolant(name="Cool_25", 
@@ -1102,6 +1114,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         # Electric heater:
         if cool_25_out.T <= T_fc - deltaT_fc:
             Q_dot_heater = (cool_25_out.mf_given * cool_25_out.cp * (T_fc - deltaT_fc - cool_25_out.T))  # Heat required to heat the coolant to FC temperature
+            Q_heater[i] += Q_dot_heater
         else:
             Q_dot_heater = 0
         cool_26 = Fluid_Coolant(name="Cool_26", T= cool_25_out.T + Q_dot_heater / (cool_25_out.cp * cool_25_out.mf_given), P=cool_25_out.P, C=0, mf=cool_25_out.mf_given, fluid_type=coolant) 
@@ -1129,18 +1142,19 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         if ambient_conditions['V'] < 100:
             fan1 = Fan(fan_eff=fan_eff, ra_mf=air_mf_fc, ra_density=ambient_conditions['rho'], delta_pressure=delta_pressure)
             power_fan1 = fan1.power()
-            fan_mass = 2.959 * power_fan1**0.707
+            fan_mass = 2.959 * (power_fan1/1000)**0.707
             m_front += fan_mass
         else:
             power_fan1 = 0
             fan_mass = 0
         
         fan_powers_1.append(power_fan1)
-        m_fans_1.append(fan_mass * 2)
+        m_fans_1.append(fan_mass)
 
 
         air_1 = Fluid(name="Air_1", T=T_amb, P=p_stag, C=0, mf=air_mf_fc, fluid_type='Air')  
         Q_dot_heater = (air_mf_fc * cp_air * (T_fc - T_amb))
+        Q_heater[i] += Q_dot_heater
         air_2 = Fluid(name="Air_2", T=T_fc, P=p_stag, C=0, mf=air_mf_fc, fluid_type='Air') 
 
         compressor_air = Compressor(comp_efficiency=0.9, pressure_ratio=p_fc / p_stag * 1.2, fluid=air_2)
@@ -1210,25 +1224,29 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
                     'pressure': var_value.P
                 }
 
-    power_required = water_turb_p_list.max() + air_turb_p_list.max() + fan_powers.max() + pump_26_27_power_list.max() + air_comp_power_list.max() + fan_powers_1.max() + pump_water_power_list.max() + p_comp_2324.max() + p_comp_1415.max() 
-    m_front = m_valve_6711.max() + m_pipe_h2_1112.max() + m_valve_121326.max() + m_pipe_h2_1314.max() + m_pipe_h2_2618.max() + m_comp_1415.max() + m_pipe_h2_1516.max() + m_pipe_h2_1719.max() + m_valve_1920.max() + m_pipe_2021.max() + m_pipe_h2_78.max() + m_pipe_valve89.max() + m_pipe_h2_910.max() + m_pipe_h2_2223.max() + m_comp_2324.max() + m_pipe_h2_2425.max() + m_pipe_cool_4_5.max() + m_pipe_cool_2120.max() + m_pipe_cool_12_13.max() \
-    + m_valve_132014.max() + m_pipe_cool_1415.max() + m_valve_151617.max() + m_pipe_cool_1718.max() + m_skin_hx.max() + m_pipe_cool_23.max() + m_fans_rad.max() + m_rads.max() + m_pipe_cool_24.max() + m_pipe_cool_16_24.max() + m_pipe_cool_25.max() + m_pipe_cool_26.max() + m_pump_2627.max() + m_pipe_cool_27.max() + m_fans_1.max() + air_comp_mass_list.max() + air_turbine_mass_list.max() \
-    + water_turbine_mass_list.max() + m_was_list.max() + m_pump_water.max() + m_valve_water.max()
-    m_rear = m_pipe_h2_12.max() + m_pipe_h2_34.max() + m_sh.max() + m_pipe_cool_201.max() + m_vap.max() 
-    m_mid = m_pipe_h2_56.max() + m_pipe_cool_2_3.max() + m_pipe_cool_1922.max()
+    heater_eff = 0.9
+    #heater_power = Q_heater.max() / heater_eff 
+    heater_power = 0 
+    # # # # # # # print(m_fans_rad)
+    power_required = -np.max(water_turb_p_list) + -np.max(air_turb_p_list) + np.max(fan_powers) + np.max(pump_26_27_power_list) + np.max(air_comp_power_list) + np.max(fan_powers_1) + np.max(pump_water_power_list) + np.max(p_comp_2324) + np.max(p_comp_1415) + heater_power
+    m_front = np.max(m_valve_6711) + np.max(m_pipe_h2_1112) + np.max(m_valve_121326) + np.max(m_pipe_h2_1314) + np.max(m_pipe_h2_2618) + np.max(m_comp_1415) + np.max(m_pipe_h2_1516) + np.max(m_pipe_h2_1719) + np.max(m_valve_1920) + np.max(m_pipe_2021) + np.max(m_pipe_h2_78) + np.max(m_pipe_valve89) + np.max(m_pipe_h2_910) + np.max(m_pipe_h2_2223) + np.max(m_comp_2324) + np.max(m_pipe_h2_2425) + np.max(m_pipe_cool_4_5) + np.max(m_pipe_cool_2120) + np.max(m_pipe_cool_12_13) \
+    + np.max(m_valve_132014) + np.max(m_pipe_cool_1415) + np.max(m_valve_151617) + np.max(m_pipe_cool_1718) + np.max(m_skin_hx) + np.max(m_pipe_cool_23) + np.max(m_fans_rad) + np.max(m_rads) + np.max(m_pipe_cool_24) + np.max(m_pipe_cool_16_24) + np.max(m_pipe_cool_25) + np.max(m_pipe_cool_26) + np.max(m_pump_2627) + np.max(m_pipe_cool_27) + np.max(m_fans_1) + np.max(air_comp_mass_list) + np.max(air_turbine_mass_list) \
+    + np.max(water_turbine_mass_list) + np.max(m_was_list) + np.max(m_pump_water) + np.max(m_valve_water)
+    
+    # # # # # # print("m_fan_power:", fan_powers)
+    # # # # # # print("m_fans_rad:", np.max(m_fans_rad))
+    
+    
+    m_rear = np.max(m_pipe_h2_12) + np.max(m_pipe_h2_34) + np.max(m_sh) + np.max(m_pipe_cool_201) + np.max(m_vap)
+    m_mid = np.max(m_pipe_h2_56) + np.max(m_pipe_cool_2_3) + np.max(m_pipe_cool_1922)
 
     output_list = [
-    drags.max(), 
+    np.max(drags), 
     power_required,
     m_front, 
     m_mid, 
     m_rear]
     
-    print(f"Net Drag: {net_drag:.4f}")
-    print(f"Power required: {power_required:.2f} W")
-    print(f"Mass front: {m_front:.2f} kg")
-    print(f"Mass mid: {m_mid:.2f} kg")
-    print(f"Mass rear: {m_rear:.2f} kg")
 
 
     return fluids_dict , output_list
@@ -1268,4 +1286,3 @@ if __name__ == "__main__":
     tms_plotting.csv_fluids(fluids)
     
     # tms_plotting.plot(pdf_path = 'Diagrams\H2D2 P&ID.pdf', fluids = fluids, positions = positions, page_number=0, dpi=300)
-    print(f"Number of PropsSI calls: {prop_counter}")

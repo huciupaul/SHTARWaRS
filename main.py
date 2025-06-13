@@ -114,7 +114,6 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     #     TMS_inputs['h2o_mf_fc'][0], "END")
                     # m_tms_front, m_tms_aft, m_tms_mid, D_rad, aux_power = 0.0, 0.0, 0.0, 0.0, 0.0
                     # break
-                    
                     _, tms_outputs = tms_main(
                         TMS_inputs['Q_dot_fc'], #ok
                         np.full(4, Qdot_eps), #ok
@@ -140,6 +139,8 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     m_tms_front = tms_outputs[2]
                     m_tms_aft = tms_outputs[4]
                     m_tms_mid = tms_outputs[3]
+                    print(f"ITER: {i}, MTOW:{MTOW}, AUX POWER {aux_power}, DRAG PENALTY {D_rad}")
+
 
                     # --------- ADD INTEGRATION HERE ---------
                     
@@ -177,6 +178,6 @@ if __name__=="__main__":
     main(
         minimum=0.1,
         maximum=1.0,
-        no_of_splits=20,
+        no_of_splits=10,
         max_iter=100
     )
