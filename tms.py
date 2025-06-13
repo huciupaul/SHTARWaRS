@@ -648,7 +648,7 @@ def size_pipes_h2(h2_mf_fc, h2_mf_cc, p_sto,fluid,diam_est):
 # ------------------------------ MAIN PROGRAM -----------------------------------
 
 
-def tms_main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, air_mf_fc, T_amb, rho_amb, V_amb, p_amb, h2_mf_rec, air_out_fc, p_sto,h2o_mf_fc):
+def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_fc_l, T_cc_l, air_mf_fc_l, T_amb_l, rho_amb_l, V_amb_l, p_amb_l, h2_mf_rec_l, air_out_fc_l, p_sto_l,h2o_mf_fc_l):
     m_pipe_h2_12 = []
     m_pipe_h2_34 = []
     m_sh = []
@@ -707,6 +707,25 @@ def tms_main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, ai
     pump_water_power_list = []
     
     for i in range(len(h2_mf_fc)): 
+        Q_dot_fc = Q_dot_fc_l[i]  # W
+        Q_dot_eps = Q_dot_eps_l[i]
+        p_fc = p_fc_l[i]  # Pa
+        p_cc = p_cc_l[i]  # Pa
+        h2_mf_fc = h2_mf_fc_l[i]  # kg/s
+        h2_mf_cc = h2_mf_cc_l[i]  # kg/s
+        T_fc = T_fc_l[i] + 273.15  # K
+        T_cc = T_cc_l[i] + 273.15  # K
+        air_mf_fc = air_mf_fc_l[i]
+        T_amb = T_amb_l[i] + 273.15
+        rho_amb = rho_amb_l[i]  # kg/m³
+        V_amb = V_amb_l[i]
+        p_amb = p_amb_l[i]
+        h2_mf_rec = h2_mf_rec_l[i]
+        air_out_fc = air_out_fc_l[i]
+        p_sto = p_sto_l  # Pa, storage pressure
+        h2o_mf_fc = h2o_mf_fc_l[i]  # kg/s, water mass flow rate to fuel cell
+        
+        
         ambient_conditions= {
             'T': T_amb,  # Ambient temperature in K
             'M': 0.4,  # Flight Mach number
