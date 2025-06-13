@@ -42,7 +42,7 @@ def _generate_and_save_all_props():
     k_fine = np.clip(interp_on_fine_grid(k), 0, None)
     dyn_visc_fine = np.clip(interp_on_fine_grid(dyn_visc), 0.001, None)
     gamma_fine = np.clip(interp_on_fine_grid(gamma), 0, None)
-    Pr_fine = np.clip(interp_on_fine_grid(Pr), 0, None)
+    Pr_fine = np.clip(interp_on_fine_grid(Pr), 0.001, None)
     rho_fine = np.clip(interp_on_fine_grid(rho), 0, None)
 
     props = {

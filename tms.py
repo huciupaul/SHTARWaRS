@@ -273,7 +273,7 @@ class HEX():
         
 
         #initial guess for mass flow rate of coolant
-        self.fluid_hot.mf_given = self.fluid_hot.mf_calculated # self.Q_req / (self.fluid_hot.cp * (self.fluid_hot.T - self.fluid_cold.T))
+        #self.fluid_hot.mf_given = self.fluid_hot.mf_calculated # self.Q_req / (self.fluid_hot.cp * (self.fluid_hot.T - self.fluid_cold.T))
         
         L_h2 = 447000 # J/kg
         area = 0.5 # assumed area of heat exchanger plate in m² (total)
@@ -287,32 +287,36 @@ class HEX():
 
         while abs(Q-self.Q_req) > 1e-5:
             if factor_exists:
-                self.fluid_hot.mf_given *= factor
-                if factor < 0:
-                    area *= abs(factor)**alpha * -1
-                else:
-                    area *= factor**alpha
-
-            t_hot_out = -self.Q_req / (self.fluid_hot.mf_given * self.fluid_hot.cp) + self.fluid_hot.T
-            
-
+                area *=factor
+            '''
+            t_hot_out = 0
+            while t_hot_out < 273 - 48:
+                self.fluid_hot.mf_given *= 1.2
+                t_hot_out = -self.Q_req / (self.fluid_hot.mf_given * self.fluid_hot.cp) + self.fluid_hot.T
+                print(f"Iteration {iteration}: t_hot_out = {t_hot_out}, mf_hot = {self.fluid_hot.mf_given}")
+            '''
+            #t_hot_out = -self.Q_req / (self.fluid_hot.mf_given * self.fluid_hot.cp) + self.fluid_hot.T
             t_hot_in = self.fluid_hot.T
             t_cold_in = self.fluid_cold.T
             #t_cold_out = self.fluid_hot.T - 5
             #t_cold_out = t_cold_in + (self.fluid_cold.mf_given/self.fluid_hot.mf_given )*(L_h2/self.fluid_hot.cp)
             if type_hx == 'sh':
-                t_cold_out = t_hot_in - 10
+                t_cold_out = t_hot_in - 20
+                t_hot_out =  t_hot_in - 150
+
             elif type_hx == 'evap':
                 t_cold_out = t_cold_out_given
+                t_hot_out = t_hot_in - 100
             delta_t1 = t_hot_out - t_cold_in
             delta_t2 = t_hot_in - t_cold_out
             
-            
+            self.fluid_hot.mf_given = self.Q_req / (self.fluid_hot.cp * (t_hot_in - t_hot_out))
+
             lmtd = (delta_t2 - delta_t1) / np.log(delta_t2 / delta_t1)
             S_eff = self.Q_req / (lmtd * H_hx)
             #s_eff = area * size_factor #assumed area of heat exchanger plate
             #N_plates = np.ceil(S_eff / s_eff)
-            s_eff = (area - 4* np.pi * (dh_coolant/2)**2 ) * size_factor  # TOTAL EFF AREA
+            s_eff = (area)  * size_factor  # TOTAL EFF AREA
             N_plates = np.ceil(S_eff / s_eff)
             n_channels = np.ceil((N_plates-1) / 2)
             volume = N_plates * area * (plate_thickness+gap_bt_plates)  # m³
@@ -323,8 +327,6 @@ class HEX():
             R_fh = 0.0003526
             Pr_coolant = self.fluid_hot.mu * self.fluid_hot.cp / self.fluid_hot.k
             Re_coolant = self.fluid_hot.mf_calculated * 4/  (np.pi * dh_coolant * self.fluid_hot.mu) 
-            print(f"Re_coolant: {Re_coolant}, Pr_coolant: {Pr_coolant}")
-            print(f"Mu = {self.fluid_hot.mu}")
             Nu_coolant = C_h_coolant * Re_coolant**y_coolant * Pr_coolant**0.33 * 1 # Assuming (mu/mu_w)**0.17 = 1, given the tubes are very narrow
             hc_hot = Nu_coolant * self.fluid_hot.k / dh_coolant
 
@@ -342,7 +344,7 @@ class HEX():
             H_hx = 1/ (1/hc_cold + 1/hc_hot + R_fc + R_fh + plate_thickness/plate_thermal_conductivity)
 
             # Recalculate the heat transferred
-            Q = H_hx * s_eff * lmtd * N_plates  * N_passes
+            Q = H_hx * s_eff * lmtd * N_plates  * N_passes 
             factor = self.Q_req / Q 
             hole_area = np.pi * (dh_coolant/2)**2
             ratio =  hole_area / area
@@ -547,6 +549,7 @@ class Pipe():
         # Calculate surface areas
         surface_in = np.pi * self.d_in * (self.length)
         surface_out = np.pi * self.d_is * (self.length / steps)
+        
 
         # Calculate thermal resistances
         r_fluid = (1 / (self.mass_flow * self.spec_heat * (1 - np.exp(-1 * heat_trans_co * surface_in / (self.mass_flow * self.spec_heat))))) * steps
@@ -634,11 +637,12 @@ def size_pipes_h2(h2_mf_fc, h2_mf_cc, p_sto,fluid,diam_est):
     # Total pressure drop
     total_pressure_drop = pressure_drop1 + pressure_drop2
     press_err = total_pressure_drop - pressure_drop
+    '''
     if press_err < 0:
         print(f"Selected pipe diameter {diam_est:.3f} m is adequate, pressure drop is {total_pressure_drop:.2f} Pa, with an estimated maximum allowed of {pressure_drop:.2f} Pa")
     else: 
         print(f"Increase pipe diameter, pressure drop is {total_pressure_drop:.2f} Pa, with an estimated maximum allowed of {pressure_drop:.2f} Pa")
-
+    '''
 
     
 # ------------------------------ MAIN PROGRAM -----------------------------------
@@ -679,8 +683,8 @@ def tms_main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, ai
     cool_mf_per_fc = Q_dot_fc / (cool_0.cp * deltaT_fc * 2)
     cool_0.mf_given = cool_mf_per_fc  # Mass flow rate of coolant to FC
 
-    alpha_sh = 0.3
-    alpha_evap = 0.6
+    alpha_sh = 1.2
+    alpha_evap = 1.2
 
     m_front = 0
     m_mid = 0
@@ -739,10 +743,11 @@ def tms_main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, ai
     m_rear += pipe_cool_20_1.mass()
     cool_1 = pipe_cool_20_1.analyze_heat_pipe("Cool_1")
     cool_1_keep = Fluid_Coolant(name="Cool_1_keep", T=cool_1.T, P=cool_1.P, C=None, mf=cool_1.mf_given, fluid_type=cool_1.fluid_type)  # Coolant out of Superheater
+    
 
     # Vaporizer HEX
     Q_vap = (PropsSI('H', 'P', h2_2.P, 'T', t_cold_out_given, h2_2.fluid_type) - PropsSI('H', 'P', h2_2.P, 'Q', 0, h2_2.fluid_type)) * h2_2.mf_given   # Heat of vaporization
-    hx_vap = HEX(name="Vaporizer", fluid_cold=h2_2, fluid_hot=cool_1, Q_req=Q_vap)
+    hx_vap = HEX(name="Vaporizer", fluid_cold=h2_2, fluid_hot=cool_1_keep, Q_req=Q_vap)
     _,cool_2,h2_3, hx_vap_area, hx_vap_n_plates = hx_vap.size(diam_est, t_cold_out_given=t_cold_out_given, type_hx='evap',alpha = alpha_evap)
     cool_2 = Fluid_Coolant(name="Cool_2", T=cool_2.T, P=cool_2.P, C=None, mf=cool_1_keep.mf_given, fluid_type=cool_1.fluid_type)  
     mass_vap_hx = hx_vap_n_plates * hx_vap_area * hx_vap.density * 3.6 * 1e-3
@@ -967,7 +972,8 @@ def tms_main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, ai
     else:
         # No need for radiator, all waste heat is absorbed
         cool_24 = Fluid_Coolant(name="Cool_24", T=cool_23.T, P=cool_23.P, C=0, mf=cool_23.mf_given, fluid_type=coolant)
-
+        power_fan = 0
+        net_drag = 0
     # Pipe 24
     pipe_cool_24 = Pipe(0.43, diam_est_cool * ratio_to_wing, cool_24)
     m_front += pipe_cool_24.mass() * 2
@@ -1022,7 +1028,7 @@ def tms_main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, ai
     if ambient_conditions['V'] < 100:
         fan1 = Fan(fan_eff=fan_eff, ra_mf=air_mf_fc, ra_density=ambient_conditions['rho'], delta_pressure=delta_pressure)
         power_fan1 = fan1.power()
-        fan_mass = 2.959 * power_fan**0.707
+        fan_mass = 2.959 * power_fan1**0.707
         m_front += fan_mass
     else:
         power_fan1 = 0
@@ -1094,10 +1100,6 @@ def tms_main(Q_dot_fc, Q_dot_eps, p_fc, p_cc, h2_mf_fc, h2_mf_cc, T_fc, T_cc, ai
             }
 
     power_required = (power_fan*2) + comp14_15_power + (comp23_24_power*2) + (pump_26_27_power*2) + power_fan1 - turbine_air_power + pump_water_power + turbine_water_power
-    print(f"power_fan: {power_fan:.2f} W")
-    print(f"comp14_15_power: {comp14_15_power:.2f} W")
-    print(f"comp23_24_power: {comp23_24_power:.2f} W")
-    print(f"pump_26_27_power: {pump_26_27_power:.2f} W")
 
     output_list = [
     net_drag, 
