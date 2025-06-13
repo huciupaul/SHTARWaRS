@@ -65,11 +65,10 @@ def main(minimum, maximum, no_of_splits, max_iter):
 
                 # Convergence of MTOW, stop if the change is less than 1% of the previous MTOW or reached max number of iterations
                 for i in range(max_iter):
-                    print("ITER", i)
-                    print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}")
+                    print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}, ITER: {i}")
                     if np.abs((MTOW-MTOW_prev)/MTOW_prev) < 0.01 and i > 0 or i == max_iter - 1:
-                        #print(f"Converged after {i} iterations with MTOW: {MTOW:.2f} kg")
-                        #print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}")
+                        print(f"Converged after {i} iterations with MTOW: {MTOW:.2f} kg")
+                        print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}")
                         break
                     
                     # FPP
@@ -116,7 +115,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     #     TMS_inputs['h2o_mf_fc'][0], "END")
                     # m_tms_front, m_tms_aft, m_tms_mid, D_rad, aux_power = 0.0, 0.0, 0.0, 0.0, 0.0
                     # break
-                    print("Inputs!!!!!", TMS_inputs if 'TMS_inputs' in locals() else "No TMS inputs yet")
+                    #print("Inputs!!!!!", TMS_inputs if 'TMS_inputs' in locals() else "No TMS inputs yet")
                     _, tms_outputs = tms_main(
                         TMS_inputs['Q_dot_fc'], #ok
                         np.full(4, Qdot_eps), #ok
@@ -136,14 +135,14 @@ def main(minimum, maximum, no_of_splits, max_iter):
                         np.full(4, MAWP_global),  # p_sto
                         TMS_inputs['h2o_mf_fc']
                     )
-                    print("Outputs!!!!!!", tms_outputs if 'tms_outputs' in locals() else "No TMS outputs yet")
+                    #print("Outputs!!!!!!", tms_outputs if 'tms_outputs' in locals() else "No TMS outputs yet")
 
                     D_rad = tms_outputs[0]
                     aux_power = tms_outputs[1]
                     m_tms_front = tms_outputs[2]
                     m_tms_aft = tms_outputs[4]
                     m_tms_mid = tms_outputs[3]
-                    #print(f"ITER: {i}, MTOW:{MTOW}, AUX POWER {aux_power}, DRAG PENALTY {D_rad}")
+                    print(f"MTOW:{MTOW}, AUX POWER {aux_power}, DRAG PENALTY {D_rad}")
                     
 
                     # --------- ADD INTEGRATION HERE ---------
