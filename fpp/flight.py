@@ -28,6 +28,7 @@ class Aircraft:
     eng: Turboprop
     fc: FuelCell
     MTOW: float
+    D_RAD: float = 0.0  # [N] Drag penalty due to radiator 
     P_cc_min: float = 0.0
     MAXC: float = MAXC
     TOGA: float = TOGA # [W] Take-Off/Go-Around propulsive power
@@ -130,7 +131,7 @@ class FlightMission:
         C_D = C_D0 + C_Di
                 
         # Constant velocity: Thrust = Drag
-        T = 0.5*rho_inf*V_inf**2*S*C_D
+        T = 0.5*rho_inf*V_inf**2*S*C_D + self.ac.D_RAD
         P = T*V_inf
         
         return P
@@ -572,7 +573,7 @@ class FlightMission:
         plt.show()
         
     
-def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: float = 0.1, MTOW: float=8037.6, CD_HEX: float=0.0, delta_AP: float=0.0, dt: float=0.1) -> tuple:
+def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: float = 0.1, MTOW: float=8037.6, D_RAD: float=0.0, delta_AP: float=0.0, dt: float=0.1) -> tuple:
     """
     Main flight performance function to obtain the fuel mass and shaft power profile.
     Args:
@@ -605,6 +606,7 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
         Powerpoint("final", 0.35, until_phase="taxi\\landing"),
         Powerpoint("taxi\\landing", 0.28285, time=10 * 60),
     ]
+    
     turboprop_H2 = Turboprop(
         name="PT6A-67D-H2",
         delta_mdot=4.9895161-4.5359237,
@@ -650,13 +652,14 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
         name="H2-D2",
         wing_area=28.79,
         wing_span=17.64,
-        CD0=0.024+CD_HEX,  # Add heat exchanger drag
+        CD0=0.024,  # Add heat exchanger drag
         prop_diameter=2.78,
         eng=turboprop_H2,
         fc=fc_model,
         MTOW=MTOW,
         P_cc_min=0.28285 * MAXC,  # [W] Minimum combustion chamber power
-        delta_AP=delta_AP  # [W] Thermal Management System power
+        delta_AP=delta_AP,  # [W] Thermal Management System power
+        D_RAD=D_RAD,  # [N] Radiator drag penalty
     )
     
     mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=dt, total_range_m=707e3, throttle_cruise=throttle_cruise)
@@ -668,24 +671,24 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
     hold    = mission_H2.profile['phase'] == 'hold'
     
     PW1_takeoff = mission_H2.profile['Pa'][takeoff][0]/(mission_H2.profile['mass'][takeoff][0]*G_0)
-    WS1_takeoff = mission_H2.profile['mass'][takeoff][0]/mission_H2.ac.wing_area
+    WS1_takeoff = mission_H2.profile['mass'][takeoff][0]*G_0/mission_H2.ac.wing_area
     PW2_takeoff = mission_H2.profile['Pa'][takeoff][-1]/(mission_H2.profile['mass'][takeoff][-1]*G_0)
-    WS2_takeoff = mission_H2.profile['mass'][takeoff][-1]/mission_H2.ac.wing_area
+    WS2_takeoff = mission_H2.profile['mass'][takeoff][-1]*G_0/mission_H2.ac.wing_area
     
     PW1_climb   = mission_H2.profile['Pa'][climb][0]/(mission_H2.profile['mass'][climb][0]*G_0)
-    WS1_climb   = mission_H2.profile['mass'][climb][0]/mission_H2.ac.wing_area
+    WS1_climb   = mission_H2.profile['mass'][climb][0]*G_0/mission_H2.ac.wing_area
     PW2_climb   = mission_H2.profile['Pa'][climb][-1]/(mission_H2.profile['mass'][climb][-1]*G_0)
-    WS2_climb   = mission_H2.profile['mass'][climb][-1]/mission_H2.ac.wing_area
+    WS2_climb   = mission_H2.profile['mass'][climb][-1]*G_0/mission_H2.ac.wing_area
     
     PW1_cruise  = mission_H2.profile['Pa'][cruise][0]/(mission_H2.profile['mass'][cruise][0]*G_0)
-    WS1_cruise  = mission_H2.profile['mass'][cruise][0]/mission_H2.ac.wing_area
+    WS1_cruise  = mission_H2.profile['mass'][cruise][0]*G_0/mission_H2.ac.wing_area
     PW2_cruise  = mission_H2.profile['Pa'][cruise][-1]/(mission_H2.profile['mass'][cruise][-1]*G_0)
-    WS2_cruise  = mission_H2.profile['mass'][cruise][-1]/mission_H2.ac.wing_area
+    WS2_cruise  = mission_H2.profile['mass'][cruise][-1]*G_0/mission_H2.ac.wing_area
     
     PW1_hold    = mission_H2.profile['Pa'][hold][0]/(mission_H2.profile['mass'][hold][0]*G_0)
-    WS1_hold    = mission_H2.profile['mass'][hold][0]/mission_H2.ac.wing_area
+    WS1_hold    = mission_H2.profile['mass'][hold][0]*G_0/mission_H2.ac.wing_area
     PW2_hold    = mission_H2.profile['Pa'][hold][-1]/(mission_H2.profile['mass'][hold][-1]*G_0)
-    WS2_hold    = mission_H2.profile['mass'][hold][-1]/mission_H2.ac.wing_area
+    WS2_hold    = mission_H2.profile['mass'][hold][-1]*G_0/mission_H2.ac.wing_area
     
     
     loading_points = np.array([
@@ -694,6 +697,8 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
         [PW1_cruise, WS1_cruise, PW2_cruise, WS2_cruise],
         [PW1_hold, WS1_hold, PW2_hold, WS2_hold]
     ])
+    
+    # print(loading_points)
     
     H2_burnt = (mission_H2.profile['mass'][0] - mission_H2.profile['mass'][-1])/(1 - E_SCALE)
     # print(f"Total H2 mass burnt: {H2_burnt:.2f} kg")

@@ -180,6 +180,6 @@ def mix_streams_const_HP(stream1, stream2, P):
     gas.TPX = T_guess, P, X_mix
 
     # Use Cantera's HP solver to find the correct temperature at constant H, P, X
-    gas.HP = H_total / mdot_mix, P
+    #gas.HP = H_total / mdot_mix, P
 
     return gas.X, gas.T, mdot_mix
