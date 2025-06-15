@@ -136,6 +136,9 @@ def main(minimum, maximum, no_of_splits, max_iter):
                         TMS_inputs['h2o_mf_fc']
                     )
                     #print("Outputs!!!!!!", tms_outputs if 'tms_outputs' in locals() else "No TMS outputs yet")
+                    # Check if tms_outputs is None or has the expected length
+                    if tms_outputs is None:
+                        break
 
                     D_rad = tms_outputs[0]
                     aux_power = tms_outputs[1]
@@ -157,7 +160,11 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     m_h2_prev = m_h2
                     m_sto_prev = m_sto
                     m_cargo_prev = M_aft_cargo
-
+                if tms_outputs is None:
+                    tensor = np.full(21, None)
+                    result_tensor[i_split, i_toga, i_cruise, :] = tensor
+                    loading_tensor[i_split, i_toga, i_cruise, :, :] = loading_vector
+                    
                 # After convergence, store the results in the tensor, then in the 4D tensor
                 tensor = np.array([m_eps, m_fc, m_h2, m_sto,V_fc, V_sto, V_elmo, MTOW, length_sto, diameter_sto, M_aft_cargo, m_tms_front, m_tms_aft, m_tms_mid, \
                                    m_nox, mdot_nox_max_takeoff, mdot_nox_max_cruise, P_elmo, co2_fc, co2_sto, co2_eps])
