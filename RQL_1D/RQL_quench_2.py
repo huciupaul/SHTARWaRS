@@ -39,16 +39,15 @@ class gas_obj:
 
 
 def main(
-        T_rich_ex_step: float = 1e-1,
-         mdot_h2o_step: float = 1e-3
+        T_rich_ex: np.ndarray,
+         mdot_h2o: np.ndarray 
          ) -> Tuple[List[float], np.ndarray]:
-    
-    T_rich_ex = np.arange(1570, 1740, T_rich_ex_step)
-    mdot_h2o = np.arange(0, 0.1 + 1e-2, mdot_h2o_step)
+
     mdot_NOx = np.zeros((len(T_rich_ex), len(mdot_h2o)))
-    temps_before_reaction = np.zeros((len(T_rich_ex), len(mdot_h2o)))
-    temps_after_reaction = np.zeros((len(T_rich_ex), len(mdot_h2o)))
-    times_to_steady = np.zeros((len(T_rich_ex), len(mdot_h2o)))
+
+    # temps_before_reaction = np.zeros((len(T_rich_ex), len(mdot_h2o)))
+    # temps_after_reaction = np.zeros((len(T_rich_ex), len(mdot_h2o)))
+    # times_to_steady = np.zeros((len(T_rich_ex), len(mdot_h2o)))
 
     for i, T_rich_ex_i in tqdm(enumerate(T_rich_ex)):
         # Exhaust of the rich zone
@@ -59,7 +58,7 @@ def main(
                 P=12 * ct.one_atm
                 )
 
-        # Air bleeded, to be mixed with rich exhaust to create stoichiometric mixture
+        # Air bled, to be mixed with rich exhaust to create stoichiometric mixture
         air = gas_obj(
                 mdot=1.0,
                 X="N2:0.78084, O2:0.20946",
@@ -109,11 +108,11 @@ def main(
             # Set up the Cantera gas object
             reactor = ct.IdealGasConstPressureReactor(stoich_with_water.gas)
             sim = ct.ReactorNet([reactor])
-            temps_before_reaction[i, j] = reactor.thermo.T
+            # temps_before_reaction[i, j] = reactor.thermo.T
 
             try:
                 sim.advance_to_steady_state()
-                times_to_steady[i, j] = sim.time
+                # times_to_steady[i, j] = sim.time
 
             except Exception as e:
                 print("Error at m_dot_h2o_i =", m_dot_h2o_j)
@@ -127,31 +126,18 @@ def main(
                     print(f"Sum(Y) = {sum(reactor.thermo.Y)}")
 
                     
-            temps_after_reaction[i, j] = reactor.thermo.T
-            mdot_NOx[i, j] = reactor.thermo['NO'].X[0] *  stoich_with_water.mdot
+            # temps_after_reaction[i, j] = reactor.thermo.T
+            mdot_NOx[i, j] = reactor.thermo['NO'].X[0] * stoich_with_water.mdot # kg/s
 
-    return mdot_NOx, temps_before_reaction, temps_after_reaction, times_to_steady, T_rich_ex, mdot_h2o, mdots
+    # return mdot_NOx, temps_before_reaction, temps_after_reaction, times_to_steady, T_rich_ex, mdot_h2o, mdots
+    return mdot_NOx
 
 
 if __name__ == "__main__":
-    mdot_NOx, temps_before_reaction, temps_after_reaction, times_to_steady, T_rich_ex, mdot_h2o, mdots = main(T_rich_ex_step = 1e1, mdot_h2o_step = 1e-2)
-    print(mdots)
+    T_rich_ex = np.arange(1570, 1740, 0.1)
+    mdot_h2o = np.arange(0, 0.1 + 1e-3, 1e-3)
 
-    T_grid, W_grid = np.meshgrid(T_rich_ex, mdot_h2o, indexing='ij')
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    surf = ax.plot_surface(W_grid, T_grid, temps_after_reaction, cmap='viridis')
-
-    ax.set_xlabel('mdot_h2o [kg/s]')
-    ax.set_ylabel('T_rich_ex [K]')
-    ax.set_zlabel('NOx')
-    ax.set_title('NOx vs Water Injection and Rich Zone Temperature')
-    fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
-    plt.show()
-
-
-
+    mdot_NOx = main(T_rich_ex, mdot_h2o)
 
     T_grid, W_grid = np.meshgrid(T_rich_ex, mdot_h2o, indexing='ij')
 
@@ -159,9 +145,9 @@ if __name__ == "__main__":
     ax = fig.add_subplot(111, projection='3d')
     surf = ax.plot_surface(W_grid, T_grid, mdot_NOx, cmap='viridis')
 
-    ax.set_xlabel('mdot_h2o [kg/s]')
-    ax.set_ylabel('T_rich_ex [K]')
-    ax.set_zlabel('NOx')
+    ax.set_xlabel('Water injection mass flow rate [kg/s]')
+    ax.set_ylabel('Rich zone exhaust temperature [K]')
+    ax.set_zlabel('NOx mass flow rate [kg/s]')
     ax.set_title('NOx vs Water Injection and Rich Zone Temperature')
     fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
     plt.show()
@@ -170,6 +156,8 @@ if __name__ == "__main__":
         (T_rich_ex, mdot_h2o), mdot_NOx, bounds_error=False, fill_value=None
     )
 
+    os.makedirs('data/interpolants', exist_ok=True)
+
     # Pickleeeeeeeeeeeee the interpolator
-    with open('NOx_interpolator.pkl', 'wb') as f:
+with open('data/interpolants/NOx_interpolator.pkl', 'wb') as f:
         pickle.dump(NOx_interpolator, f, protocol=pickle.HIGHEST_PROTOCOL)
