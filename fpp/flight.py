@@ -731,7 +731,8 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
     # Determine the maximum fuel cell power across the three splits
     FC_outputs = dict(m_fc=fc_model.fc_mass,
                       V_fc=fc_model.fc_volume,
-                      co2_fc=fc_model.fc_gwp)
+                      co2_fc=fc_model.fc_gwp,
+                      fc_cost=fc_model.fc_cost)
     # mission_H2.quicklook()  # Show quicklook plots
     
     # Get H2 mass, NOx mass, and max(mdot_NOx) for a nominal mission (- hold)
@@ -765,15 +766,15 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
 if __name__ == "__main__":
     
     mission_H2 = fpp_main(
-        fc_split=1.0,
-        throttle_TOGA=0.8,
+        fc_split=0.0,
+        throttle_TOGA=1.0,
         throttle_cruise=1.0,
         MTOW=8037.6,
         # CD_HEX=0.0,
         # delta_AP=0.0,
         dt=0.1
     )
-    print(mission_H2[0])
+    print(mission_H2[-1])
     # from mpl_toolkits.mplot3d import Axes3D
     # from matplotlib.animation import FuncAnimation, FFMpegWriter
     

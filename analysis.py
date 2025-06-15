@@ -8,9 +8,11 @@ import copy
 from typing import Tuple
 
 # Local imports
-from global_constants import Beechcraft_1900D
+from global_constants import Beechcraft_1900D, NOx_pPax_TO, NOx_pPax_cruise
 from performance.MTOW.mtow import power_and_wing_loading as pws
 from performance.Integration.integration import main as cg_excursion
+from cost import calc_cost as f_cost
+from sus import get_sus as f_gwp
 
 # Cached constants
 M_CARGO_AFT = Beechcraft_1900D["M_cargo_aft"]  # [kg] Cargo mass in the aft compartment
@@ -29,23 +31,55 @@ def load_tensor(file_path: str) -> np.ndarray:
         tensor = pickle.load(f)
     return tensor
 
-def f_obj(design: np.ndarray) -> np.ndarray:
-    """Design tensor objective function to evaluate the design based.
+def objective_function(weight: float=0.5, design: np.ndarray=None, N_PAX: np.ndarray=None) -> Tuple[np.ndarray, np.ndarray]:
+    """Objective function to collapse the 4D (N, M, P, Q) design
+    space tensor to both a 3D scalar field and a 4D (N, M, P, 2) tensor.
+    The 3D scalar field is the weighted sum of cost and GWP, while the 4D
+    tensor contains the cost and GWP values for each design.
 
     Args:
-        design (np.ndarray): Design tensor with shape (N, M, P, Q) where:
-            N: Power splits (FC use vs Turboprop use)
-            M: FC TOGA throttle setting
-            P: FC cruise throttle setting
-            Q: Design variables: 
-                < m_EPS, m_FC, m_H2, m_storage, m_TMS, V_FC, V_storage, V_ELMO, MTOW, L_storage, D_storage >
+        weight (float, optional): Cost weight from 0 to 1. Defaults to 0.5.
+        design (np.ndarray, optional): Design (N, M, P, Q) tensor. Defaults to None.
 
     Returns:
-        np.ndarray: A 3D tensor of scores with shape (N, M, P) where each element is the score for the corresponding design.
+        Tuple[np.ndarray, np.ndarray]: A tuple containing the 3D scalar field 
+        and the 4D tensor.
     """
-    pass
+    # Initialize the selection tensor and scalar field
+    selection_tensor = np.full(design.shape[:-1] + (2,), np.nan)
+    scalar_field = np.full(design.shape[:-1], np.nan)
+    
+    # Arrays for GWP
+    GWP_fc = design[..., 20]  # GWP of the fuel cell production/disposal
+    GWP_sto = design[..., 21]  # GWP of the storage system production/disposal
+    GWP_eps = design[..., 22]  # GWP of the EPS production/disposal
+    m_h2_nom = design[..., 18]   # Nominal mass of hydrogen used
+    m_nox = design[..., 14]  # Mass of NOx produced
+    
+    # Arrays for cost
+    fc_cost = design[..., 17]  # Cost of the fuel cell
+    P_eps = design[..., 19]  # Max power used by the electric propulsion system
+    m_sto = design[..., 3]  # Mass of the storage system
+    m_h2_nom = design[..., 18]  # Nominal mass of hydrogen used
+    m_h2 = design[..., 2]  # Total mass of hydrogen stored
+    
+    # Calculate GWP and cost for each design (per passenger)
+    GWP = f_gwp(GWP_fc, GWP_sto, GWP_eps, m_h2_nom, m_nox)/N_PAX
+    cost = f_cost(fc_cost, P_eps, m_sto, m_h2_nom, m_h2)/N_PAX
+    # Store GWP and cost in the selection tensor
+    selection_tensor[..., 0] = cost
+    selection_tensor[..., 1] = GWP
+    
+    # Normalize the GWP and cost values
+    GWP_norm = GWP / np.nanmax(GWP)
+    cost_norm = cost / np.nanmax(cost)
+    
+    # Calculate the scalar field as a weighted sum of cost and GWP
+    scalar_field = weight * cost_norm + (1 - weight) * GWP_norm
+    
+    return scalar_field, selection_tensor
 
-def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
+def main(weight: float=0.5,
          dim_bounds: np.ndarray=np.array([[0.1, 1.0],
                                           [0.1, 1.0],
                                           [0.0, 1.0]]),
@@ -58,11 +92,6 @@ def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
         dim_bounds (np.ndarray, optional): Bounds for the dimensions of the design space tensor. Defaults to [[0.1, 1.0], [0.1, 1.0], [0.0, 1.0]].
         fpath (str, optional): Filepath to the design space tensor created from main.py. Defaults to 'data/design_space.pkl'.
     """
-    # Quick validation of weights
-    if sum(weights) != 1.0:
-        raise ValueError("Weights must sum to 1.0")
-    if len(weights) != 4:
-        raise ValueError("Weights must be a tuple of length 4")
     
     # Load the 4D design space tensor
     try:
@@ -99,8 +128,10 @@ def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
     # Apply design space constraints
     valid_integration, N_PAX, m_cargo = cg_excursion(design)
     valid_mass = pws(loading)
+    valid_NOx   = (design[..., 15]/N_PAX < NOx_pPax_TO) & \
+        (design[..., 16]/N_PAX < NOx_pPax_cruise)  # NOx emissions constraints
     
-    valid3d = valid_integration & valid_mass
+    valid3d = valid_integration & valid_mass  & valid_NOx
     # Keep only valid designs, fill rest with np.nan
     # lift into a 4th dim so it matches (N, M, P, Q)
     valid4d = valid3d[..., None]        # shape (N, M, P, 1)
@@ -111,36 +142,29 @@ def main(weights: tuple=(0.5, 0.25, 0.125, 0.125),
     
     print(f"Percentage pruned by integration: {np.sum(~valid_integration) / np.prod(design.shape[:-1]) * 100:.2f}%")
     print(f"Percentage pruned by mass loading: {np.sum(~valid_mass) / np.prod(design.shape[:-1]) * 100:.2f}%")
+    print(f"Percentage pruned by NOx emissions: {np.sum(~valid_NOx) / np.prod(design.shape[:-1]) * 100:.2f}%")
     print(f"Total percentage pruned from design space: {np.sum(~valid4d) / np.prod(design.shape) * 100:.2f}%")
     
-    # Calculate scores for each design configuration
-    # scores = f_obj(design)
+    # Calculate the scalar field and selection tensor
+    scalar_field, selection_tensor = objective_function(weight, design, N_PAX)
     
-    # # Find optimal design configuration
-    # max_score_idx = np.unravel_index(np.nanargmax(scores, axis=None), scores.shape)
-    # optimal_design = design[max_score_idx]
-    # optimal_setting = {
-    #     'power_split': splits[max_score_idx[0]],
-    #     'toga_throttle': toga_throttle[max_score_idx[1]],
-    #     'cruise_throttle': cruise_throttle[max_score_idx[2]],
-    #     'design_variables': optimal_design
-    # }
+    # Save the scalar field and selection tensor to a pickle file
+    with open('data/logs/CostnSus.pkl', 'wb') as f:
+        pickle.dump(selection_tensor, f)
     
-    # # Print the optimal design configuration
-    # print("Optimal Design Configuration:")
-    # print(f"Power Split: {optimal_setting['power_split']:.2f}")
-    # print(f"TOGA Throttle Setting: {optimal_setting['toga_throttle']:.2f}")
-    # print(f"Cruise Throttle Setting: {optimal_setting['cruise_throttle']:.2f}")
-    # print(f"Design Variables: {optimal_setting['design_variables']}")
-    # print(f"Maximum Score: {np.nanmax(scores):.4f}")
-    # print(f"Optimal Design Index: {max_score_idx}")
+    with open('data/logs/SWAG_score.pkl', 'wb') as f:
+        pickle.dump(scalar_field, f)
+    
+    print(f"Scalar field shape: {scalar_field.shape}")
+    
+    
     
 if __name__ == "__main__":
     main(
-        weights=(0.5, 0.25, 0.125, 0.125),
+        weight=0.5,
         dim_bounds=np.array([[0.1, 1.0],
-                                [0.1, 1.0],
-                                [0.0, 1.0]]),
+                             [0.1, 1.0],
+                             [0.1, 1.0]]),
         fpath_design='data/logs/result_tensor.pkl',
         fpath_loading='data/logs/loading_tensor.pkl'
     )
