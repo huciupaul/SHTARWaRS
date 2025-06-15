@@ -35,7 +35,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
     len(power_splits),
     len(fc_toga_percentages),
     len(fc_cruise_percentages),
-    14  # Length of the tensor
+    20  # Length of the tensor
     ))
     
     loading_tensor = np.zeros((
@@ -176,8 +176,8 @@ def main(minimum, maximum, no_of_splits, max_iter):
 
 if __name__=="__main__":
     main(
-        minimum=0.1,
-        maximum=1.0,
+        minimum=0.7,
+        maximum=0.8,
         no_of_splits=10,
         max_iter=100
     )
