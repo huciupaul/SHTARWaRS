@@ -87,8 +87,8 @@ FC_disposal_cost = 9.35                                 # [EUR/kgFC] Disposal co
 Sto_disposal_cost = 0.6                                 # [EUR/kgSto] Disposal cost of the storage system per kg of tank
 AC_disposal_cost = 6.693 * 4932                         # [EUR/kgAC] Disposal cost of the aircraft per kg of aircraft
 Insurance_cost = 19000 * 25                             # [EUR] Insurance cost of the aircraft per flight
-Crew_cost = 2 * 89 * time_lifetime                          # [EUR] Crew cost of the aircraft per flight
-
+Crew_cost = 2 * 89 * time_lifetime                      # [EUR] Crew cost of the aircraft per flight
+Landing_tax = 53.54 *25 *  4932                         # [EUR/kg] Landing tax of the aircraft per flight
 Beech_maint_cost = 1100 * time_lifetime * 555/640       # [EUR] Maintenance cost of the Beechcraft 1900D https://www.guardianjet.com/jet-aircraft-online-tools/aircraft-brochure.cfm?m=Beech-1900D-198
 
 Sto_cost = 212                                          # [EUR/kgH2] Cost of the storage system https://www.horizon-europe.gouv.fr/advanced-materials-hydrogen-storage-tanks-34822

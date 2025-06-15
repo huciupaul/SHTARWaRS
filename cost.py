@@ -20,7 +20,7 @@ def calc_cost(P_fc_tot, P_fc_used, P_eps, m_fc, m_sto, m_h2_nom, m_h2):
     eps_cost = P_eps * EPS_cost
     H2_cost = m_h2_nom * flight_lifetime * H2_cost
 
-    AC_cost = AC_dev_cost + AC_purchase_cost + AC_disposal_cost + Beech_maint_cost + Insurance_cost + Crew_cost
+    AC_cost = AC_dev_cost + AC_purchase_cost + AC_disposal_cost + Beech_maint_cost + Insurance_cost + Crew_cost + Landing_tax
 
     total_cost = fc_cost + sto_cost + eps_cost + H2_cost + AC_cost
     return total_cost
