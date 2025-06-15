@@ -36,7 +36,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
     len(power_splits),
     len(fc_toga_percentages),
     len(fc_cruise_percentages),
-    20  # Length of the tensor
+    21  # Length of the tensor
     ))
     
     loading_tensor = np.zeros((
@@ -72,7 +72,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                         break
                     
                     # FPP
-                    TMS_inputs, m_h2, FC_outputs, _, loading_vector = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, D_rad, aux_power, 10)
+                    TMS_inputs, m_h2, FC_outputs, _, loading_vector, emissions = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, D_rad, aux_power, 10)
                     # Also get m_nox, nox_max_ppm, co2_fc from fpp_main
                     m_nox, mdot_nox_max_takeoff, mdot_nox_max_cruise = 0.0, 0.0, 0.0
                     m_fc = FC_outputs['m_fc']

@@ -16,7 +16,6 @@ from fpp.turboprop import Turboprop
 import global_constants
 from global_constants import MAXC, TOGA, base_AP, G_0, E_SCALE, R_AIR, k_air, isa_atmosphere
 from fc.fc_for_wrapper import FuelCell
-
 # Dataclass definitions
 @dataclass
 class Aircraft:
@@ -131,7 +130,7 @@ class FlightMission:
         C_D = C_D0 + C_Di
                 
         # Constant velocity: Thrust = Drag
-        T = 0.5*rho_inf*V_inf**2*S*C_D + self.ac.D_RAD
+        T = 0.5*rho_inf*V_inf**2*S*C_D
         P = T*V_inf
         
         return P
@@ -398,6 +397,8 @@ class FlightMission:
         mdot_fc_air_out                 = np.zeros_like(V_arr)
         mdot_fc_H2O                     = np.zeros_like(V_arr)
         mdot_fc_H2_recirculation        = np.zeros_like(V_arr)
+        mdot_NOx_arr                    = np.zeros_like(V_arr)
+        m_NOx_arr                       = np.zeros_like(V_arr)
         
 
         # Create IDLE, TOGA, CRUISE generalized masks
@@ -433,15 +434,16 @@ class FlightMission:
                 Pa_arr[sl] = Pa_total   
 
                 P_cc_arr[sl] = Pa_cc
-                P_fc_arr[sl] = Pa_fc    
+                P_fc_arr[sl] = Pa_fc
+
+                # Add fuel cell mass flow from threshold power
+                Qdot_fc[sl], mdot_fc_arr[sl], mdot_fc_air_in[sl], mdot_fc_air_out[sl], mdot_fc_H2O[sl], mdot_fc_H2_recirculation[sl], mdot_cc_H2O = self.ac.fc.get_TMS_values(power=Pa_fc)
                 
                 # Fuel mass flow using Torenbeek method (PSFC)
-                mdot_fuel_arr[sl], eta_th_arr[sl], eta_prop_arr[sl], mdot_air_arr[sl], T_cc[sl], p_cc[sl] = self.ac.eng.compute(
-                    T_arr[sl], P_arr[sl], rho_arr[sl], V_arr[sl], R_LHV=self.R_LHV, Pa=Pa_cc_arr)
+                mdot_fuel_arr[sl], eta_th_arr[sl], eta_prop_arr[sl], mdot_air_arr[sl], T_cc[sl], p_cc[sl], mdot_NOx_arr[sl] = self.ac.eng.compute(
+                    T_arr[sl], P_arr[sl], rho_arr[sl], V_arr[sl], R_LHV=self.R_LHV, Pa=Pa_cc_arr, mdot_H2O=mdot_cc_H2O)
                 mdot_cc_arr[sl] = mdot_fuel_arr[sl]
                 
-                # Add fuel cell mass flow from threshold power
-                Qdot_fc[sl], mdot_fc_arr[sl], mdot_fc_air_in[sl], mdot_fc_air_out[sl], mdot_fc_H2O[sl], mdot_fc_H2_recirculation[sl] = self.ac.fc.get_TMS_values(power=Pa_fc)
   
                 mdot_fuel_arr[sl] += mdot_fc_arr[sl]
 
@@ -454,6 +456,10 @@ class FlightMission:
                 m_start = m_arr[sl.start - 1] if sl.start > 0 else self.ac.MTOW
                 burn = np.cumsum(mdot_fuel_arr[sl]) * self.dt          # cumulative fuel burnt _within_ slice
                 m_arr[sl] = m_start - np.concatenate(([0.0], burn[:-1]))
+                
+                m_NOx_start = m_NOx_arr[sl.start - 1] if sl.start > 0 else 0.0
+                m_NOx_arr[sl] = m_NOx_start + np.cumsum(mdot_NOx_arr[sl]) * self.dt
+                
         
             else:
                 # Compute power from drag balance
@@ -495,14 +501,14 @@ class FlightMission:
                                 Pa_fc = self.ac.fc.power_min
                                 Pa_cc = self.ac.P_cc_min
                                 P_fc_dumpy = (Pa_cc + Pa_fc) - Pa_total
+                    # Add fuel cell mass flow from threshold power
+                    Qdot_fc[i], mdot_fc_arr[i], mdot_fc_air_in[i], mdot_fc_air_out[i], mdot_fc_H2O[i], mdot_fc_H2_recirculation[i], mdot_cc_H2O = self.ac.fc.get_TMS_values(power=Pa_fc)
                     
-                    mdot_fuel, eta_th, eta_prop, mdot_air, T_cc[i], p_cc[i] = self.ac.eng.compute(
-                        T_arr[i], P_arr[i], rho_arr[i], V_arr[i], R_LHV=self.R_LHV, Pa=Pa_cc
+                    mdot_fuel, eta_th, eta_prop, mdot_air, T_cc[i], p_cc[i], mdot_NOx_arr[i] = self.ac.eng.compute(
+                        T_arr[i], P_arr[i], rho_arr[i], V_arr[i], R_LHV=self.R_LHV, Pa=Pa_cc, mdot_H2O=mdot_cc_H2O
                     )
                     mdot_cc_arr[i] = mdot_fuel
                     
-                    # Add fuel cell mass flow from threshold power
-                    Qdot_fc[i], mdot_fc_arr[i], mdot_fc_air_in[i], mdot_fc_air_out[i], mdot_fc_H2O[i], mdot_fc_H2_recirculation[i] = self.ac.fc.get_TMS_values(power=Pa_fc)
 
                     mdot_fuel += mdot_fc_arr[i]
 
@@ -510,6 +516,8 @@ class FlightMission:
                     m_dumpy[i+1] = m_dumpy[i] + mdot_dumpy_arr[i] * self.dt
 
                     m_arr[i+1] = m_arr[i] - mdot_fuel*self.dt
+                    m_NOx_arr[i+1] = m_NOx_arr[i] + mdot_NOx_arr[i] * self.dt
+                    
                     
                     # 7) Store results @current time step
                     Pr_arr[i] = Pr
@@ -537,7 +545,10 @@ class FlightMission:
                             mdot_fuel=mdot_fuel_arr, mdot_air=mdot_air_arr,
                             mdot_cc=mdot_cc_arr, mdot_fc=mdot_fc_arr,
                             mdot_dumpy=mdot_dumpy_arr, m_dumpy=m_dumpy,
-                            eta_th=eta_th_arr, eta_prop=eta_prop_arr, mass=m_arr
+                            eta_th=eta_th_arr, eta_prop=eta_prop_arr, mass=m_arr,
+                            mdot_cc_H2O=mdot_cc_H2O,
+                            mdot_NOx=mdot_NOx_arr,
+                            m_NOx=m_NOx_arr,
                             )
 
     # ---------------------------------------------------------------------
@@ -574,7 +585,7 @@ class FlightMission:
         plt.show()
         
     
-def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: float = 0.1, MTOW: float=8037.6, D_RAD: float=0.0, delta_AP: float=0.0, dt: float=0.1) -> tuple:
+def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: float = 0.1, MTOW: float=8037.6, CD_RAD: float=0.0, delta_AP: float=0.0, dt: float=0.1) -> tuple:
     """
     Main flight performance function to obtain the fuel mass and shaft power profile.
     Args:
@@ -653,14 +664,13 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
         name="H2-D2",
         wing_area=28.79,
         wing_span=17.64,
-        CD0=0.024,  # Add heat exchanger drag
+        CD0=0.024+CD_RAD,  # Add heat exchanger drag
         prop_diameter=2.78,
         eng=turboprop_H2,
         fc=fc_model,
         MTOW=MTOW,
         P_cc_min=0.056 * TOGA,  # [W] Minimum combustion chamber power
         delta_AP=delta_AP,  # [W] Thermal Management System power
-        D_RAD=D_RAD,  # [N] Radiator drag penalty
     )
     
     mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=dt, total_range_m=707e3, throttle_cruise=throttle_cruise)
@@ -723,15 +733,41 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
                       V_fc=fc_model.fc_volume,
                       co2_fc=fc_model.fc_gwp)
     # mission_H2.quicklook()  # Show quicklook plots
+    
+    # Get H2 mass, NOx mass, and max(mdot_NOx) for a nominal mission (- hold)
+    # full‐length arrays
+    no2_arr = mission_H2.profile['mdot_NOx']
+    fuel_arr = mission_H2.profile['mdot_fuel']
+    phase = mission_H2.profile['phase']
+
+    # masks
+    nominal_mask = phase != 'hold'
+    toga_mask    = (phase == 'takeoff') | (phase == 'climb1') | (phase == 'climb2')
+    cruise_mask  = (phase == 'cruise')  | (phase == 'descent1') | (phase == 'descent2')
+
+    # integrate total masses over nominal
+    m_NOx_nom = np.cumsum(no2_arr[nominal_mask])  * dt
+    m_H2_nom  = np.cumsum(fuel_arr[nominal_mask]) * dt
+
+    # peak NOx flow rates (only over nominal points in each phase)
+    max_NOx_TO     = np.max(no2_arr[toga_mask   & nominal_mask])
+    max_NOx_cruise = np.max(no2_arr[cruise_mask & nominal_mask])
+
+    emissions_outputs = dict(
+        m_NOx               = m_NOx_nom[-1],
+        max_mdot_NOx_TO     = max_NOx_TO,
+        max_mdot_NOx_cruise = max_NOx_cruise,
+        m_H2_nom            = m_H2_nom[-1],
+    )
         
-    return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile, loading_points
+    return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile, loading_points, emissions_outputs
 
 if __name__ == "__main__":
     
     mission_H2 = fpp_main(
-        fc_split=0.1,
-        throttle_TOGA=0.5,
-        throttle_cruise=0.1,
+        fc_split=1.0,
+        throttle_TOGA=0.8,
+        throttle_cruise=1.0,
         MTOW=8037.6,
         # CD_HEX=0.0,
         # delta_AP=0.0,

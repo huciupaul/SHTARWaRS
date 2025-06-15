@@ -157,7 +157,7 @@ class RamAirHeatExchanger():
         cool_out = Fluid_Coolant(name = "Coolant Out", T = coolant_temp_out, P = self.fluid.P, 
                          mf = self.fluid.mf_given, fluid_type = self.fluid.fluid_type)
         
-        return self.required_area, cool_out, power_fan, eta_p,net_drag,length_rad, A_0,mf_air
+        return self.required_area, cool_out, power_fan, eta_p, C_D_rad, length_rad, A_0,mf_air
 
     # THRUST RECOVERY   
     def thrust_ratio(self,gamma, R, M0, T0, eta_p07, CD_d_CD_sp):

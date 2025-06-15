@@ -11,6 +11,8 @@ import os
 from global_constants import R_AIR, MAXC
 from global_constants import mdot_air as mfa
 from global_constants import mdot_fuel as mff
+from global_constants import mdot_NOx as mfn
+from global_constants import T_peak_interpolator as tcc
 class Turboprop:
     """Full model of a turboprop engine. The model is based on the following
     assumptions:
@@ -250,10 +252,31 @@ class Turboprop:
         """Linear model of the air mass flow rate."""
         # mdot_air = (Pa/Pa_TOGA)*delta_mdot + mdot_min
         mdot_air = mfa(Pa/2e3)
-        return mdot_air
+        return mdot_air*2
+    
+    @staticmethod
+    def __mdot_NOx(
+        Pa: np.ndarray,
+        mdot_H2O: np.ndarray
+    ):
+        """Mass flow rate of NOx."""
+        mfh = np.clip(mdot_H2O, 0, 0.1*2)
+        T = np.clip(tcc(Pa/2e3), 1570, 1740)  # Use the combustion chamber inlet temperature
+        mdot_NOx = mfn((T, mfh/2))
+        return mdot_NOx*2  # Multiply by 2 for two engines
     
     #  COMPUTE
-    def compute(self, T0: np.ndarray, P0: np.ndarray, rho0:np.ndarray, V0: np.ndarray, R_LHV: float=1.0, Pr: np.ndarray=None, Pa: np.ndarray=None) -> Tuple[np.ndarray, np.ndarray]:
+    def compute(
+        self, 
+        T0: np.ndarray,
+        P0: np.ndarray,
+        rho0:np.ndarray,
+        V0: np.ndarray,
+        R_LHV: float=1.0,
+        Pr: np.ndarray=None,
+        Pa: np.ndarray=None,
+        mdot_H2O: np.ndarray=None
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Compute the turboprop engine performance."""
         
         # Atmospheric conditions
@@ -282,7 +305,13 @@ class Turboprop:
         
         # Fuel flow rate
         # mdot_fuel = C_p*R_LHV*Pa/(1-0.16) # Max engine installation losses
-        mdot_fuel = 2*mff(Pa/2e3)
+        mdot_fuel = mff(Pa/2e3)*2
+        
+        # NOx emissions
+        if mdot_H2O is not None:
+            mdot_NOx = self.__mdot_NOx(Pa, mdot_H2O)
+        else:
+            mdot_NOx = np.zeros_like(Pa)
 
         # Station 5 (turbine exit)
         T05, P05 = self.__05(mdot_air, mdot_fuel, self.c_pa, self.c_pg, T02, T03, T04, P04,
@@ -294,4 +323,4 @@ class Turboprop:
                                self.c_pg,
                                self.k_gas)
         
-        return mdot_fuel, eta_th, eta_prop, 2*mdot_air, T03, P03
+        return mdot_fuel, eta_th, eta_prop, mdot_air, T03, P03, mdot_NOx
