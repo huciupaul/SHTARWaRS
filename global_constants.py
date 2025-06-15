@@ -120,7 +120,13 @@ with open('data/interpolants/engine2035_interpolators.pkl', 'rb') as f:
     engine_interpolators = pickle.load(f)
 
 mdot_fuel = engine_interpolators['mf_fuel_from_power']  # [kg/s] Mass flow rate of fuel from power
-mdot_air = engine_interpolators['mf_air_from_power']   # [kg/s] Mass flow rate of air from power
+mdot_air = engine_interpolators['mf_air_from_power']    # [kg/s] Mass flow rate of air from power
+
+# Engine NOx emission model
+with open('data/interpolants/NOx_interpolator.pkl', 'rb') as f:
+    NOx_interpolator = pickle.load(f)
+
+mdot_NOx = NOx_interpolator                             # [kg/s] Mass flow rate of NOx from shaft power
 
 eff_prop   = 0.80
 mu_TO      = 0.04
