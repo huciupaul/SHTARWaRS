@@ -51,6 +51,7 @@ GWP_CO2 = 1.0                                            # [-] Global Warming Po
 GWP_NOx = 10                                             # [-] Global Warming Potential of NOx https://doi.org/10.3390/app122010429
 GWP_H2O = 0.0005                                         # [-] Global Warming Potential of H2O        https://iopscience.iop.org/article/10.1088/1748-9326/aae018/pdf
 GWP_beech = 335000 * 30/19                               # [-] Global Warming Potential of Beechcraft 1900D https://odr.chalmers.se/items/a33bc0b8-bf61-47cc-87b8-3ab92fe388ed
+GWP_H2 = 2.9                                            # [kgCO2e/kgH2] Global Warming Potential of Hydrogen https://doi.org/10.1038/s41560-024-01563-1
 
 #######################################################################################
 #################### Code specific constants from each part ###########################

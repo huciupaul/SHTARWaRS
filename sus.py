@@ -12,6 +12,7 @@ def get_sus(GWP_fc, GWP_sto, GWP_eps, m_h2, m_nox):
     """
     GWP_ac = (GWP_fc + GWP_sto + GWP_eps + GWP_beech) / flight_lifetime  # Total GWP of the aircraft per flight
     m_h2o = m_h2 * 18.01528 / 2.01568  # [kg] Mass of water produced over the flight
+    GWP_h2 = m_h2 * GWP_H2  # [kg CO2] GWP of the hydrogen used
     GWP_h2o = m_h2o * GWP_H2O  # [kg CO2] GWP of the water produced
     GWP_nox = m_nox * GWP_NOx  # [kg CO2] GWP of the NOx produced
     GWP_total = GWP_ac + GWP_h2o + GWP_nox  # Total GWP of the aircraft per flight
