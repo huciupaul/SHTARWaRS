@@ -114,6 +114,7 @@ LHV_H2 = 120e6                                         # [J/kg] Lower Heating Va
 ####################
 A_inlet = 2*0.038410516                                 # [m^2] Inlet area
 MAXC = 2*906e3                                          # [W] Max Continuous Power
+TOGA =  1908*1000                                        # [W] Take-Off/Go-Around power
 
 # Engine performance models
 with open('data/interpolants/engine2035_interpolators.pkl', 'rb') as f:
@@ -123,6 +124,9 @@ mdot_fuel = engine_interpolators['mf_fuel_from_power']  # [kg/s] Mass flow rate 
 mdot_air = engine_interpolators['mf_air_from_power']    # [kg/s] Mass flow rate of air from power
 
 # Engine NOx emission model
+with open('data/interpolants/T_peak_interpolant.pkl', 'rb') as f:
+    T_peak_interpolator = pickle.load(f)
+    
 with open('data/interpolants/NOx_interpolator.pkl', 'rb') as f:
     NOx_interpolator = pickle.load(f)
 

@@ -16,7 +16,6 @@ from fpp.turboprop import Turboprop
 import global_constants
 from global_constants import MAXC, TOGA, base_AP, G_0, E_SCALE, R_AIR, k_air, isa_atmosphere
 from fc.fc_for_wrapper import FuelCell
-
 # Dataclass definitions
 @dataclass
 class Aircraft:
@@ -737,26 +736,29 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
     # mission_H2.quicklook()  # Show quicklook plots
     
     # Get H2 mass, NOx mass, and max(mdot_NOx) for a nominal mission (- hold)
-    nominal =  mission_H2.profile['phase'] != 'hold'
-    mdot_NOx_nom = mission_H2.profile['mdot_NOx'][nominal]
-    mdot_H2_nom  = mission_H2.profile['mdot_fuel'][nominal]
-    
-    # Integrate the mass flow rates to get total NOx and H2 mass
-    m_NOx_nom = np.cumsum(mdot_NOx_nom) * dt
-    m_H2_nom = np.cumsum(mdot_H2_nom) * dt
-    
-    # Get max NOx/s at TO and CRUISE phases
-    cruise =  (mission_H2.profile['phase'] == 'cruise') | (mission_H2.profile['phase'] == 'descent1') | (mission_H2.profile['phase'] == 'descent2')
-    TOGA =  (mission_H2.profile['phase'] == 'takeoff') | (mission_H2.profile['phase'] == 'climb1') | (mission_H2.profile['phase'] == 'climb2')
-    m_NOx_TO = np.max(mdot_NOx_nom[TOGA])
-    m_NOx_cruise = np.max(mdot_NOx_nom[cruise])
-    
+    # full‐length arrays
+    no2_arr = mission_H2.profile['mdot_NOx']
+    fuel_arr = mission_H2.profile['mdot_fuel']
+    phase = mission_H2.profile['phase']
+
+    # masks
+    nominal_mask = phase != 'hold'
+    toga_mask    = (phase == 'takeoff') | (phase == 'climb1') | (phase == 'climb2')
+    cruise_mask  = (phase == 'cruise')  | (phase == 'descent1') | (phase == 'descent2')
+
+    # integrate total masses over nominal
+    m_NOx_nom = np.cumsum(no2_arr[nominal_mask])  * dt
+    m_H2_nom  = np.cumsum(fuel_arr[nominal_mask]) * dt
+
+    # peak NOx flow rates (only over nominal points in each phase)
+    max_NOx_TO     = np.max(no2_arr[toga_mask   & nominal_mask])
+    max_NOx_cruise = np.max(no2_arr[cruise_mask & nominal_mask])
 
     emissions_outputs = dict(
-        m_NOx=m_NOx_nom,  # Total NOx mass in kg
-        max_mdot_NOx_TO=m_NOx_TO,  # Maximum NOx mass flow rate at TOGA in kg/s
-        max_mdot_NOx_cruise=m_NOx_cruise,  # Maximum NOx mass flow rate at CRUISE in kg/s
-        m_H2=m_H2_nom,  # Total H2 mass in kg
+        m_NOx               = m_NOx_nom[-1],
+        max_mdot_NOx_TO     = max_NOx_TO,
+        max_mdot_NOx_cruise = max_NOx_cruise,
+        m_H2_nom            = m_H2_nom[-1],
     )
         
     return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile, loading_points, emissions_outputs
@@ -764,15 +766,15 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
 if __name__ == "__main__":
     
     mission_H2 = fpp_main(
-        fc_split=0.1,
-        throttle_TOGA=0.5,
-        throttle_cruise=0.1,
+        fc_split=1.0,
+        throttle_TOGA=1.0,
+        throttle_cruise=1.0,
         MTOW=8037.6,
         # CD_HEX=0.0,
         # delta_AP=0.0,
         dt=0.1
     )
-    print(mission_H2[0])
+    print(mission_H2[-1])
     # from mpl_toolkits.mplot3d import Axes3D
     # from matplotlib.animation import FuncAnimation, FFMpegWriter
     

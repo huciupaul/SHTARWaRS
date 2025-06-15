@@ -12,7 +12,7 @@ from global_constants import R_AIR, MAXC
 from global_constants import mdot_air as mfa
 from global_constants import mdot_fuel as mff
 from global_constants import mdot_NOx as mfn
-from global_constants import cc_inlet_temp as tcc
+from global_constants import T_peak_interpolator as tcc
 class Turboprop:
     """Full model of a turboprop engine. The model is based on the following
     assumptions:
