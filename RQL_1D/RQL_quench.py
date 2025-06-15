@@ -40,8 +40,7 @@ class gas_obj:
 
 def main(
         T_rich_ex: np.ndarray,
-        mdot_h2o: np.ndarray,
-        n_PAX: int = 19
+        mdot_h2o: np.ndarray
         ) -> Tuple[List[float], np.ndarray]:
 
     mdot_NOx = np.zeros((len(T_rich_ex), len(mdot_h2o)))
@@ -128,17 +127,17 @@ def main(
 
                     
             # temps_after_reaction[i, j] = reactor.thermo.T
-            mdot_NOx[i, j] = reactor.thermo['NO'].X[0] * stoich_with_water.mdot / n_PAX # kg/s/PAX
+            mdot_NOx[i, j] = reactor.thermo['NO'].X[0] * stoich_with_water.mdot # kg/s
 
     # return mdot_NOx, temps_before_reaction, temps_after_reaction, times_to_steady, T_rich_ex, mdot_h2o, mdots
     return mdot_NOx
 
 
 if __name__ == "__main__":
-    T_rich_ex = np.arange(1570, 1740, 10)
+    T_rich_ex = np.arange(1570, 1740, 1)
     mdot_h2o = np.arange(0, 0.1 + 1e-3, 1e-2)
 
-    mdot_NOx = main(T_rich_ex=T_rich_ex, mdot_h2o=mdot_h2o, n_PAX=19)
+    mdot_NOx = main(T_rich_ex=T_rich_ex, mdot_h2o=mdot_h2o)
 
     T_grid, W_grid = np.meshgrid(T_rich_ex, mdot_h2o, indexing='ij')
 
@@ -148,7 +147,7 @@ if __name__ == "__main__":
 
     ax.set_xlabel('Water injection [kg/s]')
     ax.set_ylabel('Rich zone exhaust temperature [K]')
-    ax.set_zlabel('NOx formed [kg/s/PAX]')
+    ax.set_zlabel('NOx formed [kg/s]')
     ax.set_title('NOx vs Water Injection and Rich Zone Temperature')
     fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
     plt.show()
