@@ -117,7 +117,7 @@ class FuelCell:
         # Calculate the recirculation mass flow rate of hydrogen
         self.m_H2_recirculation = self.m_H2_FC * (gc.stoic_ratio_A - 1)
 
-        return self.Qdot_FC, self.m_H2_FC, self.m_air_FC_in, self.m_air_FC_out, self.m_H20_FC, self.m_H2_recirculation
+        return self.Qdot_FC, self.m_H2_FC, self.m_air_FC_in, self.m_air_FC_out, self.m_H20_FC, self.m_H2_recirculation, self.m_H20_FC_CC
     
 
 

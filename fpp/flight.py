@@ -398,6 +398,8 @@ class FlightMission:
         mdot_fc_air_out                 = np.zeros_like(V_arr)
         mdot_fc_H2O                     = np.zeros_like(V_arr)
         mdot_fc_H2_recirculation        = np.zeros_like(V_arr)
+        mdot_NOx_arr                    = np.zeros_like(V_arr)
+        m_NOx_arr                       = np.zeros_like(V_arr)
         
 
         # Create IDLE, TOGA, CRUISE generalized masks
@@ -433,15 +435,16 @@ class FlightMission:
                 Pa_arr[sl] = Pa_total   
 
                 P_cc_arr[sl] = Pa_cc
-                P_fc_arr[sl] = Pa_fc    
+                P_fc_arr[sl] = Pa_fc
+
+                # Add fuel cell mass flow from threshold power
+                Qdot_fc[sl], mdot_fc_arr[sl], mdot_fc_air_in[sl], mdot_fc_air_out[sl], mdot_fc_H2O[sl], mdot_fc_H2_recirculation[sl], mdot_cc_H2O = self.ac.fc.get_TMS_values(power=Pa_fc)
                 
                 # Fuel mass flow using Torenbeek method (PSFC)
-                mdot_fuel_arr[sl], eta_th_arr[sl], eta_prop_arr[sl], mdot_air_arr[sl], T_cc[sl], p_cc[sl] = self.ac.eng.compute(
-                    T_arr[sl], P_arr[sl], rho_arr[sl], V_arr[sl], R_LHV=self.R_LHV, Pa=Pa_cc_arr)
+                mdot_fuel_arr[sl], eta_th_arr[sl], eta_prop_arr[sl], mdot_air_arr[sl], T_cc[sl], p_cc[sl], mdot_NOx_arr[sl] = self.ac.eng.compute(
+                    T_arr[sl], P_arr[sl], rho_arr[sl], V_arr[sl], R_LHV=self.R_LHV, Pa=Pa_cc_arr, mdot_H2O=mdot_cc_H2O)
                 mdot_cc_arr[sl] = mdot_fuel_arr[sl]
                 
-                # Add fuel cell mass flow from threshold power
-                Qdot_fc[sl], mdot_fc_arr[sl], mdot_fc_air_in[sl], mdot_fc_air_out[sl], mdot_fc_H2O[sl], mdot_fc_H2_recirculation[sl] = self.ac.fc.get_TMS_values(power=Pa_fc)
   
                 mdot_fuel_arr[sl] += mdot_fc_arr[sl]
 
@@ -454,6 +457,10 @@ class FlightMission:
                 m_start = m_arr[sl.start - 1] if sl.start > 0 else self.ac.MTOW
                 burn = np.cumsum(mdot_fuel_arr[sl]) * self.dt          # cumulative fuel burnt _within_ slice
                 m_arr[sl] = m_start - np.concatenate(([0.0], burn[:-1]))
+                
+                m_NOx_start = m_NOx_arr[sl.start - 1] if sl.start > 0 else 0.0
+                m_NOx_arr[sl] = m_NOx_start + np.cumsum(mdot_NOx_arr[sl]) * self.dt
+                
         
             else:
                 # Compute power from drag balance
@@ -495,14 +502,14 @@ class FlightMission:
                                 Pa_fc = self.ac.fc.power_min
                                 Pa_cc = self.ac.P_cc_min
                                 P_fc_dumpy = (Pa_cc + Pa_fc) - Pa_total
+                    # Add fuel cell mass flow from threshold power
+                    Qdot_fc[i], mdot_fc_arr[i], mdot_fc_air_in[i], mdot_fc_air_out[i], mdot_fc_H2O[i], mdot_fc_H2_recirculation[i], mdot_cc_H2O = self.ac.fc.get_TMS_values(power=Pa_fc)
                     
-                    mdot_fuel, eta_th, eta_prop, mdot_air, T_cc[i], p_cc[i] = self.ac.eng.compute(
-                        T_arr[i], P_arr[i], rho_arr[i], V_arr[i], R_LHV=self.R_LHV, Pa=Pa_cc
+                    mdot_fuel, eta_th, eta_prop, mdot_air, T_cc[i], p_cc[i], mdot_NOx_arr[i] = self.ac.eng.compute(
+                        T_arr[i], P_arr[i], rho_arr[i], V_arr[i], R_LHV=self.R_LHV, Pa=Pa_cc, mdot_H2O=mdot_cc_H2O
                     )
                     mdot_cc_arr[i] = mdot_fuel
                     
-                    # Add fuel cell mass flow from threshold power
-                    Qdot_fc[i], mdot_fc_arr[i], mdot_fc_air_in[i], mdot_fc_air_out[i], mdot_fc_H2O[i], mdot_fc_H2_recirculation[i] = self.ac.fc.get_TMS_values(power=Pa_fc)
 
                     mdot_fuel += mdot_fc_arr[i]
 
@@ -510,6 +517,8 @@ class FlightMission:
                     m_dumpy[i+1] = m_dumpy[i] + mdot_dumpy_arr[i] * self.dt
 
                     m_arr[i+1] = m_arr[i] - mdot_fuel*self.dt
+                    m_NOx_arr[i+1] = m_NOx_arr[i] + mdot_NOx_arr[i] * self.dt
+                    
                     
                     # 7) Store results @current time step
                     Pr_arr[i] = Pr
@@ -537,7 +546,10 @@ class FlightMission:
                             mdot_fuel=mdot_fuel_arr, mdot_air=mdot_air_arr,
                             mdot_cc=mdot_cc_arr, mdot_fc=mdot_fc_arr,
                             mdot_dumpy=mdot_dumpy_arr, m_dumpy=m_dumpy,
-                            eta_th=eta_th_arr, eta_prop=eta_prop_arr, mass=m_arr
+                            eta_th=eta_th_arr, eta_prop=eta_prop_arr, mass=m_arr,
+                            mdot_cc_H2O=mdot_cc_H2O,
+                            mdot_NOx=mdot_NOx_arr,
+                            m_NOx=m_NOx_arr,
                             )
 
     # ---------------------------------------------------------------------
@@ -723,8 +735,31 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
                       V_fc=fc_model.fc_volume,
                       co2_fc=fc_model.fc_gwp)
     # mission_H2.quicklook()  # Show quicklook plots
+    
+    # Get H2 mass, NOx mass, and max(mdot_NOx) for a nominal mission (- hold)
+    nominal =  mission_H2.profile['phase'] != 'hold'
+    mdot_NOx_nom = mission_H2.profile['mdot_NOx'][nominal]
+    mdot_H2_nom  = mission_H2.profile['mdot_fuel'][nominal]
+    
+    # Integrate the mass flow rates to get total NOx and H2 mass
+    m_NOx_nom = np.cumsum(mdot_NOx_nom) * dt
+    m_H2_nom = np.cumsum(mdot_H2_nom) * dt
+    
+    # Get max NOx/s at TO and CRUISE phases
+    cruise =  (mission_H2.profile['phase'] == 'cruise') | (mission_H2.profile['phase'] == 'descent1') | (mission_H2.profile['phase'] == 'descent2')
+    TOGA =  (mission_H2.profile['phase'] == 'takeoff') | (mission_H2.profile['phase'] == 'climb1') | (mission_H2.profile['phase'] == 'climb2')
+    m_NOx_TO = np.max(mdot_NOx_nom[TOGA])
+    m_NOx_cruise = np.max(mdot_NOx_nom[cruise])
+    
+
+    emissions_outputs = dict(
+        m_NOx=m_NOx_nom,  # Total NOx mass in kg
+        max_mdot_NOx_TO=m_NOx_TO,  # Maximum NOx mass flow rate at TOGA in kg/s
+        max_mdot_NOx_cruise=m_NOx_cruise,  # Maximum NOx mass flow rate at CRUISE in kg/s
+        m_H2=m_H2_nom,  # Total H2 mass in kg
+    )
         
-    return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile, loading_points
+    return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile, loading_points, emissions_outputs
 
 if __name__ == "__main__":
     
