@@ -239,5 +239,5 @@ if __name__=="__main__":
         minimum=0.8,
         maximum=1.0,
         no_of_splits=10,
-        max_iter=100
+        max_iter=10
     )
