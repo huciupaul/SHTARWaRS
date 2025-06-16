@@ -67,7 +67,7 @@ NOx_pPax_cruise = 0.000009341715 # [kg/s/PAX]
 # Fuel Cell Stack Characteristics
 mass_specific_power = 5000                              # [W/kg] Specific power of the fuel cell stack (FZO Roadmap-report)
 volume_specific_power = 3100000                         # [W/m^3] Volume specific power of the fuel cell stack (FZO Roadmap-report)
-stoic_ratio_A = 1.1                                     # [-] Stoichiometric ratio of the anode
+stoic_ratio_A = 1.05                                     # [-] Stoichiometric ratio of the anode
 stoic_ratio_C = 1.6                                     # [-] Stoichiometric ratio of the cathode
 pickle_path = 'fc/spline_eta_of_P.pkl'                     # Path to the efficiency function file
 # Load efficiency function from file
@@ -88,10 +88,10 @@ num_aircraft = 500                                          # number of aircraft
 FC_prod_gwp = 30.5                                      # [kg CO2/kW] GWP of the fuel cell production with bop (see excel) DOI: 10.4271/2024-24-0020
 FC_cost_no_bop = 555/2                                  # [EUR/kW] Cost of the fuel cell stack without balance of plant (flyzero)
 FC_cost = 555                                           # [EUR/kW] Cost of the fuel cell with bop (flyzero)
-FC_maint_cost = 220/2400 * time_lifetime                # [EUR/kW] Maintenance cost of the fuel cell per kW
+FC_maint_cost = 220/2400 * time_lifetime                # [EUR/kWh] Maintenance cost of the fuel cell per kW
 FC_disposal_cost = 9.35                                 # [EUR/kgFC] Disposal cost of the fuel cell stack per kg of fuel cell stack
 Sto_disposal_cost = 0.6                                 # [EUR/kgSto] Disposal cost of the storage system per kg of tank
-Sto_maint_cost = 42.8                                  # [EUR/kgH2/yr] Maintenance cost of the storage system
+Sto_maint_cost = 42.8                                   # [EUR/kgH2/yr] Maintenance cost of the storage system
 AC_disposal_cost = 6.693 * 4932                         # [EUR/kgAC] Disposal cost of the aircraft per kg of aircraft
 Insurance_cost = 19000 * 25                             # [EUR] Insurance cost of the aircraft over its lifetime
 Crew_cost = 2 * 89 * time_lifetime                      # [EUR] Crew cost of the aircraft over its lifetime
