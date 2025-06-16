@@ -13,6 +13,7 @@ from global_constants import mdot_air as mfa
 from global_constants import mdot_fuel as mff
 from global_constants import mdot_NOx as mfn
 from global_constants import T_peak_interpolator as tcc
+from global_constants import TOGA
 class Turboprop:
     """Full model of a turboprop engine. The model is based on the following
     assumptions:
@@ -261,8 +262,9 @@ class Turboprop:
     ):
         """Mass flow rate of NOx."""
         mfh = np.clip(mdot_H2O, 0, 0.1*2)
+        T = np.zeros_like(Pa)
         T = np.clip(tcc(Pa/2e3), 1570, 1740)  # Use the combustion chamber inlet temperature
-        mdot_NOx = mfn((T, mfh/2))
+        mdot_NOx = np.where(Pa>=TOGA*0.056, mfn((T, mfh/2)), 0)  # Use the combustion chamber inlet temperature and half the mass flow rate of water
         return mdot_NOx*2  # Multiply by 2 for two engines
     
     #  COMPUTE

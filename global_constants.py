@@ -48,8 +48,14 @@ ROC, V_climb = 10.16, 73.43
 # 100 year GWP of gases (compared to CO2)
 
 GWP_CO2 = 1.0                                            # [-] Global Warming Potential of CO2
-GWP_NOx = 273.0                                          # [-] Global Warming Potential of NOx https://www.epa.gov/ghgemissions/understanding-global-warming-potentials#:~:text=Nitrous%20Oxide%20(N2O,Sinks%20uses%20a%20different%20value.)
+GWP_NOx = 10                                             # [-] Global Warming Potential of NOx https://doi.org/10.3390/app122010429
 GWP_H2O = 0.0005                                         # [-] Global Warming Potential of H2O        https://iopscience.iop.org/article/10.1088/1748-9326/aae018/pdf
+GWP_beech = 335000 * 30/19                               # [-] Global Warming Potential of Beechcraft 1900D https://odr.chalmers.se/items/a33bc0b8-bf61-47cc-87b8-3ab92fe388ed
+GWP_H2 = 2.9                                            # [kgCO2e/kgH2] Global Warming Potential of Hydrogen https://doi.org/10.1038/s41560-024-01563-1
+
+# NOx KPIs
+NOx_pPax_TO     = 0.000012783399 # [kg/s/PAX]
+NOx_pPax_cruise = 0.000009341715 # [kg/s/PAX]
 
 #######################################################################################
 #################### Code specific constants from each part ###########################
@@ -223,6 +229,7 @@ Beechcraft_1900D = dict(
     MTOW        = 7766,
     M_fuel      = 337,
     OEW         = 7766-2022,
+    X_OEW       = 6.76,
     M_cargo_aft = 4.8106*rho_cargo,
     num_PAX     = 19,
     X_cargo_aft = 12.64,

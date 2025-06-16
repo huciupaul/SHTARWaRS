@@ -17,18 +17,19 @@ def X_PAX(num_PAX) -> float:
 def X_OEW(M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_TMS, X_tank_front) -> Tuple[float, float]:
     """Calculate the center of gravity position of the original aircraft's empty weight."""
     """Original aircraft OEW"""
-    M_cargo_og = V_cargo_fwd * rho_cargo + Beechcraft_1900D['M_cargo_aft']
-    X_cargo_og = (V_cargo_fwd * rho_cargo * X_cargo_fwd + Beechcraft_1900D['M_cargo_aft'] * Beechcraft_1900D['X_cargo_aft']) / M_cargo_og
+    # M_cargo_og = V_cargo_fwd * rho_cargo + Beechcraft_1900D['M_cargo_aft']
+    # X_cargo_og = (V_cargo_fwd * rho_cargo * X_cargo_fwd + Beechcraft_1900D['M_cargo_aft'] * Beechcraft_1900D['X_cargo_aft']) / M_cargo_og
 
-    M_PAX_og = Beechcraft_1900D['num_PAX'] * M_PAX
-    X_PAX_og = X_PAX(Beechcraft_1900D['num_PAX'])
+    # M_PAX_og = Beechcraft_1900D['num_PAX'] * M_PAX
+    # X_PAX_og = X_PAX(Beechcraft_1900D['num_PAX'])
 
-    M_payload_og = M_cargo_og + M_PAX_og
-    X_payload_og = (M_PAX_og * X_PAX_og + M_cargo_og*X_cargo_og) / M_payload_og
+    # M_payload_og = M_cargo_og + M_PAX_og
+    # X_payload_og = (M_PAX_og * X_PAX_og + M_cargo_og*X_cargo_og) / M_payload_og
 
-    # CG position of the OEW of Beechcraft 1900D based on its most forward MTOW CG position
-    # TODO: rethink this choice
-    X_OEW_og = (Beechcraft_1900D['MTOW'] * X_most_fwd - Beechcraft_1900D['M_fuel'] * X_wing - M_payload_og * X_payload_og) / Beechcraft_1900D['OEW']
+    # # CG position of the OEW of Beechcraft 1900D based on its most forward MTOW CG position
+    # # TODO: rethink this choice
+    # X_OEW_og = (Beechcraft_1900D['MTOW'] * X_most_fwd - Beechcraft_1900D['M_fuel'] * X_wing - M_payload_og * X_payload_og) / Beechcraft_1900D['OEW']
+    X_OEW_og = Beechcraft_1900D['X_OEW']
 
     OEW_H2D2 = Beechcraft_1900D['OEW'] + M_FC + M_EPS + M_TMS_fwd + M_TMS_aft + M_tank + M_TMS_mid
     X_OEW_H2D2 = (Beechcraft_1900D['OEW'] * X_OEW_og + (M_FC + M_EPS + M_TMS_fwd) * X_wing + (M_TMS_aft + M_tank) * X_tank_TMS + M_TMS_mid * (X_wing_end + X_tank_front) / 2) / OEW_H2D2
@@ -154,9 +155,7 @@ def min_max_X_cg_positions(
     back_loading = M_cargo_aft + M_TMS_aft + M_tank
     original_loading = Beechcraft_1900D['M_cargo_aft']
     
-    delta = back_loading - original_loading
-    print(f"Delta: {delta:.2f} kg")
-    
+    delta = back_loading - original_loading    
     
 
     cumulative_lengths = np.cumsum([len(arr) for arr in arrays])
@@ -294,7 +293,7 @@ def main(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         m_cargo_ok = m_cargo_aft >= N_PAX*M_cargo_per_PAX
 
         # ---- 1.4   Store results
-        valid_vec[i]   = volume_ok and N_PAX_ok #and m_cargo_ok # and cg_ok
+        valid_vec[i]   = volume_ok and N_PAX_ok and m_cargo_ok and cg_ok
         N_PAX_vec[i]   = N_PAX
         m_cargo_vec[i] = m_cargo_aft
 

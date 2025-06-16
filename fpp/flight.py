@@ -130,7 +130,7 @@ class FlightMission:
         C_D = C_D0 + C_Di
                 
         # Constant velocity: Thrust = Drag
-        T = 0.5*rho_inf*V_inf**2*S*C_D + self.ac.D_RAD
+        T = 0.5*rho_inf*V_inf**2*S*C_D
         P = T*V_inf
         
         return P
@@ -585,7 +585,7 @@ class FlightMission:
         plt.show()
         
     
-def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: float = 0.1, MTOW: float=8037.6, D_RAD: float=0.0, delta_AP: float=0.0, dt: float=0.1) -> tuple:
+def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: float = 0.1, MTOW: float=8037.6, CD_RAD: float=0.0, delta_AP: float=0.0, dt: float=0.1) -> tuple:
     """
     Main flight performance function to obtain the fuel mass and shaft power profile.
     Args:
@@ -664,14 +664,13 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
         name="H2-D2",
         wing_area=28.79,
         wing_span=17.64,
-        CD0=0.024,  # Add heat exchanger drag
+        CD0=0.024+CD_RAD,  # Add heat exchanger drag
         prop_diameter=2.78,
         eng=turboprop_H2,
         fc=fc_model,
         MTOW=MTOW,
         P_cc_min=0.056 * TOGA,  # [W] Minimum combustion chamber power
         delta_AP=delta_AP,  # [W] Thermal Management System power
-        D_RAD=D_RAD,  # [N] Radiator drag penalty
     )
     
     mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=dt, total_range_m=707e3, throttle_cruise=throttle_cruise)
@@ -732,7 +731,8 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
     # Determine the maximum fuel cell power across the three splits
     FC_outputs = dict(m_fc=fc_model.fc_mass,
                       V_fc=fc_model.fc_volume,
-                      co2_fc=fc_model.fc_gwp)
+                      co2_fc=fc_model.fc_gwp,
+                      fc_cost=fc_model.fc_cost)
     # mission_H2.quicklook()  # Show quicklook plots
     
     # Get H2 mass, NOx mass, and max(mdot_NOx) for a nominal mission (- hold)
@@ -766,7 +766,7 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
 if __name__ == "__main__":
     
     mission_H2 = fpp_main(
-        fc_split=1.0,
+        fc_split=0.0,
         throttle_TOGA=1.0,
         throttle_cruise=1.0,
         MTOW=8037.6,

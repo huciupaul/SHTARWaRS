@@ -6,6 +6,7 @@ from global_constants import *
 import time
 from functools import lru_cache
 import csv
+import math
 
 
 start_time = time.time()
@@ -135,7 +136,7 @@ class RamAirHeatExchanger():
 
             D_g = mf_air * self.ambient_conditions['V']
             C_D_rad = D_g/(0.5*self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * S_w/2) # C_D for both radiator 
-            F_n = (self.TR + 1 )*D_g
+            F_n = (self.TR - 1 )*D_g
             net_drag = D_g - F_n
 
             if abs(ratio - 1.0) < tol:           # close enough
@@ -169,7 +170,7 @@ class RamAirHeatExchanger():
         cool_out = Fluid_Coolant(name = "Coolant Out", T = coolant_temp_out, P = self.fluid.P, 
                          mf = self.fluid.mf_given, fluid_type = self.fluid.fluid_type)
         
-        return self.required_area, cool_out, power_fan, eta_p, C_D_rad, length_rad, A_0,mf_air
+        return self.required_area, cool_out, power_fan, eta_p,net_drag,length_rad, A_0,mf_air
 
     # THRUST RECOVERY   
     def thrust_ratio(self,gamma, R, M0, T0, eta_p07, CD_d_CD_sp):
@@ -722,6 +723,15 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
     pump_water_power_list = [0]
     p_comp_1415 = [0]
     Q_heater = np.zeros(len(Q_dot_fc_l)) 
+
+    # Check for NaN in any input list
+    input_lists = [
+        Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_fc_l, T_cc_l,
+        air_mf_fc_l, T_amb_l, rho_amb_l, V_amb_l, p_amb_l, h2_mf_rec_l, air_out_fc_l, p_sto_l, h2o_mf_fc_l
+    ]
+    for lst in input_lists:
+        if any((x is None) or (isinstance(x, float) and np.isnan(x)) for x in (lst if isinstance(lst, (list, np.ndarray)) else [lst])):
+            return None, None
     
     for i in range(len(h2_mf_fc_l)): 
         Q_dot_fc = Q_dot_fc_l[i]  # W
@@ -1259,6 +1269,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
     m_front, 
     m_mid, 
     m_rear]
+    
     
 
 
