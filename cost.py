@@ -9,7 +9,7 @@ def calc_cost(fc_cost, P_eps, m_sto, m_h2):
     eps_init = P_eps * EPS_cost
     
     purchase_cost = sto_init + eps_init + AC_purchase_cost + AC_dev_cost
-    print(f"Initial costs: FC={0}, STO={sto_init}, EPS={eps_init}, AC={AC_purchase_cost}, Dev={AC_dev_cost}, Total={purchase_cost}")
+    # print(f"Initial costs: FC={0}, STO={sto_init}, EPS={eps_init}, AC={AC_purchase_cost}, Dev={AC_dev_cost}, Total={purchase_cost}")
 
 
     # -----Operational costs  per year-----
@@ -21,7 +21,7 @@ def calc_cost(fc_cost, P_eps, m_sto, m_h2):
     insurance = Insurance_cost / years_of_life
     
     operational_costs = sto_maint + landing + crew + fuel_cost + insurance + AC_maint_cost
-    print(f"Operational costs per year: FC={0}, STO={sto_maint}, Landing={landing}, Crew={crew}, Fuel={fuel_cost}, Insurance={insurance}, Total={operational_costs}")
+    # print(f"Operational costs per year: FC={0}, STO={sto_maint}, Landing={landing}, Crew={crew}, Fuel={fuel_cost}, Insurance={insurance}, Total={operational_costs}")
 
 
     # -----Disposal costs-----
@@ -29,7 +29,7 @@ def calc_cost(fc_cost, P_eps, m_sto, m_h2):
     sto_disposal = Sto_disposal_cost * m_sto
 
     disposal_cost =  sto_disposal + AC_disposal_cost
-    print(f"Disposal costs: FC={0}, STO={sto_disposal}, Total={disposal_cost}")
+    # print(f"Disposal costs: FC={0}, STO={sto_disposal}, Total={disposal_cost}")
 
 
     # -----Depreciation-----
@@ -45,4 +45,4 @@ def calc_cost(fc_cost, P_eps, m_sto, m_h2):
     avg_ticket_price = total_cost / (15 * flight_lifetime) # 15 pax
     return total_cost #, avg_ticket_price
 
-print(calc_cost(940835, 500*.99*.97, 275, 250))
+# print(calc_cost(940835, 500*.99*.97, 275, 250))

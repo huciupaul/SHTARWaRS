@@ -31,7 +31,7 @@ valid_mass = pws(loading_tensor)
 valid_NOx = (design_tensor[..., 15]/N_PAX < NOx_pPax_TO) & (design_tensor[..., 16]/N_PAX < NOx_pPax_cruise)
 
 # Define dimension bounds
-dim_bounds = np.array([[0.1, 1.0], [0.1, 1.0], [0.1, 1.0]])
+dim_bounds = np.array([[0.1, 0.9], [0.1, 1.0], [0.1, 1.0]])
 N, M, P, Q = design_tensor.shape
 power_splits = np.linspace(dim_bounds[0, 0], dim_bounds[0, 1], N)
 toga_throttle = np.linspace(dim_bounds[1, 0], dim_bounds[1, 1], M)
@@ -204,9 +204,7 @@ def update_graph(weight, constraints):
     else:
         opt_idx = None
         design_info_str = "No valid designs found with current constraints."
-    
-    # REPLACEMENT CODE STARTS HERE - Fix for voxel visualization
-    
+        
     # Create the figure
     fig = go.Figure()
     

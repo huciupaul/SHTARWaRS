@@ -6,7 +6,6 @@ from scipy.optimize import fsolve
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 import matplotlib.pyplot as plt
-import pandas as pd
 
 # Local imports
 import sys
@@ -766,7 +765,7 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
 if __name__ == "__main__":
     
     mission_H2 = fpp_main(
-        fc_split=0.0,
+        fc_split=0.1,
         throttle_TOGA=1.0,
         throttle_cruise=1.0,
         MTOW=8037.6,

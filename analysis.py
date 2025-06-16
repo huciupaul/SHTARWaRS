@@ -9,6 +9,8 @@ from typing import Tuple
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.spatial import ConvexHull
+from scipy.stats import gaussian_kde
+
 
 
 # Local imports
@@ -69,208 +71,209 @@ def objective_function(weight: float=0.5, design: np.ndarray=None, N_PAX: np.nda
     
     # Calculate GWP and cost for each design (per passenger)
     GWP = f_gwp(GWP_fc, GWP_sto, GWP_eps, m_h2_nom, m_nox)/N_PAX
-    cost = f_cost(fc_cost, P_eps, m_sto, m_h2_nom, m_h2)/N_PAX
-    # Store GWP and cost in the selection tensor
-    selection_tensor[..., 0] = cost
-    selection_tensor[..., 1] = GWP
+    cost = f_cost(fc_cost, P_eps, m_sto, m_h2)/N_PAX
+    cost = cost / 1e6  # Convert cost to M€
     
-    # Normalize the GWP and cost values
-    GWP_norm = GWP / np.nanmax(GWP)
-    cost_norm = cost / np.nanmax(cost)
+    # Normalize cost and GWP via L^2 norm
+    obj = np.stack([cost, GWP], axis=-1)
+    norms = np.linalg.norm(obj, axis=-1, keepdims=True)
+    norms[norms == 0] = 1  # Avoid division by zero
+    obj_norm = obj / norms  # Normalize to unit sphere
+    cost_norm = obj_norm[..., 0]  # Normalized cost
+    GWP_norm = obj_norm[..., 1]  # Normalized GWP 
     
     # Calculate the scalar field as a weighted sum of cost and GWP
     scalar_field = weight * cost_norm + (1 - weight) * GWP_norm
     
+    selection_tensor[..., 0] = cost 
+    selection_tensor[..., 1] = GWP
+    
     return scalar_field, selection_tensor
 
-def pareto_front(selection_tensor: np.ndarray, fpath: str="data/plots/pareto_front.png", dpi=600, 
-                 remove_outliers: bool=True, outlier_threshold: float=2.0,
-                 bounds: np.ndarray=np.array([
-                     [0.1, 1.0],
-                     [0.1, 1.0],
-                     [0.1, 1.0]
-                     ])) -> None:
-    """Create a Pareto front plot from the selection tensor.
-    Args:
-        selection_tensor (np.ndarray): The 4D selection tensor containing cost and GWP values.
-        fpath (str, optional): Filepath to save the Pareto front plot. Defaults to "data/plots/pareto_front.png".
-        dpi (int, optional): DPI for the saved plot. Defaults to 600.
-        remove_outliers (bool, optional): Whether to remove outliers. Defaults to True.
-        outlier_threshold (float, optional): IQR multiplier for outlier detection. Defaults to 2.0.
-        bounds (np.ndarray, optional): Bounds for the dimensions of the design space tensor. Defaults to [[0.1, 1.0], [0.1, 1.0], [0.0, 1.0]].
+
+def score_distribution(
+        selection_tensor: np.ndarray,
+        fpath: str = "data/plots/cost_gwp_distrib.png",
+        dpi: int = 600,
+        method: str | None = None,        # 'auto', 'hex', 'kde', 'scatter'
+        bins: int = 60,                   # for hex / hist
+    ) -> None:
     """
-    # Create parameter arrays based on tensor dimensions and bounds
-    N, M, P, _ = selection_tensor.shape
-    splits = np.linspace(bounds[0, 0], bounds[0, 1], N)
-    toga_throttle = np.linspace(bounds[1, 0], bounds[1, 1], M)
-    cruise_throttle = np.linspace(bounds[2, 0], bounds[2, 1], P)
-    
-    # Track original indices before flattening
-    indices = np.zeros(selection_tensor[..., 0].shape + (3,), dtype=int)
-    for i in range(N):
-        for j in range(M):
-            for k in range(P):
-                indices[i, j, k] = [i, j, k]
-    
-    # Extract cost and GWP from the selection tensor
-    cost = selection_tensor[..., 0].flatten()
-    gwp = selection_tensor[..., 1].flatten()
-    flat_indices = indices.reshape(-1, 3)
-    
-    # Remove NaN values and keep corresponding indices
-    mask = ~np.isnan(cost) & ~np.isnan(gwp)
-    cost = cost[mask]/1e6  # Convert cost to M€
-    gwp = gwp[mask]
-    flat_indices = flat_indices[mask]
-    
-    # Create data points array
-    points = np.column_stack((cost, gwp))
-    
-    # Remove outliers if requested
+    Visualise the distribution of cost vs GWP with a smarter default than
+    a blunt 2-D histogram.
+
+    Parameters
+    ----------
+    method : str | None
+        'hex', 'kde', 'scatter', or None => choose automatically.
+    """
+
+    cost = selection_tensor[..., 0].ravel()
+    gwp  = selection_tensor[..., 1].ravel()
+    mask = np.isfinite(cost) & np.isfinite(gwp)
+    cost, gwp = cost[mask], gwp[mask]
+    N = len(cost)
+
+    if method is None:
+        # choose automatically
+        if N > 3e5:
+            method = "hex"
+        elif N > 5e4:
+            method = "scatter"
+        else:
+            method = "kde"
+
+    sns.set_theme(style="whitegrid")
+    g = sns.JointGrid(x=cost, y=gwp, height=6, space=0)
+
+    if method == "hex":
+        hb = g.ax_joint.hexbin(cost, gwp, gridsize=bins, cmap="viridis",
+                               norm=plt.LogNorm(), mincnt=1)
+        cb = g.figure.colorbar(hb, ax=g.ax_joint, label="counts (log-scaled)")
+    elif method == "kde":
+        # joint KDE
+        xy = np.vstack([cost, gwp])
+        kde = gaussian_kde(xy)(xy)
+        idx = kde.argsort()
+        g.ax_joint.scatter(cost[idx], gwp[idx], c=kde[idx], s=8,
+                           cmap="viridis", edgecolors="none")
+        # filled contour lines (levels = 10%, 30%, 50%, 70%, 90%)
+        levels = kde.max() * np.array([.1, .3, .5, .7, .9])
+        g.ax_joint.tricontourf(cost, gwp, kde, levels=levels,
+                               alpha=.25, cmap="viridis")
+        cb = g.figure.colorbar(plt.cm.ScalarMappable(cmap="viridis"),
+                            ax=g.ax_joint, label="relative density")
+    elif method == "scatter":
+        # compute local density for colour
+        xy = np.vstack([cost, gwp])
+        kde = gaussian_kde(xy)(xy)
+        idx = kde.argsort()
+        g.ax_joint.scatter(cost[idx], gwp[idx], c=kde[idx], s=4,
+                           cmap="viridis", edgecolors="none")
+        cb = g.figure.colorbar(plt.cm.ScalarMappable(cmap="viridis"),
+                            ax=g.ax_joint, label="relative density")
+    else:
+        raise ValueError("method must be 'hex', 'kde', 'scatter', or None")
+
+    # marginals
+    g.ax_marg_x.hist(cost, bins=bins, color="grey", alpha=.7)
+    g.ax_marg_y.hist(gwp,  bins=bins, color="grey", alpha=.7, orientation="horizontal")
+
+    # labels
+    g.ax_joint.set_xlabel("Lifetime cost [M€/PAX]")
+    g.ax_joint.set_ylabel(r"GWP [kg CO$_2$e/PAX]")
+    g.figure.suptitle(f"Cost vs GWP distribution  (N = {N:,})", y=.98)
+    g.figure.tight_layout()
+    g.figure.savefig(fpath, dpi=dpi)
+    plt.close(g.figure)
+
+def pareto_front(
+        selection_tensor: np.ndarray,
+        fpath: str = "data/plots/pareto_front.png",
+        dpi: int = 600,
+        remove_outliers: bool = True,
+        outlier_threshold: float = 1.5,
+        bounds: np.ndarray = np.array([[0.1, 1.0],
+                                       [0.1, 1.0],
+                                       [0.1, 1.0]]),
+        annotate_weights: bool = True,
+    ) -> None:
+    """
+    Plot Pareto front (cost vs GWP) and report the frontier segment weights.
+
+    Parameters
+    ----------
+    selection_tensor : ndarray, shape (..., 2)
+        Last axis = (cost, GWP) *per PAX* (any NaN => ignored).
+    fpath : str
+        Where to save the .png.
+    remove_outliers : bool
+        If True, remove points lying outside `outlier_threshold`·IQR
+        in either objective.
+    annotate_weights : bool
+        Write the weight that makes each frontier vertex optimal.
+    """
+
+    cost   = selection_tensor[..., 0].ravel()
+    gwp    = selection_tensor[..., 1].ravel()
+    mask   = np.isfinite(cost) & np.isfinite(gwp)
+    cost, gwp = cost[mask], gwp[mask]
+
     if remove_outliers:
-        # Calculate IQR for cost and GWP
-        q1_cost, q3_cost = np.percentile(cost, [25, 75])
-        q1_gwp, q3_gwp = np.percentile(gwp, [25, 75])
-        iqr_cost = q3_cost - q1_cost
-        iqr_gwp = q3_gwp - q1_gwp
-        
-        # Define outlier bounds
-        cost_lower = q1_cost - outlier_threshold * iqr_cost
-        cost_upper = q3_cost + outlier_threshold * iqr_cost
-        gwp_lower = q1_gwp - outlier_threshold * iqr_gwp
-        gwp_upper = q3_gwp + outlier_threshold * iqr_gwp
-        
-        # Filter outliers
-        outlier_mask = ((cost >= cost_lower) & (cost <= cost_upper) & 
-                (gwp >= gwp_lower) & (gwp <= gwp_upper))
-        
-        # Save original points for later reference
-        all_points = points.copy()
-        original_count = len(points)
-        
-        # Apply outlier filter
-        points = points[outlier_mask]
-        flat_indices = flat_indices[outlier_mask]
-        outlier_count = original_count - len(points)
-        print(f"Removed {outlier_count} outliers ({outlier_count/original_count:.1%} of data)")
+        def _cut(x):
+            q1, q3 = np.percentile(x, [25, 75])
+            iqr = q3 - q1
+            lo, hi = q1 - outlier_threshold*iqr, q3 + outlier_threshold*iqr
+            return (x >= lo) & (x <= hi)
+        keep = _cut(cost) & _cut(gwp)
+        cost, gwp = cost[keep], gwp[keep]
+
+    pts = np.column_stack((cost, gwp))
+    sort_idx    = np.argsort(pts[:, 0])
+    pts_sorted  = pts[sort_idx]
+    gwp_min_run = np.minimum.accumulate(pts_sorted[:, 1])
+    is_pareto   = pts_sorted[:, 1] == gwp_min_run
+    pareto_idx  = sort_idx[is_pareto]
+    P           = pts[pareto_idx]
+    # Now strictly ascending cost, strictly descending GWP
+    P = P[np.argsort(P[:, 0])]
+
+    Cn = (P[:, 0] - P[:, 0].min()) / (np.ptp(P[:, 0]) or 1)
+    Gn = (P[:, 1] - P[:, 1].min()) / (np.ptp(P[:, 1]) or 1)
+
+    # Slopes between consecutive frontier vertices (negative values)
+    dC, dG = np.diff(Cn), np.diff(Gn)
+    slopes = dG / dC                                   # shape (k-1,)
+    w_opt  = np.abs(slopes) / (1 + np.abs(slopes))     # [0,1]
     
-    # Find Pareto-optimal points and their indices
-    pareto_points = []
-    pareto_indices = []
-    for i, point in enumerate(points):
-        is_dominated = False
-        for other_point in points:
-            # Check if other_point dominates point (lower cost AND lower GWP)
-            if (other_point[0] < point[0] and other_point[1] <= point[1]) or \
-               (other_point[0] <= point[0] and other_point[1] < point[1]):
-                is_dominated = True
-                break
-        if not is_dominated:
-            pareto_points.append(point)
-            pareto_indices.append(flat_indices[i])
-    
-    pareto_points = np.array(pareto_points)
-    pareto_indices = np.array(pareto_indices)
-    print(f"Found {len(pareto_points)} Pareto-optimal points")
-    
-    # Sort Pareto points by cost for drawing the front
-    sorted_indices = np.argsort(pareto_points[:, 0])
-    sorted_pareto = pareto_points[sorted_indices]
-    
-    # Create a scatter plot for all designs
-    sns.set(style="whitegrid")
-    plt.figure(figsize=(10, 6))
-    
-    # Plot all design points
-    plt.scatter(points[:, 0], points[:, 1], c='blue', alpha=0.3, label='Designs')
-    
-    # Plot Pareto points with different style
-    plt.scatter(pareto_points[:, 0], pareto_points[:, 1], 
-                c='red', edgecolors='black', s=70, alpha=0.9, label='Pareto-optimal designs')
-    
-    # Draw the Pareto front line
-    plt.plot(sorted_pareto[:, 0], sorted_pareto[:, 1], 'r-', linewidth=2, label='Pareto front')
-    
-    # Generate convex hull Pareto front (boundary front)
-    if len(pareto_points) >= 3:  # ConvexHull requires at least 3 points
-        hull = ConvexHull(pareto_points)
-        # Get the vertices of the convex hull in order
-        hull_vertices = pareto_points[hull.vertices]
-        hull_indices = pareto_indices[hull.vertices]
-        # Sort by x-coordinate to draw from left to right
-        sort_order = np.argsort(hull_vertices[:, 0])
-        hull_vertices = hull_vertices[sort_order]
-        hull_indices = hull_indices[sort_order]
-        
-        # Keep only the lower part of the hull (the actual Pareto boundary)
-        hull_y_max = hull_vertices[:, 1].max()
-        lower_mask = hull_vertices[:, 1] < hull_y_max
-        lower_hull = hull_vertices[lower_mask]
-        lower_hull_indices = hull_indices[lower_mask]
-        
-        if len(lower_hull) >= 2:  # Need at least 2 points to draw a line
-            # Plot convex hull boundary
-            plt.plot(lower_hull[:, 0], lower_hull[:, 1], 'g--', linewidth=2, 
-                    label='Convex Pareto boundary')
-            
-            # Label key points on the convex hull boundary
-            for i, (point, idx) in enumerate(zip(lower_hull, lower_hull_indices)):
-                # Convert indices to parameter values
-                split_val = splits[idx[0]]
-                toga_val = toga_throttle[idx[1]]
-                cruise_val = cruise_throttle[idx[2]]
-                
-                plt.annotate(f"({split_val:.2f}, {toga_val:.2f}, {cruise_val:.2f})",
-                           xy=(point[0], point[1]),
-                           xytext=(10, 5 + (i % 3) * 15),  # Stagger labels to avoid overlap
-                           textcoords='offset points',
-                           fontsize=8,
-                           arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.2', color='black'))
-    
-    # Add additional information
-    min_cost_idx = np.argmin(pareto_points[:, 0])
-    min_gwp_idx = np.argmin(pareto_points[:, 1])
-    
-    # Convert min cost and min GWP indices to parameter values
-    min_cost_params = (
-        splits[pareto_indices[min_cost_idx][0]],
-        toga_throttle[pareto_indices[min_cost_idx][1]],
-        cruise_throttle[pareto_indices[min_cost_idx][2]]
-    )
-    
-    min_gwp_params = (
-        splits[pareto_indices[min_gwp_idx][0]],
-        toga_throttle[pareto_indices[min_gwp_idx][1]],
-        cruise_throttle[pareto_indices[min_gwp_idx][2]]
-    )
-    
-    # plt.annotate(f'Min cost: {pareto_points[min_cost_idx, 0]:.3f} M€/PAX\n({min_cost_params[0]:.2f}, {min_cost_params[1]:.2f}, {min_cost_params[2]:.2f})',
-    #             xy=(pareto_points[min_cost_idx, 0], pareto_points[min_cost_idx, 1]),
-    #             xytext=(10, 15), textcoords='offset points',
-    #             arrowprops=dict(arrowstyle='->'))
-    
-    # plt.annotate(f'Min GWP: {pareto_points[min_gwp_idx, 1]:.1f} kg CO₂e/PAX\n({min_gwp_params[0]:.2f}, {min_gwp_params[1]:.2f}, {min_gwp_params[2]:.2f})',
-    #             xy=(pareto_points[min_gwp_idx, 0], pareto_points[min_gwp_idx, 1]),
-    #             xytext=(10, -25), textcoords='offset points',
-    #             arrowprops=dict(arrowstyle='->'))
-    
-    # # Add statistics about the design space
-    # plt.text(0.02, 0.98, 
-    #         f'Total designs: {len(points)}\nPareto-optimal designs: {len(pareto_points)}',
-    #         transform=plt.gca().transAxes, 
-    #         verticalalignment='top',
-    #         bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
-    
-    # Add labels and title
-    plt.xlabel('Lifetime Cost [M€/PAX]')
-    plt.ylabel(r'GWP [kg CO$_2$e/PAX]')
-    plt.title('Pareto Front of Cost vs GWP')
-    plt.legend(loc='upper right')
-    plt.tight_layout()
-    
-    # Save the plot
-    plt.savefig(fpath, dpi=dpi)
-    plt.close()
+    dC, dG = np.diff(Cn), np.diff(Gn)
+    w_star  = np.abs(dG) / (np.abs(dG) + np.abs(dC))
+    w_vertices = np.concatenate(([1.0], w_star, [0.0]))
+
+    # Pick the “knee” = slope closest to -1
+    knee_seg = np.argmin(np.abs(np.abs(slopes) - 1))
+    knee_pt  = P[knee_seg + 1] # second vertex in that segment
+
+    sns.set_theme(style="whitegrid")
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    ax.scatter(pts[:, 0], pts[:, 1], s=8, alpha=.3, label="all designs")
+    ax.plot(P[:, 0], P[:, 1], "r-", lw=2, label="Pareto front")
+    ax.scatter(P[:, 0], P[:, 1], c="red", edgecolors="k", zorder=3)
+
+    # annotate frontier vertices with w*
+    if annotate_weights:
+        for (c, g), wv in zip(P, w_vertices):
+            ax.annotate(f"w={wv:0.2f}", xy=(c, g), xytext=(4,-6),
+                        textcoords="offset points", fontsize=7)
+    # if annotate_weights:
+    #     for i, (c, g) in enumerate(P):
+    #         if i in (0, len(P)-1):
+    #             txt = "w=1" if i == 0 else "w=0"
+    #         elif i-1 < len(w_opt):
+    #             txt = f"w≈{w_opt[i-1]:.2f}"
+    #         else:
+    #             continue
+
+
+    # highlight knee
+    ax.scatter(*knee_pt, s=70, marker="*", zorder=5, label="knee (slope≈-1)")
+
+    ax.set_xlabel("Lifetime cost [M€/PAX]")
+    ax.set_ylabel(r"GWP [kg CO$_2$e/PAX]")
+    ax.set_title("Pareto front: cost vs GWP")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(fpath, dpi=dpi)
+    plt.close(fig)
+
+    # ---------- Console read-out ----------
+    print(f"Total designs kept: {len(pts)}")
+    print(f"Pareto-optimal designs: {len(P)}")
+    print("Frontier segment slopes & optimal weights:")
+    for s, w in zip(slopes, w_opt):
+        print(f"  slope = {s:6.3f} -> weight* -> {w:5.3f}")
+    print(f"Knee point @ cost = {knee_pt[0]:.3f} M€,  GWP = {knee_pt[1]:.1f} kg")
 
 def main(weight: float=0.5,
          dim_bounds: np.ndarray=np.array([[0.1, 1.0],
@@ -348,9 +351,13 @@ def main(weight: float=0.5,
     
     # Create a Pareto front plot
     pareto_front(selection_tensor, fpath="data/plots/pareto_front_no_cons.png", dpi=600)
+    
+    # Generate a score distribution plot
+    score_distribution(selection_tensor, fpath="data/plots/cost_gwp_distrib.png", dpi=600, method='kde')
     constrained_selection_tensor = selection_tensor.copy()
-    constrained_selection_tensor[~valid4d] = np.nan  # Apply the valid mask to the selection tensor
-    pareto_front(constrained_selection_tensor, fpath="data/plots/pareto_front.png", dpi=600)
+    # TODO: BROKEN, NEEDS FIXING
+    # constrained_selection_tensor[~valid4d] = np.nan  # Apply the valid mask to the selection tensor
+    # pareto_front(constrained_selection_tensor, fpath="data/plots/pareto_front.png", dpi=600)
     
     # Save the scalar field and selection tensor to a pickle file
     with open('data/logs/CostnSus.pkl', 'wb') as f:
@@ -372,7 +379,7 @@ def main(weight: float=0.5,
           f"\n  Cruise throttle: {optimal_cruise:.2f}")
     
     optimal_convergence = convergence[optimal_params]
-    print(optimal_convergence)
+    # print(optimal_convergence)
     plt.plot(optimal_convergence)
     plt.show()
     

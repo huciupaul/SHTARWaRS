@@ -256,8 +256,8 @@ def main(minimum, maximum, no_of_splits, max_iter):
 
 if __name__=="__main__":
     main(
-        minimum=np.array([0.1, 0.1, 0.1]),
+        minimum=np.array([0.1, 0.1, 0.0]),
         maximum=np.array([0.9, 1.0, 1.0]),
         no_of_splits=np.array([9, 10, 10]),
-        max_iter=100
+        max_iter=20
     )
