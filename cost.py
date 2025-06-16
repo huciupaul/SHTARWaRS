@@ -14,7 +14,7 @@ def calc_cost(fc_cost, P_eps, m_sto, m_h2_nom, m_h2):
 
     :return: total cost of the aircraft and its fuel over its lifetime [EUR]
     """
-    sto_cost = m_h2 * Sto_cost + m_sto * Sto_disposal_cost
+    sto_cost = m_h2 * Sto_cost + m_sto * Sto_disposal_cost + m_sto * Sto_maint_cost * 25
     eps_cost = P_eps * EPS_cost
     h2_cost_full = m_h2_nom * flight_lifetime * H2_cost
 
