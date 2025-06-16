@@ -134,9 +134,9 @@ class RamAirHeatExchanger():
             # --- ratio we want to drive to 1 -----------------------------------------
             ratio = (mf_air * cp_air * T) / (self.U_ra * dT_lm)
             if abs(ratio - self.required_area) < tol:           # close enough
-                print(mf_air, "kg/s")
-                print(front_area_rad, "front area rad")
-                print(T, "K")
+                # print(mf_air, "kg/s")
+                # print(front_area_rad, "front area rad")
+                # print(T, "K")
                 break
 
 
@@ -158,9 +158,7 @@ class RamAirHeatExchanger():
         pressure_drop_HX = mu_air /(2* g_c * self.ambient_conditions['rho']) * (4 * L /D_h**2) * (mf_air/A_0) * (f * Re) 
         pressure_drop_duct = (0.5*self.ambient_conditions['rho']*self.ambient_conditions['V']**2)*(eff_duct)*(1-1/AR**2)
         pressure_drop = pressure_drop_duct + pressure_drop_HX
-        print(pressure_drop, "Pa")
         eta_p = 1 - pressure_drop / P_air 
-        print(eta_p, "-")
 
         cool_out = Fluid_Coolant(name = "Coolant Out", T = coolant_temp_out, P = self.fluid.P, 
                          mf = self.fluid.mf_given, fluid_type = self.fluid.fluid_type)

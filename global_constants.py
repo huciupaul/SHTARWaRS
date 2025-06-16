@@ -136,13 +136,13 @@ mdot_fuel = engine_interpolators['mf_fuel_from_power']  # [kg/s] Mass flow rate 
 mdot_air = engine_interpolators['mf_air_from_power']    # [kg/s] Mass flow rate of air from power
 
 # Engine NOx emission model
-# with open('data/interpolants/T_peak_interpolant.pkl', 'rb') as f:
-#     T_peak_interpolator = pickle.load(f)
+with open('data/interpolants/T_peak_interpolant.pkl', 'rb') as f:
+    T_peak_interpolator = pickle.load(f)
     
-# with open('data/interpolants/NOx_interpolator.pkl', 'rb') as f:
-#     NOx_interpolator = pickle.load(f)
+with open('data/interpolants/NOx_interpolator.pkl', 'rb') as f:
+    NOx_interpolator = pickle.load(f)
 
-# mdot_NOx = NOx_interpolator                             # [kg/s] Mass flow rate of NOx from shaft power
+mdot_NOx = NOx_interpolator                             # [kg/s] Mass flow rate of NOx from shaft power
 
 eff_prop   = 0.80
 mu_TO      = 0.04

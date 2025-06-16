@@ -27,9 +27,9 @@ def main(minimum, maximum, no_of_splits, max_iter):
         os.makedirs(output_dir)
 
     # Define the power splits and fuel cell percentages
-    power_splits = np.linspace(minimum, maximum, no_of_splits)  # 10 splits from 0 to 1
-    fc_toga_percentages = np.linspace(minimum, maximum, no_of_splits)  # Example percentages of TOGA power for the fuel cell
-    fc_cruise_percentages = np.linspace(minimum, maximum, no_of_splits)  # Example percentages of CRUISE power for the fuel cell
+    power_splits = np.linspace(minimum[0], maximum[0], no_of_splits[0])  # 10 splits from 0 to 1
+    fc_toga_percentages = np.linspace(minimum[1], maximum[1], no_of_splits[1])  # Example percentages of TOGA power for the fuel cell
+    fc_cruise_percentages = np.linspace(minimum[2], maximum[2], no_of_splits[2])  # Example percentages of CRUISE power for the fuel cell
 
     # Initialize the result tensor with zeros
     result_tensor = np.zeros((
@@ -45,6 +45,13 @@ def main(minimum, maximum, no_of_splits, max_iter):
         len(fc_cruise_percentages),
         4, 4
     ))
+    
+    convergence_tensor = np.full((
+        len(power_splits),
+        len(fc_toga_percentages),
+        len(fc_cruise_percentages),
+        max_iter
+        ), np.nan)
 
     for i_split, split in enumerate(power_splits):
         
@@ -76,13 +83,17 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     + m_cargo_prev
                 )
 
-                alpha      = 0.5     # under-relaxation factor
+                alpha      = 0.5     # Under-relaxation factor
                 delta_prev = 0.0
-                tol        = 0.01    # 1% convergence tolerance
+                tol        = 0.001    # 0.1% convergence tolerance
                 
                 CD_rad = 0.0  # Initialize CD_rad
                 aux_power = 0.0  # Initialize aux_power
-
+                
+                m_tms_front = 0.0
+                m_tms_aft = 0.0
+                m_tms_mid = 0.0
+                
                 # Convergence of MTOW, stop if the change is less than 1% of the previous MTOW or reached max number of iterations
                 for i in range(max_iter):
                     print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}, ITER: {i}")
@@ -96,6 +107,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                         aux_power,
                         dt=10
                     )
+                    
                     m_fc = FC_outputs['m_fc']
                     cost_fc = FC_outputs['fc_cost']
 
@@ -140,6 +152,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     # Check if tms_outputs is None or has the expected length
                     if tms_outputs is None or (isinstance(tms_outputs, (list, np.ndarray)) and len(tms_outputs) > 0 and np.isnan(tms_outputs[0])):
                         break
+                    
                     D_rad = tms_outputs[0]
                     aux_power = tms_outputs[1]
                     m_tms_front = tms_outputs[2]
@@ -162,10 +175,12 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     delta = MTOW_candidate - MTOW_prev
 
                     # if sign flip, damp further
-                    if delta * delta_prev < 0:
+                    if delta * delta_prev < 0 and i > 0:
                         alpha *= 0.5
 
-                    MTOW = MTOW_prev + alpha * delta
+                    MTOW = MTOW_prev + alpha * delta if i > 0 else MTOW_candidate
+                    
+                    convergence_tensor[i_split, i_toga, i_cruise, i] = MTOW
 
                     # check convergence
                     if abs(delta) / MTOW_prev < tol:
@@ -185,7 +200,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                 
                 # CONVERGED
                 MTOW = MTOW_prev
-                    
+                
                 # Update the loading vector                     
                 if tms_outputs is None or (isinstance(tms_outputs, (list, np.ndarray)) and len(tms_outputs) > 0 and np.isnan(tms_outputs[0])):
                     tensor = np.full(23, np.nan)
@@ -218,7 +233,8 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     co2_sto,                # 21
                     co2_eps ,               # 22
                     ])
-                result_tensor[i_split, i_toga, i_cruise, :] = tensor
+                
+                result_tensor[i_split, i_toga, i_cruise, :]     = tensor
                 loading_tensor[i_split, i_toga, i_cruise, :, :] = loading_vector
 
     # Save the result tensor to a pickle file
@@ -227,17 +243,21 @@ def main(minimum, maximum, no_of_splits, max_iter):
     
     with open("data/logs/loading_tensor.pkl", "wb") as f:
         pickle.dump(loading_tensor, f)
+        
+    with open("data/logs/convergence_tensor.pkl", "wb") as f:
+        pickle.dump(convergence_tensor, f)
     
     print("Result tensor saved to data/logs/result_tensor.pkl")
     print("Loading tensor saved to data/logs/loading_tensor.pkl")
+    print("Convergence tensor saved to data/logs/convergence_tensor.pkl")
 
     return None       
 
 
 if __name__=="__main__":
     main(
-        minimum=0.8,
-        maximum=1.0,
-        no_of_splits=10,
-        max_iter=10
+        minimum=np.array([0.1, 0.1, 0.1]),
+        maximum=np.array([0.9, 1.0, 1.0]),
+        no_of_splits=np.array([9, 10, 10]),
+        max_iter=100
     )
