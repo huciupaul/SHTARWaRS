@@ -20,13 +20,14 @@ from tms import tms_main  # Import TMS sizing function
 
 
 def main(minimum, maximum, no_of_splits, max_iter):
+    #np.seterr(all='ignore')
     # Check if the output directory exists, if not create it
     output_dir = "data/logs"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
     # Define the power splits and fuel cell percentages
-    power_splits = np.linspace(minimum, maximum, no_of_splits)  # 10 splits from 0 to 1
+    power_splits = np.linspace(0.6, 1.0, 5)  # 10 splits from 0 to 1
     fc_toga_percentages = np.linspace(minimum, maximum, no_of_splits)  # Example percentages of TOGA power for the fuel cell
     fc_cruise_percentages = np.linspace(minimum, maximum, no_of_splits)  # Example percentages of CRUISE power for the fuel cell
 
@@ -35,7 +36,11 @@ def main(minimum, maximum, no_of_splits, max_iter):
     len(power_splits),
     len(fc_toga_percentages),
     len(fc_cruise_percentages),
+<<<<<<< HEAD
     20  # Length of the tensor
+=======
+    21  # Length of the tensor
+>>>>>>> d293d8177a8b30fa249223f45ae49e3a12beb751
     ))
     
     loading_tensor = np.zeros((
@@ -64,16 +69,16 @@ def main(minimum, maximum, no_of_splits, max_iter):
 
                 # Convergence of MTOW, stop if the change is less than 1% of the previous MTOW or reached max number of iterations
                 for i in range(max_iter):
-                    print("ITER", i)
-                    if np.abs((MTOW-MTOW_prev)/MTOW_prev) < 0.01 and i > 0:
+                    print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}, ITER: {i}")
+                    if np.abs((MTOW-MTOW_prev)/MTOW_prev) < 0.01 and i > 0 or i == max_iter - 1:
                         print(f"Converged after {i} iterations with MTOW: {MTOW:.2f} kg")
                         print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}")
                         break
                     
                     # FPP
-                    TMS_inputs, m_h2, FC_outputs, _, loading_vector = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, D_rad, aux_power, 10)
+                    TMS_inputs, m_h2, FC_outputs, _, loading_vector, emissions = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, D_rad, aux_power, 10)
                     # Also get m_nox, nox_max_ppm, co2_fc from fpp_main
-                    m_nox, nox_max_ppm = 0.0, 0.0
+                    m_nox, mdot_nox_max_takeoff, mdot_nox_max_cruise = 0.0, 0.0, 0.0
                     m_fc = FC_outputs['m_fc']
                     V_fc = FC_outputs['V_fc']
                     co2_fc = FC_outputs['co2_fc']
@@ -114,6 +119,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     #     TMS_inputs['h2o_mf_fc'][0], "END")
                     # m_tms_front, m_tms_aft, m_tms_mid, D_rad, aux_power = 0.0, 0.0, 0.0, 0.0, 0.0
                     # break
+                    #print("Inputs!!!!!", TMS_inputs if 'TMS_inputs' in locals() else "No TMS inputs yet")
                     _, tms_outputs = tms_main(
                         TMS_inputs['Q_dot_fc'], #ok
                         np.full(4, Qdot_eps), #ok
@@ -133,14 +139,15 @@ def main(minimum, maximum, no_of_splits, max_iter):
                         np.full(4, MAWP_global),  # p_sto
                         TMS_inputs['h2o_mf_fc']
                     )
+                    #print("Outputs!!!!!!", tms_outputs if 'tms_outputs' in locals() else "No TMS outputs yet")
 
                     D_rad = tms_outputs[0]
                     aux_power = tms_outputs[1]
                     m_tms_front = tms_outputs[2]
                     m_tms_aft = tms_outputs[4]
                     m_tms_mid = tms_outputs[3]
-                    print(f"ITER: {i}, MTOW:{MTOW}, AUX POWER {aux_power}, DRAG PENALTY {D_rad}")
-
+                    print(f"MTOW:{MTOW}, AUX POWER {aux_power}, DRAG PENALTY {D_rad}")
+                    
 
                     # --------- ADD INTEGRATION HERE ---------
                     
@@ -157,7 +164,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
 
                 # After convergence, store the results in the tensor, then in the 4D tensor
                 tensor = np.array([m_eps, m_fc, m_h2, m_sto,V_fc, V_sto, V_elmo, MTOW, length_sto, diameter_sto, M_aft_cargo, m_tms_front, m_tms_aft, m_tms_mid, \
-                                   m_nox, nox_max_ppm, P_elmo, co2_fc, co2_sto, co2_eps])
+                                   m_nox, mdot_nox_max_takeoff, mdot_nox_max_cruise, P_elmo, co2_fc, co2_sto, co2_eps])
                 result_tensor[i_split, i_toga, i_cruise, :] = tensor
                 loading_tensor[i_split, i_toga, i_cruise, :, :] = loading_vector
 

@@ -72,8 +72,34 @@ P_A=1.6 * 101325 + 0.06 * 1e5,                          # [Pa] Anode Pressure
 P_C=1.6 * 101325,                                       # [Pa] Cathode Pressure
 T_FC = 273.15 + 160,                                    # [K] Fuel Cell Temperature
 
+
+# Aircraft lifetime:
+flight_lifetime = 25000                                 # number of flights over the aircraft's lifetime
+time_lifetime = 50000                                   # number of flight hours over the aircraft's lifetime
+num_aircraft = 500                                          # number of aircraft in the fleet
+
+# Costs and emissions
 FC_prod_gwp = 30.5                                      # [kg CO2/kW] GWP of the fuel cell production with bop (see excel) DOI: 10.4271/2024-24-0020
-FC_cost = 640                                           # [$/kW] Cost of the fuel cell with bop (flyzero)
+FC_cost_no_bop = 555/2                                  # [EUR/kW] Cost of the fuel cell stack without balance of plant (flyzero)
+FC_cost = 555                                           # [EUR/kW] Cost of the fuel cell with bop (flyzero)
+FC_maint_cost = 220/2400 * time_lifetime                # [EUR/kW] Maintenance cost of the fuel cell per kW
+FC_disposal_cost = 9.35                                 # [EUR/kgFC] Disposal cost of the fuel cell stack per kg of fuel cell stack
+Sto_disposal_cost = 0.6                                 # [EUR/kgSto] Disposal cost of the storage system per kg of tank
+AC_disposal_cost = 6.693 * 4932                         # [EUR/kgAC] Disposal cost of the aircraft per kg of aircraft
+Insurance_cost = 19000 * 25                             # [EUR] Insurance cost of the aircraft over its lifetime
+Crew_cost = 2 * 89 * time_lifetime                      # [EUR] Crew cost of the aircraft over its lifetime
+Landing_tax = 32.35 * flight_lifetime                   # [EUR] Landing tax of the aircraft over its lifetime
+Beech_maint_cost = 1100 * time_lifetime * 555/640       # [EUR] Maintenance cost of the Beechcraft 1900D https://www.guardianjet.com/jet-aircraft-online-tools/aircraft-brochure.cfm?m=Beech-1900D-198
+
+Sto_cost = 212                                          # [EUR/kgH2] Cost of the storage system https://www.horizon-europe.gouv.fr/advanced-materials-hydrogen-storage-tanks-34822
+EPS_cost = 94                                           # [EUR/kWELMO] Cost of the electrical power system 
+AC_dev_cost = 96737324.66 / num_aircraft                # [EUR] Development cost of the aircraft per aircraft https://www.mdpi.com/2226-4310/9/7/349
+AC_purchase_cost = 1_300_000                            # [EUR] Purchase cost of the aircraft (1.5 times the development cost)
+
+### REVIEW THIS
+H2_cost = 4                                             # [EUR/kg] Cost of liquid hydrogen
+
+
 
 ### FOR CODE CHECKING PURPOSES ONLY ###
 #50% power split
@@ -88,13 +114,23 @@ LHV_H2 = 120e6                                         # [J/kg] Lower Heating Va
 ####################
 A_inlet = 2*0.038410516                                 # [m^2] Inlet area
 MAXC = 2*906e3                                          # [W] Max Continuous Power
+TOGA =  1908*1000                                        # [W] Take-Off/Go-Around power
 
 # Engine performance models
 with open('data/interpolants/engine2035_interpolators.pkl', 'rb') as f:
     engine_interpolators = pickle.load(f)
 
 mdot_fuel = engine_interpolators['mf_fuel_from_power']  # [kg/s] Mass flow rate of fuel from power
-mdot_air = engine_interpolators['mf_air_from_power']   # [kg/s] Mass flow rate of air from power
+mdot_air = engine_interpolators['mf_air_from_power']    # [kg/s] Mass flow rate of air from power
+
+# Engine NOx emission model
+with open('data/interpolants/T_peak_interpolant.pkl', 'rb') as f:
+    T_peak_interpolator = pickle.load(f)
+    
+with open('data/interpolants/NOx_interpolator.pkl', 'rb') as f:
+    NOx_interpolator = pickle.load(f)
+
+mdot_NOx = NOx_interpolator                             # [kg/s] Mass flow rate of NOx from shaft power
 
 eff_prop   = 0.80
 mu_TO      = 0.04

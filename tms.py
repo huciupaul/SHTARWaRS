@@ -281,7 +281,7 @@ class HEX():
 
         # Pipe Properties
         N_passes = 1
-        dh_coolant = 2*gap_bt_plates / size_factor  # diameter of coolant pipes
+        dh_coolant = 4*gap_bt_plates / size_factor  # diameter of coolant pipes
         dh_h2 = dh_coolant                          # diameter of hydrogen pipes
         
 
@@ -396,7 +396,7 @@ class Compressor():
     def power(self):
         inlet_temperature = self.fluid.T  
         gamma = self.fluid.gamma 
-        #print(f"Pressure ratio: {self.pressure_ratio}, FLuid: {self.fluid.name}")
+        print(f"Pressure ratio: {self.pressure_ratio}, FLuid: {self.fluid.name}")
         T_out = inlet_temperature * (1 + 1 / self.efficiency * (self.pressure_ratio ** ((gamma - 1) / gamma) - 1))  # Isentropic relation
 
         cp = self.fluid.cp  
@@ -807,8 +807,8 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         T_tank = PropsSI('T', 'P', p_sto, 'Q', 0, 'ParaHydrogen')  # Initial temperature of LH2 tank
         h2_1 = Fluid(name="H2_1", T=T_tank, P=p_sto, C = None, mf = h2_mf_fc + h2_mf_cc, fluid_type='ParaHydrogen')
 
-        #print(f"Initial H2_1: {h2_1.name}, T: {h2_1.T}, P: {h2_1.P}, mf: {h2_1.mf_given}, fluid_type: {h2_1.fluid_type}")
-        #print(f"mf_h2_fc: {h2_mf_fc}, mf_h2_cc: {h2_mf_cc}, p_sto: {p_sto}, diam_est: {diam_est}")
+        print(f"Initial H2_1: {h2_1.name}, T: {h2_1.T}, P: {h2_1.P}, mf: {h2_1.mf_given}, fluid_type: {h2_1.fluid_type}")
+        print(f"mf_h2_fc: {h2_mf_fc}, mf_h2_cc: {h2_mf_cc}, p_sto: {p_sto}, diam_est: {diam_est}")
         # Pipe h2 12
         pipe_h2_12 = Pipe(1.42, diam_est, h2_1, cryo=True) 
         m_pipe_h2_12.append(pipe_h2_12.mass())
@@ -838,7 +838,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         Q_dot_rem -= Q_h2_heat 
 
         # Pipe cool 20-1
-        ratio_to_hex = (cool_20_new.mf_given/(2*cool_mf_per_fc))
+        ratio_to_hex = (cool_20_new.mf_given/(2*cool_mf_per_fc)) * 2
         pipe_cool_20_1 = Pipe(1.42, diam_est_cool *ratio_to_hex, cool_20_new)  
         m_pipe_cool_201.append(pipe_cool_20_1.mass())
         cool_1 = pipe_cool_20_1.analyze_heat_pipe("Cool_1")
@@ -953,7 +953,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         fc_press_drop_h2 = 0.06e5
         h2_22 = Fluid(name="H2_22", T=T_fc, P=p_fc - fc_press_drop_h2 , C=0, mf=h2_mf_rec, fluid_type='ParaHydrogen')  
         # Pipe h2 22-23
-        pipe_h2_22_23 = Pipe(0.57, diam_est * ratio_h2_to_fc * 0.5, h2_22)  
+        pipe_h2_22_23 = Pipe(0.57, diam_est, h2_22)  
         m_pipe_h2_2223.append(pipe_h2_22_23.mass() * 2)
         h2_23 = pipe_h2_22_23.analyze_heat_pipe("H2_23")
 
@@ -992,7 +992,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         cool_5 = pipe_cool_4_5.analyze_heat_pipe("Cool_5")
 
         # Pipe 19-22
-        pipe_cool_19_22 = Pipe(4.96, diam_est_cool*ratio_to_hex, cool_19, type ='inv')  
+        pipe_cool_19_22 = Pipe(4.96, diam_est_cool, cool_19, type ='inv')  
         m_pipe_cool_1922.append(pipe_cool_19_22.mass())
         cool_22 = pipe_cool_19_22.analyze_heat_pipe("Cool_22")
 

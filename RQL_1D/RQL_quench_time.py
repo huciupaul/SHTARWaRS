@@ -52,7 +52,7 @@ def main(M_cc: float = 0.3, l_cc: float = 0.1) -> Tuple[List[float], np.ndarray]
             P=rich_ex.P
             )
     
-    cut_off_time = l_cc / (M_cc * )
+    cut_off_time = l_cc / (M_cc * np.sqrt(gamma * R * T))
 
     #----------Iteration----------
     for mdot_air2_i in tqdm(mdot_air):
