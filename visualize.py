@@ -324,7 +324,7 @@ def update_graph(weight, constraints, pareto_options):
                     mode='markers',
                     marker=dict(
                         size=10,  # Larger than regular points
-                        color='#00AEEF',
+                        color='#00A6D6', # Delft Blue :)
                         symbol='diamond',
                         opacity=0.7,
                         line=dict(color='black', width=1)  # Add outline for better visibility
@@ -341,10 +341,10 @@ def update_graph(weight, constraints, pareto_options):
                     yref="paper",
                     text=f"Found {pareto_count} Pareto optimal designs",
                     showarrow=False,
-                    font=dict(color="red", size=14),
+                    font=dict(color="#00A6D6", size=14),
                     align="left",
                     bgcolor="rgba(255, 255, 255, 0.7)",
-                    bordercolor="red",
+                    bordercolor="#00A6D6",
                     borderwidth=1,
                     borderpad=4
                 )
