@@ -236,8 +236,8 @@ def main(minimum, maximum, no_of_splits, max_iter):
 
 if __name__=="__main__":
     main(
-        minimum=0.7,
-        maximum=0.8,
+        minimum=0.8,
+        maximum=1.0,
         no_of_splits=10,
-        max_iter=100
+        max_iter=10
     )

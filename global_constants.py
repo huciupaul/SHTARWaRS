@@ -51,7 +51,7 @@ GWP_CO2 = 1.0                                            # [-] Global Warming Po
 GWP_NOx = 10                                             # [-] Global Warming Potential of NOx https://doi.org/10.3390/app122010429
 GWP_H2O = 0.0005                                         # [-] Global Warming Potential of H2O        https://iopscience.iop.org/article/10.1088/1748-9326/aae018/pdf
 GWP_beech = 335000 * 30/19                               # [-] Global Warming Potential of Beechcraft 1900D https://odr.chalmers.se/items/a33bc0b8-bf61-47cc-87b8-3ab92fe388ed
-GWP_H2 = 2.9                                            # [kgCO2e/kgH2] Global Warming Potential of Hydrogen https://doi.org/10.1038/s41560-024-01563-1
+GWP_H2 = 2                                              # [kgCO2e/kgH2] Global Warming Potential of Hydrogen https://doi.org/10.1016/j.apenergy.2023.122586    NOT THIS ONE https://doi.org/10.1038/s41560-024-01563-1
 
 # NOx KPIs
 NOx_pPax_TO     = 0.000012783399 # [kg/s/PAX]
@@ -66,8 +66,8 @@ NOx_pPax_cruise = 0.000009341715 # [kg/s/PAX]
 
 # Fuel Cell Stack Characteristics
 mass_specific_power = 5000                              # [W/kg] Specific power of the fuel cell stack (FZO Roadmap-report)
-volume_specific_power = 4000000                         # [W/m^3] Volume specific power of the fuel cell stack (FZO Roadmap-report)
-stoic_ratio_A = 1.1                                     # [-] Stoichiometric ratio of the anode
+volume_specific_power = 3100000                         # [W/m^3] Volume specific power of the fuel cell stack (FZO Roadmap-report)
+stoic_ratio_A = 1.05                                     # [-] Stoichiometric ratio of the anode
 stoic_ratio_C = 1.6                                     # [-] Stoichiometric ratio of the cathode
 pickle_path = 'fc/spline_eta_of_P.pkl'                     # Path to the efficiency function file
 # Load efficiency function from file
@@ -80,27 +80,30 @@ T_FC = 273.15 + 160,                                    # [K] Fuel Cell Temperat
 
 
 # Aircraft lifetime:
-flight_lifetime = 25000                                 # number of flights over the aircraft's lifetime
-time_lifetime = 50000                                   # number of flight hours over the aircraft's lifetime
-num_aircraft = 500                                          # number of aircraft in the fleet
+years_of_life = 20                                      # [years] Aircraft lifetime  
+flight_lifetime = 920 * years_of_life                   # number of flights over the aircraft's lifetime
+time_lifetime = flight_lifetime * 1.5                   # number of flight hours over the aircraft's lifetime
+num_aircraft = 500                                      # number of aircraft in the fleet
 
 # Costs and emissions
 FC_prod_gwp = 30.5                                      # [kg CO2/kW] GWP of the fuel cell production with bop (see excel) DOI: 10.4271/2024-24-0020
 FC_cost_no_bop = 555/2                                  # [EUR/kW] Cost of the fuel cell stack without balance of plant (flyzero)
 FC_cost = 555                                           # [EUR/kW] Cost of the fuel cell with bop (flyzero)
-FC_maint_cost = 220/2400 * time_lifetime                # [EUR/kW] Maintenance cost of the fuel cell per kW
+FC_maint_cost = 220/2400 * time_lifetime                # [EUR/kWh] Maintenance cost of the fuel cell per kW
 FC_disposal_cost = 9.35                                 # [EUR/kgFC] Disposal cost of the fuel cell stack per kg of fuel cell stack
 Sto_disposal_cost = 0.6                                 # [EUR/kgSto] Disposal cost of the storage system per kg of tank
+Sto_maint_cost = 37                                     # [EUR/kgH2/yr] Maintenance cost of the storage system
 AC_disposal_cost = 6.693 * 4932                         # [EUR/kgAC] Disposal cost of the aircraft per kg of aircraft
-Insurance_cost = 19000 * 25                             # [EUR] Insurance cost of the aircraft over its lifetime
+Insurance_cost = 19000 * years_of_life                            # [EUR] Insurance cost of the aircraft over its lifetime
 Crew_cost = 2 * 89 * time_lifetime                      # [EUR] Crew cost of the aircraft over its lifetime
-Landing_tax = 32.35 * flight_lifetime                   # [EUR] Landing tax of the aircraft over its lifetime
+Landing_tax = 53.54 * flight_lifetime                   # [EUR] Landing tax of the aircraft over its lifetime
 Beech_maint_cost = 1100 * time_lifetime * 555/640       # [EUR] Maintenance cost of the Beechcraft 1900D https://www.guardianjet.com/jet-aircraft-online-tools/aircraft-brochure.cfm?m=Beech-1900D-198
 
 Sto_cost = 212                                          # [EUR/kgH2] Cost of the storage system https://www.horizon-europe.gouv.fr/advanced-materials-hydrogen-storage-tanks-34822
 EPS_cost = 94                                           # [EUR/kWELMO] Cost of the electrical power system 
-AC_dev_cost = 96737324.66 / num_aircraft                # [EUR] Development cost of the aircraft per aircraft https://www.mdpi.com/2226-4310/9/7/349
+AC_dev_cost = 255900000 / num_aircraft                  # [EUR] Development cost of the aircraft per aircraft https://www.mdpi.com/2226-4310/9/7/349
 AC_purchase_cost = 1_300_000                            # [EUR] Purchase cost of the aircraft (1.5 times the development cost)
+AC_maint_cost = 1_311_000                               # [EUR] Maintenance cost of the aircraft over its lifetime per aircraft
 
 ### REVIEW THIS
 H2_cost = 4                                             # [EUR/kg] Cost of liquid hydrogen
