@@ -24,7 +24,6 @@ TO_conditions= {
     'rho': 1.225 # Air density at cruise in kg/m^3
 }
 
-S_w = 28.79 #m²
 
 
 # Main Classes for Heat Sinks (TMS) -------------------------------
@@ -93,7 +92,6 @@ class RamAirHeatExchanger():
         wing_coolant_temp = 320  # K
 
         self.U_ra = 1 / (1/h_air + 1/h_cool)
-        #print("U_ra", self.U_ra)
 
         return self.U_ra
 
@@ -105,11 +103,10 @@ class RamAirHeatExchanger():
         self.U_ra = self.U_rad()
 
         coolant_temp_out = self.coolant_temp - heat_w / (self.fluid.cp * self.fluid.mf_given)  
-        print("coolant t out", coolant_temp_out)
 
         # Iteration for delta T
         deltaT_grid = np.linspace(1, 150, 1000 )        
-        tol = 0.01                                   # “almost 1” → ±1 %
+        tol = 0.009                                   # “almost 1” → ±1 %
 
         for T in deltaT_grid:
 
@@ -133,21 +130,7 @@ class RamAirHeatExchanger():
 
             # --- ratio we want to drive to 1 -----------------------------------------
             ratio = (mf_air * cp_air * T) / (self.U_ra * dT_lm)
-
-            D_g = mf_air * self.ambient_conditions['V']
-            C_D_rad = D_g/(0.5*self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * S_w/2) # C_D for both radiator 
-            F_n = (self.TR - 1 )*D_g
-            net_drag = D_g - F_n
-
             if abs(ratio - 1.0) < tol:           # close enough
-                #print("T", T, "at ratio", ratio)
-                #print("F_n", F_n)
-                #print("D_g", D_g)
-                print("mf", mf_air)
-                #print("TR", self.TR )
-                #print("net drag", net_drag)
-                #print("rho:", self.ambient_conditions['rho'])
-            
                 break
 
         self.delta_t_air = T
@@ -164,19 +147,31 @@ class RamAirHeatExchanger():
         f = 0.046 * Re**-0.2
         t_w = f /( 2 * g_c * self.ambient_conditions['rho'] / G**2 )
         pressure_drop = mu_air /(2* g_c * self.ambient_conditions['rho']) * (4 * L /D_h**2) * (mf_air**2/A_0) * (f * Re) 
-        eta_p = 0.92 #1 - pressure_drop / P_air 
-        print("eta_p", eta_p)
+        eta_p = 1 - pressure_drop / P_air 
 
         cool_out = Fluid_Coolant(name = "Coolant Out", T = coolant_temp_out, P = self.fluid.P, 
                          mf = self.fluid.mf_given, fluid_type = self.fluid.fluid_type)
         
-        return self.required_area, cool_out, power_fan, eta_p,net_drag,length_rad, A_0,mf_air
+        new_drag = True
+
+        if new_drag == True:
+            # Estimate exit velocity using bernoulli
+            V_exit = np.sqrt(self.ambient_conditions['V']**2 - 2 * pressure_drop / self.ambient_conditions['rho'])
+            D_g = mf_air * (self.ambient_conditions['V'] - V_exit)  # mass flow rate of air through radiator
+            C_D_rad = D_g/(0.5*self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * S_w/2)
+        else:
+            D_g = mf_air * self.ambient_conditions['V']
+            C_D_rad = D_g/(0.5*self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * S_w/2) # C_D for both radiator 
+            F_n = (self.TR - 1 )*D_g
+            net_drag = D_g - F_n
+
+        
+        return self.required_area, cool_out, power_fan, eta_p, C_D_rad, length_rad, A_0,mf_air
 
     # THRUST RECOVERY   
     def thrust_ratio(self,gamma, R, M0, T0, eta_p07, CD_d_CD_sp):
 
         deltaT_HX0 = self.delta_t_air
-        print("deltaT_HX", self.delta_t_air)
         comp_ratio = (1.0 + 0.5 * (gamma - 1.0) * M0**2) * eta_p07 ** ((gamma - 1.0) / gamma)
 
         # Guard against unphysical D <= 1
@@ -397,7 +392,6 @@ class Compressor():
     def power(self):
         inlet_temperature = self.fluid.T  
         gamma = self.fluid.gamma 
-        print(f"Pressure ratio: {self.pressure_ratio}, FLuid: {self.fluid.name}")
         T_out = inlet_temperature * (1 + 1 / self.efficiency * (self.pressure_ratio ** ((gamma - 1) / gamma) - 1))  # Isentropic relation
 
         cp = self.fluid.cp  
@@ -817,8 +811,8 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         T_tank = PropsSI('T', 'P', p_sto, 'Q', 0, 'ParaHydrogen')  # Initial temperature of LH2 tank
         h2_1 = Fluid(name="H2_1", T=T_tank, P=p_sto, C = None, mf = h2_mf_fc + h2_mf_cc, fluid_type='ParaHydrogen')
 
-        print(f"Initial H2_1: {h2_1.name}, T: {h2_1.T}, P: {h2_1.P}, mf: {h2_1.mf_given}, fluid_type: {h2_1.fluid_type}")
-        print(f"mf_h2_fc: {h2_mf_fc}, mf_h2_cc: {h2_mf_cc}, p_sto: {p_sto}, diam_est: {diam_est}")
+        # print(f"Initial H2_1: {h2_1.name}, T: {h2_1.T}, P: {h2_1.P}, mf: {h2_1.mf_given}, fluid_type: {h2_1.fluid_type}")
+        # print(f"mf_h2_fc: {h2_mf_fc}, mf_h2_cc: {h2_mf_cc}, p_sto: {p_sto}, diam_est: {diam_est}")
         # Pipe h2 12
         pipe_h2_12 = Pipe(1.42, diam_est, h2_1, cryo=True) 
         m_pipe_h2_12.append(pipe_h2_12.mass())
