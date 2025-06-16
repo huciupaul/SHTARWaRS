@@ -147,7 +147,7 @@ def update_graph(weight, constraints):
     
     # Calculate GWP and cost
     GWP = f_gwp(GWP_fc, GWP_sto, GWP_eps, m_h2_nom, m_nox) / N_PAX
-    cost = f_cost(fc_cost, P_eps, m_sto, m_h2_nom, m_h2) / N_PAX
+    cost = f_cost(fc_cost, P_eps, m_sto, m_h2) / N_PAX
     
     # Normalize values
     valid_gwp = ~np.isnan(GWP)
