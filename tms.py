@@ -106,11 +106,12 @@ class RamAirHeatExchanger():
 
         # Iteration for delta T
         deltaT_grid = np.linspace(1, 150, 1000 )        
-        tol = 0.009                                   # “almost 1” → ±1 %
+        tol = 0.009    
+        AR = 3.6                               # “almost 1” → ±1 %
 
         for T in deltaT_grid:
 
-            dT1 = coolant_temp_out - T_air_in_K                      
+            dT1 = self.coolant_temp - T_air_in_K #coolant_temp_out - T_air_in_K                      
             dT2 = self.coolant_temp - (T_air_in_K + T)                
 
             dT_lm = (dT2 - dT1) / np.log(dT2 / dT1)
@@ -118,24 +119,30 @@ class RamAirHeatExchanger():
             self.required_area = heat_w / (self.U_ra * dT_lm)
             beta  = 1100
             vol_rad = self.required_area/beta
-            front_area_rad = vol_rad/0.05
+            front_area_rad = vol_rad/0.019
+            front_area_duct = front_area_rad/AR
+            #print(front_area_duct, "duct m2")
             length_rad = np.sqrt(front_area_rad)
             if self.ambient_conditions['V'] < vel_fan:
-                mf_air = front_area_rad * vel_fan * self.ambient_conditions['rho']
+                mf_air = front_area_duct * vel_fan * self.ambient_conditions['rho']
                 fan = Fan(fan_eff=fan_eff, ra_mf=mf_air, ra_density=self.ambient_conditions['rho'], delta_pressure=delta_pressure)
                 power_fan = fan.power()
             else:
-                mf_air = front_area_rad * self.ambient_conditions['V'] * self.ambient_conditions['rho']
+                mf_air = front_area_duct * self.ambient_conditions['V'] * self.ambient_conditions['rho']
                 power_fan = 0.0
 
             # --- ratio we want to drive to 1 -----------------------------------------
             ratio = (mf_air * cp_air * T) / (self.U_ra * dT_lm)
-            if abs(ratio - 1.0) < tol:           # close enough
+            if abs(ratio - self.required_area) < tol:           # close enough
+                print(mf_air, "kg/s")
+                print(front_area_rad, "front area rad")
+                print(T, "K")
                 break
+
 
         self.delta_t_air = T
         A_0 = front_area_rad
-        P_air = self.p_amb         #self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * 0.5 + self.p_amb 
+        P_air = self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * 0.5 + self.p_amb 
         mu_air = PropsSI('VISCOSITY', 'P', P_air, 'T', self.ambient_conditions['T'], 'Air')
         g_c = 1  
         L = length_rad
@@ -145,10 +152,15 @@ class RamAirHeatExchanger():
         D_h = 4 * r_h
         Re = G * D_h / mu_air
         f = 0.046 * Re**-0.2
+        eff_duct = 0.7
+        #AR = 3.6
         t_w = f /( 2 * g_c * self.ambient_conditions['rho'] / G**2 )
-        pressure_drop = mu_air /(2* g_c * self.ambient_conditions['rho']) * (4 * L /D_h**2) * (mf_air/A_0) * (f * Re) 
-        print(pressure_drop)
-        eta_p = 0.92 #1 - pressure_drop / P_air 
+        pressure_drop_HX = mu_air /(2* g_c * self.ambient_conditions['rho']) * (4 * L /D_h**2) * (mf_air/A_0) * (f * Re) 
+        pressure_drop_duct = (0.5*self.ambient_conditions['rho']*self.ambient_conditions['V']**2)*(eff_duct)*(1-1/AR**2)
+        pressure_drop = pressure_drop_duct + pressure_drop_HX
+        print(pressure_drop, "Pa")
+        eta_p = 1 - pressure_drop / P_air 
+        print(eta_p, "-")
 
         cool_out = Fluid_Coolant(name = "Coolant Out", T = coolant_temp_out, P = self.fluid.P, 
                          mf = self.fluid.mf_given, fluid_type = self.fluid.fluid_type)
@@ -158,7 +170,7 @@ class RamAirHeatExchanger():
         if new_drag == True:
             # Estimate exit velocity using bernoulli
             V_exit = np.sqrt(self.ambient_conditions['V']**2 - 2 * pressure_drop / self.ambient_conditions['rho'])
-            D_g = mf_air * (self.ambient_conditions['V'] - V_exit)  # mass flow rate of air through radiator
+            D_g = mf_air * (self.ambient_conditions['V'] - V_exit ) #mf_air * (self.ambient_conditions['V'] - V_exit)  # mass flow rate of air through radiator
             F_n = (self.TR + 1 )*D_g
             net_drag = D_g - F_n
             C_D_rad = net_drag/(0.5*self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * S_w/2) # C_D for both radiator 
