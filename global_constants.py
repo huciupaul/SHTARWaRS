@@ -91,6 +91,7 @@ FC_cost = 555                                           # [EUR/kW] Cost of the f
 FC_maint_cost = 220/2400 * time_lifetime                # [EUR/kW] Maintenance cost of the fuel cell per kW
 FC_disposal_cost = 9.35                                 # [EUR/kgFC] Disposal cost of the fuel cell stack per kg of fuel cell stack
 Sto_disposal_cost = 0.6                                 # [EUR/kgSto] Disposal cost of the storage system per kg of tank
+Sto_maint_cost = 42.8                                  # [EUR/kgH2/yr] Maintenance cost of the storage system
 AC_disposal_cost = 6.693 * 4932                         # [EUR/kgAC] Disposal cost of the aircraft per kg of aircraft
 Insurance_cost = 19000 * 25                             # [EUR] Insurance cost of the aircraft over its lifetime
 Crew_cost = 2 * 89 * time_lifetime                      # [EUR] Crew cost of the aircraft over its lifetime
@@ -99,7 +100,7 @@ Beech_maint_cost = 1100 * time_lifetime * 555/640       # [EUR] Maintenance cost
 
 Sto_cost = 212                                          # [EUR/kgH2] Cost of the storage system https://www.horizon-europe.gouv.fr/advanced-materials-hydrogen-storage-tanks-34822
 EPS_cost = 94                                           # [EUR/kWELMO] Cost of the electrical power system 
-AC_dev_cost = 96737324.66 / num_aircraft                # [EUR] Development cost of the aircraft per aircraft https://www.mdpi.com/2226-4310/9/7/349
+AC_dev_cost = 255900000 / num_aircraft                  # [EUR] Development cost of the aircraft per aircraft https://www.mdpi.com/2226-4310/9/7/349
 AC_purchase_cost = 1_300_000                            # [EUR] Purchase cost of the aircraft (1.5 times the development cost)
 
 ### REVIEW THIS
