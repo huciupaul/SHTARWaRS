@@ -135,19 +135,20 @@ class RamAirHeatExchanger():
 
         self.delta_t_air = T
         A_0 = front_area_rad
-        P_air = self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * 0.5 + self.p_amb 
+        P_air = self.p_amb         #self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * 0.5 + self.p_amb 
         mu_air = PropsSI('VISCOSITY', 'P', P_air, 'T', self.ambient_conditions['T'], 'Air')
         g_c = 1  
         L = length_rad
-        P = A_0 * L
+        P = 4 * L
         G = mf_air / A_0 
         r_h = A_0/P
         D_h = 4 * r_h
         Re = G * D_h / mu_air
         f = 0.046 * Re**-0.2
         t_w = f /( 2 * g_c * self.ambient_conditions['rho'] / G**2 )
-        pressure_drop = mu_air /(2* g_c * self.ambient_conditions['rho']) * (4 * L /D_h**2) * (mf_air**2/A_0) * (f * Re) 
-        eta_p = 1 - pressure_drop / P_air 
+        pressure_drop = mu_air /(2* g_c * self.ambient_conditions['rho']) * (4 * L /D_h**2) * (mf_air/A_0) * (f * Re) 
+        print(pressure_drop)
+        eta_p = 0.92 #1 - pressure_drop / P_air 
 
         cool_out = Fluid_Coolant(name = "Coolant Out", T = coolant_temp_out, P = self.fluid.P, 
                          mf = self.fluid.mf_given, fluid_type = self.fluid.fluid_type)
@@ -158,15 +159,19 @@ class RamAirHeatExchanger():
             # Estimate exit velocity using bernoulli
             V_exit = np.sqrt(self.ambient_conditions['V']**2 - 2 * pressure_drop / self.ambient_conditions['rho'])
             D_g = mf_air * (self.ambient_conditions['V'] - V_exit)  # mass flow rate of air through radiator
-            C_D_rad = D_g/(0.5*self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * S_w/2)
+            F_n = (self.TR + 1 )*D_g
+            net_drag = D_g - F_n
+            C_D_rad = net_drag/(0.5*self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * S_w/2) # C_D for both radiator 
+            #C_D_rad = D_g/(0.5*self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * S_w/2)
         else:
             D_g = mf_air * self.ambient_conditions['V']
-            C_D_rad = D_g/(0.5*self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * S_w/2) # C_D for both radiator 
-            F_n = (self.TR - 1 )*D_g
+            #C_D_rad = D_g/(0.5*self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * S_w/2) # C_D for both radiator 
+            F_n = (self.TR + 1 )*D_g
             net_drag = D_g - F_n
+            C_D_rad = net_drag/(0.5*self.ambient_conditions['rho'] * self.ambient_conditions['V']**2 * S_w/2) # C_D for both radiator 
 
         
-        return self.required_area, cool_out, power_fan, eta_p, C_D_rad, length_rad, A_0,mf_air
+        return self.required_area, cool_out, power_fan, eta_p, C_D_rad, length_rad, A_0, mf_air
 
     # THRUST RECOVERY   
     def thrust_ratio(self,gamma, R, M0, T0, eta_p07, CD_d_CD_sp):
