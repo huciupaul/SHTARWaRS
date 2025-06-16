@@ -27,7 +27,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
         os.makedirs(output_dir)
 
     # Define the power splits and fuel cell percentages
-    power_splits = np.linspace(0.6, 1.0, 5)  # 10 splits from 0 to 1
+    power_splits = np.linspace(minimum, maximum, no_of_splits)  # 10 splits from 0 to 1
     fc_toga_percentages = np.linspace(minimum, maximum, no_of_splits)  # Example percentages of TOGA power for the fuel cell
     fc_cruise_percentages = np.linspace(minimum, maximum, no_of_splits)  # Example percentages of CRUISE power for the fuel cell
 
@@ -36,7 +36,15 @@ def main(minimum, maximum, no_of_splits, max_iter):
     len(power_splits),
     len(fc_toga_percentages),
     len(fc_cruise_percentages),
+<<<<<<< HEAD
+<<<<<<< HEAD
+    20  # Length of the tensor
+=======
     21  # Length of the tensor
+>>>>>>> d293d8177a8b30fa249223f45ae49e3a12beb751
+=======
+    23  # Length of the tensor
+>>>>>>> 4bf8d8abe45b1991e6568ed4c656e7174536e2cf
     ))
     
     loading_tensor = np.zeros((
@@ -54,68 +62,69 @@ def main(minimum, maximum, no_of_splits, max_iter):
         for i_toga, fc_toga_percentage in enumerate(fc_toga_percentages):
 
             for i_cruise, fc_cruise_percentage in enumerate(fc_cruise_percentages):
+                # ----------------------------------------------------------
+                # INITIALIZE MTOW FIXED-POINT ITERATION
+                # ----------------------------------------------------------
+                OEW = Beechcraft_1900D['OEW']
 
-                # Initialize variables for the first iteration of convergence
-                MTOW = Beechcraft_1900D['OEW'] # Original OEW
-                m_eps_prev, m_fc_tms_prev, m_h2_prev, m_sto_prev, m_cargo_prev = 0.0, 326.63, 315.39, 141.38, 714.05 # from midterm
-                MTOW += (m_eps + m_fc_tms_prev + m_h2_prev + m_sto_prev)  # Initial MTOW
-                MTOW_prev = 0.001
+                # First-guess component masses (from midterm or prior run)
+                m_eps_prev     = 0.0
+                m_fc_tms_prev  = 326.63  # sum of prior FC+TMS masses
+                m_h2_prev      = 315.39
+                m_sto_prev     = 141.38
+                m_cargo_prev   = 714.05
+                
+                MTOW_prev = 0.0
+                MTOW = (
+                    OEW
+                    + m_eps_prev
+                    + m_fc_tms_prev
+                    + m_h2_prev
+                    + m_sto_prev
+                    + m_cargo_prev
+                )
 
-                aux_power, D_rad = 0.0, 0.0
+                alpha      = 0.5     # under-relaxation factor
+                delta_prev = 0.0
+                tol        = 0.01    # 1% convergence tolerance
+                
+                CD_rad = 0.0  # Initialize CD_rad
+                aux_power = 0.0  # Initialize aux_power
 
                 # Convergence of MTOW, stop if the change is less than 1% of the previous MTOW or reached max number of iterations
                 for i in range(max_iter):
                     print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}, ITER: {i}")
-                    if np.abs((MTOW-MTOW_prev)/MTOW_prev) < 0.01 and i > 0 or i == max_iter - 1:
-                        print(f"Converged after {i} iterations with MTOW: {MTOW:.2f} kg")
-                        print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}")
-                        break
-                    
-                    # FPP
-                    TMS_inputs, m_h2, FC_outputs, _, loading_vector, emissions = fpp_main(split, fc_toga_percentage, fc_cruise_percentage, MTOW, D_rad, aux_power, 10)
+                    # --- FPP call ---
+                    TMS_inputs, m_h2, FC_outputs, _, loading_vector, emissions = fpp_main(
+                        split,
+                        fc_toga_percentage,
+                        fc_cruise_percentage,
+                        MTOW_prev,
+                        CD_rad,
+                        aux_power,
+                        dt=10
+                    )
+                    m_fc = FC_outputs['m_fc']
+                    cost_fc = FC_outputs['fc_cost']
+
                     # Also get m_nox, nox_max_ppm, co2_fc from fpp_main
-                    m_nox, mdot_nox_max_takeoff, mdot_nox_max_cruise = 0.0, 0.0, 0.0
+                    m_nox = emissions['m_NOx']
+                    mdot_nox_max_takeoff = emissions['max_mdot_NOx_TO']
+                    mdot_nox_max_cruise = emissions['max_mdot_NOx_cruise']
+                    m_h2_nom = emissions['m_H2_nom']
+
                     m_fc = FC_outputs['m_fc']
                     V_fc = FC_outputs['V_fc']
                     co2_fc = FC_outputs['co2_fc']
 
-                    # Storage
+                    # --- STORAGE call ---
                     m_sto, V_sto, _, _, _, length_sto, diameter_sto, co2_sto = main_storage(m_h2)
-                    
-                    # Cargo
+                                        
+                    # --- CARGO call ---
                     result = cargo_main(length_sto, diameter_sto)
-                    M_aft_cargo:  float = result["M_aft_cargo"]
-                    # Uncomment the following if needed
-                    # X_tank_front: float = result["X_tank_front"]
-                    # X_tank_back:  float = result["X_tank_back"]
-                    # X_tank_TMS:   float = result["X_tank_TMS"]
-                    # V_tank_TMS:   float = result["V_tank_TMS"]
-                    # X_aft_cargo:  float = result["X_aft_cargo"]
-                    # V_aft_cargo:  float = result["V_aft_cargo"]
-                    # num_PAX:      int   = result["num_PAX"]
-
-                    # TMS
-
-                    # print("START",TMS_inputs['Q_dot_fc'][0], #ok
-                    #     Qdot_eps, #ok
-                    #     P_A[0], #ok
-                    #     TMS_inputs['p_cc'][0], #ok
-                    #     TMS_inputs['h2_mf_fc'][0], #ok
-                    #     TMS_inputs['h2_mf_cc'][0], #ok
-                    #     T_FC[0],
-                    #     TMS_inputs['t_cc'][0], #ok
-                    #     TMS_inputs['air_mf_fc'][0], #ok
-                    #     TMS_inputs['t_amb'][0], #ok
-                    #     TMS_inputs['rho_amb'][0], #ok
-                    #     TMS_inputs['V_amb'][0], #ok
-                    #     mission_profile['P'][0], #ok
-                    #     TMS_inputs['h2_mf_fc_recirculated'][0], 
-                    #     TMS_inputs['air_mf_fc'][0],
-                    #     7e5,  # p_sto
-                    #     TMS_inputs['h2o_mf_fc'][0], "END")
-                    # m_tms_front, m_tms_aft, m_tms_mid, D_rad, aux_power = 0.0, 0.0, 0.0, 0.0, 0.0
-                    # break
-                    #print("Inputs!!!!!", TMS_inputs if 'TMS_inputs' in locals() else "No TMS inputs yet")
+                    M_aft_cargo = result["M_aft_cargo"]
+                    
+                    
                     _, tms_outputs = tms_main(
                         TMS_inputs['Q_dot_fc'], #ok
                         np.full(4, Qdot_eps), #ok
@@ -136,31 +145,87 @@ def main(minimum, maximum, no_of_splits, max_iter):
                         TMS_inputs['h2o_mf_fc']
                     )
                     #print("Outputs!!!!!!", tms_outputs if 'tms_outputs' in locals() else "No TMS outputs yet")
-
+                    # Check if tms_outputs is None or has the expected length
+                    if tms_outputs is None or (isinstance(tms_outputs, (list, np.ndarray)) and len(tms_outputs) > 0 and np.isnan(tms_outputs[0])):
+                        break
                     D_rad = tms_outputs[0]
                     aux_power = tms_outputs[1]
                     m_tms_front = tms_outputs[2]
                     m_tms_aft = tms_outputs[4]
                     m_tms_mid = tms_outputs[3]
-                    print(f"MTOW:{MTOW}, AUX POWER {aux_power}, DRAG PENALTY {D_rad}")
                     
-
-                    # --------- ADD INTEGRATION HERE ---------
+                    print(f"MTOW:{MTOW:.2f}, AUX POWER {aux_power:.2f}, DRAG PENALTY {D_rad:.6f}")
                     
-                    #MTOW update
-                    MTOW_prev = MTOW
-                    MTOW += ((m_eps - m_eps_prev) + (m_h2 - m_h2_prev) + (m_sto - m_sto_prev) + \
-                        (m_tms_front + m_tms_aft + m_tms_mid + m_fc - m_fc_tms_prev) + (M_aft_cargo - m_cargo_prev))
-                    # Update the values based on the previous iteration
-                    m_eps_prev = m_eps
-                    m_fc_tms_prev = m_tms_aft + m_tms_front + m_tms_mid + m_fc
-                    m_h2_prev = m_h2
-                    m_sto_prev = m_sto
-                    m_cargo_prev = M_aft_cargo
+                    # ----------------------------------------------------------
+                    # FIXED-POINT UPDATE WITH UNDER-RELAXATION
+                    # ----------------------------------------------------------
+                    MTOW_candidate = (
+                        OEW
+                        + m_eps
+                        + (m_tms_front + m_tms_mid + m_tms_aft + m_fc)
+                        + m_h2
+                        + m_sto
+                        + M_aft_cargo
+                    )
+                    delta = MTOW_candidate - MTOW_prev
 
+                    # if sign flip, damp further
+                    if delta * delta_prev < 0:
+                        alpha *= 0.5
+
+                    MTOW = MTOW_prev + alpha * delta
+
+                    # check convergence
+                    if abs(delta) / MTOW_prev < tol:
+                        MTOW_prev = MTOW
+                        break
+
+                    # prepare for next iter
+                    delta_prev = delta
+                    MTOW_prev  = MTOW
+
+                    # update component previous-mass trackers
+                    m_eps_prev    = m_eps
+                    m_fc_tms_prev = m_tms_front + m_tms_mid + m_tms_aft + m_fc
+                    m_h2_prev     = m_h2
+                    m_sto_prev    = m_sto
+                    m_cargo_prev  = M_aft_cargo
+                
+                # CONVERGED
+                MTOW = MTOW_prev
+                    
+                # Update the loading vector                     
+                if tms_outputs is None or (isinstance(tms_outputs, (list, np.ndarray)) and len(tms_outputs) > 0 and np.isnan(tms_outputs[0])):
+                    tensor = np.full(23, np.nan)
+                    result_tensor[i_split, i_toga, i_cruise, :] = tensor
+                    loading_tensor[i_split, i_toga, i_cruise, :, :] = loading_vector
+                
                 # After convergence, store the results in the tensor, then in the 4D tensor
-                tensor = np.array([m_eps, m_fc, m_h2, m_sto,V_fc, V_sto, V_elmo, MTOW, length_sto, diameter_sto, M_aft_cargo, m_tms_front, m_tms_aft, m_tms_mid, \
-                                   m_nox, mdot_nox_max_takeoff, mdot_nox_max_cruise, P_elmo, co2_fc, co2_sto, co2_eps])
+                tensor = np.array([
+                    m_eps,                  # 0
+                    m_fc,                   # 1
+                    m_h2,                   # 2
+                    m_sto,                  # 3
+                    V_fc,                   # 4
+                    V_sto,                  # 5
+                    V_elmo,                 # 6
+                    MTOW,                   # 7
+                    length_sto,             # 8
+                    diameter_sto,           # 9
+                    M_aft_cargo,            # 10
+                    m_tms_front,            # 11
+                    m_tms_aft,              # 12
+                    m_tms_mid,              # 13
+                    m_nox,                  # 14
+                    mdot_nox_max_takeoff,   # 15
+                    mdot_nox_max_cruise,    # 16
+                    cost_fc,                # 17
+                    m_h2_nom,               # 18
+                    P_elmo,                 # 19
+                    co2_fc,                 # 20
+                    co2_sto,                # 21
+                    co2_eps ,               # 22
+                    ])
                 result_tensor[i_split, i_toga, i_cruise, :] = tensor
                 loading_tensor[i_split, i_toga, i_cruise, :, :] = loading_vector
 
@@ -179,8 +244,8 @@ def main(minimum, maximum, no_of_splits, max_iter):
 
 if __name__=="__main__":
     main(
-        minimum=0.1,
-        maximum=1.0,
+        minimum=0.7,
+        maximum=0.8,
         no_of_splits=10,
         max_iter=100
     )

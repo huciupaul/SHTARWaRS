@@ -53,6 +53,10 @@ GWP_H2O = 0.0005                                         # [-] Global Warming Po
 GWP_beech = 335000 * 30/19                               # [-] Global Warming Potential of Beechcraft 1900D https://odr.chalmers.se/items/a33bc0b8-bf61-47cc-87b8-3ab92fe388ed
 GWP_H2 = 2.9                                            # [kgCO2e/kgH2] Global Warming Potential of Hydrogen https://doi.org/10.1038/s41560-024-01563-1
 
+# NOx KPIs
+NOx_pPax_TO     = 0.000012783399 # [kg/s/PAX]
+NOx_pPax_cruise = 0.000009341715 # [kg/s/PAX]
+
 #######################################################################################
 #################### Code specific constants from each part ###########################
 

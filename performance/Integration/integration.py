@@ -155,9 +155,7 @@ def min_max_X_cg_positions(
     back_loading = M_cargo_aft + M_TMS_aft + M_tank
     original_loading = Beechcraft_1900D['M_cargo_aft']
     
-    delta = back_loading - original_loading
-    print(f"Delta: {delta:.2f} kg")
-    
+    delta = back_loading - original_loading    
     
 
     cumulative_lengths = np.cumsum([len(arr) for arr in arrays])
@@ -295,7 +293,7 @@ def main(design: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         m_cargo_ok = m_cargo_aft >= N_PAX*M_cargo_per_PAX
 
         # ---- 1.4   Store results
-        valid_vec[i]   = volume_ok and N_PAX_ok #and m_cargo_ok # and cg_ok
+        valid_vec[i]   = volume_ok and N_PAX_ok and m_cargo_ok and cg_ok
         N_PAX_vec[i]   = N_PAX
         m_cargo_vec[i] = m_cargo_aft
 
