@@ -202,42 +202,44 @@ def main(
 
 
 if __name__ == "__main__":
-    #power_arr = np.arange(64.5, 1223, 10)
-    power_arr = [64.5, 813, 1223]
-    mdot_h2o = np.arange(0, 0.1 + 1e-4, 1e-4)
+    power_arr = np.arange(64.5, 1223, 1)
+    #power_arr = [64.5, 813, 1223]
+    mdot_h2o = np.arange(0, 0.1 + 1e-2, 1e-2)
 
     NOx_normalized, NOx_at_autoignition, P_matrix, time_max_dT_dlogt = main(power_arr=power_arr, mdot_h2o=mdot_h2o, water_liquid=True)
 
-    with open(r'C:\Users\zksie\OneDrive - Delft University of Technology\Documents\Academic Year 2024-2025\Q4 - DSE\Emissions_tool\DSE_1\RQL_1D\quench_nox.csv', 'w') as f:
-        # Write header
-        f.write('power_arr/mdot_h2o,' + ','.join(map(str, mdot_h2o)) + '\n')
-        # Write each row
-        for i, xi in enumerate(power_arr):
-            row = [str(xi)] + [str(val) for val in NOx_normalized[i, :]]
-            f.write(','.join(row) + '\n')
+    # with open(r'C:\Users\zksie\OneDrive - Delft University of Technology\Documents\Academic Year 2024-2025\Q4 - DSE\Emissions_tool\DSE_1\RQL_1D\quench_nox.csv', 'w') as f:
+    #     # Write header
+    #     f.write('power_arr/mdot_h2o,' + ','.join(map(str, mdot_h2o)) + '\n')
+    #     # Write each row
+    #     for i, xi in enumerate(power_arr):
+    #         row = [str(xi)] + [str(val) for val in NOx_normalized[i, :]]
+    #         f.write(','.join(row) + '\n')
 
-    # T_grid, W_grid = np.meshgrid(power_arr, mdot_h2o, indexing='ij')
+    T_grid, W_grid = np.meshgrid(power_arr, mdot_h2o, indexing='ij')
 
 
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection='3d')
-    # surf = ax.plot_surface(W_grid, T_grid, NOx_normalized, cmap='viridis')
+    fig = plt.figure(dpi=600)
+    ax = fig.add_subplot(111, projection='3d')
+    surf = ax.plot_surface(W_grid, T_grid, NOx_normalized, cmap='viridis')
 
-    # # Add 25 ppm contour (2.5e-5)
-    # contour = ax.contour(
-    #     W_grid, T_grid, NOx_normalized,
-    #     levels=[2.5e-5],
-    #     colors='red',
-    #     linewidths=2,
-    #     offset=2.5e-5  # Place contour at the correct z-level
-    # )
-    # ax.clabel(contour, fmt={2.5e-5: '25 ppm'}, colors='red')
+    # Add 25 ppm contour (2.5e-5)
+    contour = ax.contour(
+        W_grid, T_grid, NOx_normalized,
+        levels=[2.5e-5],
+        colors='red',
+        linewidths=2,
+        offset=2.5e-5  # Place contour at the correct z-level
+    )
+    ax.clabel(contour, fmt={2.5e-5: '25 ppm'}, colors='red')
 
-    # ax.set_xlabel('Water injection [kg/s]')
-    # ax.set_ylabel('Power [kW]')
-    # ax.set_zlabel('NOx formed in the quench zone [kg/s]')
-    # fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
-    # plt.show()
+    ax.set_xlabel('Water injection [kg/s]')
+    ax.set_ylabel('Power [kW]')
+    ax.set_zlabel('NOx formed [kg/s]')
+    fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
+    plt.show()
+
+    plt.savefig('NOx_quench.png', dpi=600)
 
 
     # fig = plt.figure()
@@ -262,21 +264,25 @@ if __name__ == "__main__":
 
 
 
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection='3d')
-    # time_log = np.log10(time_max_dT_dlogt)
-    # surf = ax.plot_surface(W_grid, T_grid, time_log, cmap='viridis')
+    plt.figure(dpi=600)
+    # Show heatmap: x-axis = water injection, y-axis = temperature
+    plt.imshow(
+        time_max_dT_dlogt.T,  # Transpose if you want x=W, y=T
+        origin='lower',
+        aspect='auto',
+        extent=[W_grid.min(), W_grid.max(), T_grid.min(), T_grid.max()],
+        cmap='viridis'
+    )
+    cbar = plt.colorbar(label='log10(Autoignition time [s])')
 
-    # # Choose tick positions (in log10 space)
-    # zticks = np.arange(np.floor(time_log.min()), np.ceil(time_log.max())+1)
-    # ax.set_zticks(zticks)
-    # ax.set_zticklabels([f"{10**z:.1e}" for z in zticks])
+    # Set ticks and labels
+    yticks = np.linspace(T_grid.min(), T_grid.max(), num=6)
+    plt.yticks(yticks)
+    plt.xlabel('Water injection [kg/s]')
+    plt.ylabel('Power [kW]')
+    plt.show()
 
-    # ax.set_xlabel('Water injection [kg/s]')
-    # ax.set_ylabel('Rich zone exhaust temperature [K]')
-    # ax.set_zlabel('Autoignition time [s]')
-    # fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
-    # plt.show()
+    plt.savefig('Autoignition_time.png', dpi=600)
 
 
     # NOx_interpolator = RegularGridInterpolator(
