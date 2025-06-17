@@ -13,10 +13,10 @@ import matplotlib.pyplot as plt
 from typing import List, Tuple
 import pickle
 from scipy.interpolate import RegularGridInterpolator, InterpolatedUnivariateSpline
+import json
 
 from MECH import MECH
 from mixture_properties import mixture_properties_with_temp
-from global_constants import Power, T_rich, P_rich
 
 '''
 This script is used to estimate the NOx formation in the quench zone of a RQL combustor.
@@ -39,27 +39,46 @@ class gas_obj:
 
 
 def main(
-        T_rich_ex: np.ndarray,
+        power_arr: np.ndarray,
         mdot_h2o: np.ndarray,
         water_liquid: bool = True
         ) -> Tuple[List[float], np.ndarray]:
 
-    NOx_normalized = np.full((len(T_rich_ex), len(mdot_h2o)), np.nan)
-    NOx_at_autoignition = np.full((len(T_rich_ex), len(mdot_h2o)), np.nan)
-    P_matrix = np.zeros((len(T_rich_ex), len(mdot_h2o)))
-    time_max_dT_dlogt = np.zeros((len(T_rich_ex), len(mdot_h2o)))
 
-    P_min, P_max, T_min, T_max = 482017, 1465306, 1579, 1730
+    with open(r'C:\Users\zksie\OneDrive - Delft University of Technology\Documents\Academic Year 2024-2025\Q4 - DSE\Emissions_tool\DSE_1\RQL_1D\rich_cases.json', 'r') as f:
+        data = json.load(f)
+        
+    cases = data["cases"]
+    power_plotted = np.array([case['power_kW'] for case in cases])
+    P_const = np.array([case['P_inlet_Pa'] for case in cases])
+    T_rich_exh = np.array([case['T_peak_K'] for case in cases])
+    mdot_rich_exh = np.array([case['mdot_exh'] for case in cases])
+    X_in = np.array([case['X_exh'] for case in cases])
 
-    for i, T_rich_ex_i in tqdm(enumerate(T_rich_ex)):
-        P_rich_ex = (P_max - P_min) / (T_max - T_min) * T_rich_ex_i + (P_min - (P_max - P_min) / (T_max - T_min) * T_min)
+    P_spline = InterpolatedUnivariateSpline(power_plotted, P_const, k=3)
+    T_spline = InterpolatedUnivariateSpline(power_plotted, T_rich_exh, k=3)
+    mdot_exh_spline = InterpolatedUnivariateSpline(power_plotted, mdot_rich_exh, k=3)
+    
+    P_out = P_spline(power_arr)
+    T_out = T_spline(power_arr)
+    mdot_exh = mdot_exh_spline(power_arr)
 
+
+    NOx_normalized = np.full((len(power_arr), len(mdot_h2o)), np.nan)
+    NOx_at_autoignition = np.full((len(power_arr), len(mdot_h2o)), np.nan)
+    P_matrix = np.zeros((len(power_arr), len(mdot_h2o)))
+    time_max_dT_dlogt = np.zeros((len(power_arr), len(mdot_h2o)))
+
+
+    for i in tqdm(range(len(power_arr))):
+        idx_closest_power = np.argmin(np.abs(power_plotted - power_arr[i]))
+        X_in_i = X_in[idx_closest_power]
         # Exhaust of the rich zone
         rich_ex = gas_obj(
-                mdot=0.23071218802678672,
-                X="N2:0.27396853378378067, H2:0.5784925158354742, H:0.0005133907896591396, O2:7.393652373124469e-10, O:4.591482831748451e-09, H2O:0.14701811528905126, OH:7.430992453322465e-06, H2O2:1.1742925935728515e-10, HO2:3.6285427485688574e-12, NO:5.4364866743951985e-09, N2O:9.901157119223157e-12, N:4.953608429224339e-12, NH:1.4251848100599631e-11, NNH:1.977256219409285e-09, NH2:4.148258601540983e-10",
-                T= T_rich_ex_i,
-                P= P_rich_ex
+                mdot=mdot_exh[i],
+                X=X_in_i,
+                T= T_out[i],
+                P= P_out[i]
                 )
 
         # Air bled, to be mixed with rich exhaust to create stoichiometric mixture
@@ -183,83 +202,92 @@ def main(
 
 
 if __name__ == "__main__":
-    T_rich_ex = np.arange(1570, 1740, 1)
-    mdot_h2o = np.arange(0, 0.1 + 1e-2, 1e-2)
+    #power_arr = np.arange(64.5, 1223, 10)
+    power_arr = [64.5, 813, 1223]
+    mdot_h2o = np.arange(0, 0.1 + 1e-4, 1e-4)
 
-    NOx_normalized, NOx_at_autoignition, P_matrix, time_max_dT_dlogt = main(T_rich_ex=T_rich_ex, mdot_h2o=mdot_h2o, water_liquid=True)
+    NOx_normalized, NOx_at_autoignition, P_matrix, time_max_dT_dlogt = main(power_arr=power_arr, mdot_h2o=mdot_h2o, water_liquid=True)
 
-    T_grid, W_grid = np.meshgrid(T_rich_ex, mdot_h2o, indexing='ij')
+    with open(r'C:\Users\zksie\OneDrive - Delft University of Technology\Documents\Academic Year 2024-2025\Q4 - DSE\Emissions_tool\DSE_1\RQL_1D\quench_nox.csv', 'w') as f:
+        # Write header
+        f.write('power_arr/mdot_h2o,' + ','.join(map(str, mdot_h2o)) + '\n')
+        # Write each row
+        for i, xi in enumerate(power_arr):
+            row = [str(xi)] + [str(val) for val in NOx_normalized[i, :]]
+            f.write(','.join(row) + '\n')
 
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    surf = ax.plot_surface(W_grid, T_grid, NOx_normalized, cmap='viridis')
-
-    # Add 25 ppm contour (2.5e-5)
-    contour = ax.contour(
-        W_grid, T_grid, NOx_normalized,
-        levels=[2.5e-5],
-        colors='red',
-        linewidths=2,
-        offset=2.5e-5  # Place contour at the correct z-level
-    )
-    ax.clabel(contour, fmt={2.5e-5: '25 ppm'}, colors='red')
-
-    ax.set_xlabel('Water injection [kg/s]')
-    ax.set_ylabel('Rich zone exhaust temperature [K]')
-    ax.set_zlabel('NOx formed in the quench zone [ppm]')
-    fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
-    plt.show()
+    # T_grid, W_grid = np.meshgrid(power_arr, mdot_h2o, indexing='ij')
 
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    surf = ax.plot_surface(W_grid, T_grid, NOx_at_autoignition, cmap='viridis')
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # surf = ax.plot_surface(W_grid, T_grid, NOx_normalized, cmap='viridis')
 
-    # Add 25 ppm contour (2.5e-5)
-    contour = ax.contour(
-        W_grid, T_grid, NOx_at_autoignition,
-        levels=[2.5e-5],
-        colors='red',
-        linewidths=2,
-        offset=2.5e-5  # Place contour at the correct z-level
-    )
-    ax.clabel(contour, fmt={2.5e-5: '25 ppm'}, colors='red')
+    # # Add 25 ppm contour (2.5e-5)
+    # contour = ax.contour(
+    #     W_grid, T_grid, NOx_normalized,
+    #     levels=[2.5e-5],
+    #     colors='red',
+    #     linewidths=2,
+    #     offset=2.5e-5  # Place contour at the correct z-level
+    # )
+    # ax.clabel(contour, fmt={2.5e-5: '25 ppm'}, colors='red')
 
-    ax.set_xlabel('Water injection [kg/s]')
-    ax.set_ylabel('Rich zone exhaust temperature [K]')
-    ax.set_zlabel('NOx formed till the autoignition time [ppm]')
-    fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
-    plt.show()
-
-
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    time_log = np.log10(time_max_dT_dlogt)
-    surf = ax.plot_surface(W_grid, T_grid, time_log, cmap='viridis')
-
-    # Choose tick positions (in log10 space)
-    zticks = np.arange(np.floor(time_log.min()), np.ceil(time_log.max())+1)
-    ax.set_zticks(zticks)
-    ax.set_zticklabels([f"{10**z:.1e}" for z in zticks])
-
-    ax.set_xlabel('Water injection [kg/s]')
-    ax.set_ylabel('Rich zone exhaust temperature [K]')
-    ax.set_zlabel('Autoignition time [s]')
-    fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
-    plt.show()
+    # ax.set_xlabel('Water injection [kg/s]')
+    # ax.set_ylabel('Power [kW]')
+    # ax.set_zlabel('NOx formed in the quench zone [kg/s]')
+    # fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
+    # plt.show()
 
 
-    NOx_interpolator = RegularGridInterpolator(
-        (T_rich_ex, mdot_h2o), NOx_normalized, bounds_error=False, fill_value=None
-    )
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # surf = ax.plot_surface(W_grid, T_grid, NOx_at_autoignition, cmap='viridis')
 
-    os.makedirs('data/interpolants', exist_ok=True)
+    # # Add 25 ppm contour (2.5e-5)
+    # contour = ax.contour(
+    #     W_grid, T_grid, NOx_at_autoignition,
+    #     levels=[2.5e-5],
+    #     colors='red',
+    #     linewidths=2,
+    #     offset=2.5e-5  # Place contour at the correct z-level
+    # )
+    # ax.clabel(contour, fmt={2.5e-5: '25 ppm'}, colors='red')
 
-    # Pickleeeeeeeeeeeee the interpolator
-    with open('data/interpolants/NOx_interpolator.pkl', 'wb') as f:
-        pickle.dump(NOx_interpolator, f, protocol=pickle.HIGHEST_PROTOCOL)
+    # ax.set_xlabel('Water injection [kg/s]')
+    # ax.set_ylabel('Rich zone exhaust temperature [K]')
+    # ax.set_zlabel('NOx formed till the autoignition time [ppm]')
+    # fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
+    # plt.show()
+
+
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # time_log = np.log10(time_max_dT_dlogt)
+    # surf = ax.plot_surface(W_grid, T_grid, time_log, cmap='viridis')
+
+    # # Choose tick positions (in log10 space)
+    # zticks = np.arange(np.floor(time_log.min()), np.ceil(time_log.max())+1)
+    # ax.set_zticks(zticks)
+    # ax.set_zticklabels([f"{10**z:.1e}" for z in zticks])
+
+    # ax.set_xlabel('Water injection [kg/s]')
+    # ax.set_ylabel('Rich zone exhaust temperature [K]')
+    # ax.set_zlabel('Autoignition time [s]')
+    # fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
+    # plt.show()
+
+
+    # NOx_interpolator = RegularGridInterpolator(
+    #     (power_arr, mdot_h2o), NOx_normalized, bounds_error=False, fill_value=None
+    # )
+
+    # os.makedirs('data/interpolants', exist_ok=True)
+
+    # # Pickleeeeeeeeeeeee the interpolator
+    # with open('data/interpolants/NOx_interpolator.pkl', 'wb') as f:
+    #     pickle.dump(NOx_interpolator, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
     # fig, ax = plt.subplots(figsize=(6, 5))

@@ -78,12 +78,10 @@ def quench_zone(
         ) -> Tuple[List[float], np.ndarray]:
     
     NOx_normalized = np.full((len(power_arr), len(mdot_h2o)), np.nan)
-    NOx_at_autoignition = np.full((len(power_arr), len(mdot_h2o)), np.nan)
     P_matrix = np.zeros((len(power_arr), len(mdot_h2o)))
     T_out = np.zeros((len(power_arr), len(mdot_h2o)))
     X_exh = np.empty((len(power_arr), len(mdot_h2o)), dtype=object)
     mdot_exh = np.zeros((len(power_arr), len(mdot_h2o)))
-    time_max_dT_dlogt = np.zeros((len(power_arr), len(mdot_h2o)))
     mdot_air_2 = np.zeros(len(power_arr))
 
     with open(r'C:\Users\zksie\OneDrive - Delft University of Technology\Documents\Academic Year 2024-2025\Q4 - DSE\Emissions_tool\DSE_1\RQL_1D\rich_cases.json', 'r') as f:
@@ -97,7 +95,7 @@ def quench_zone(
     P_in = quench_inputs['P_out']
     mdot_in = quench_inputs['mdot_exh']
 
-    for i in range(len(power_arr)):
+    for i in tqdm(range(len(power_arr))):
         
         idx_closest_power = np.argmin(np.abs(power_plotted - power_arr[i]))
         X_in_i = X_in[idx_closest_power]
@@ -279,7 +277,7 @@ def main(
     # NOx_lean, _ = lean_zone(lean_inputs=lean_inputs, power_arr=power_arr, mdot_h2o=mdot_h2o)
     # print('Lean zone calculation completed...')
 
-    NOx_tot = NOx_rich_matrix + NOx_quench #+ NOx_lean
+    NOx_tot = NOx_rich_matrix # + NOx_quench # + NOx_lean
     print('NOx calcualtion completed -> Plotting...')
 
     return NOx_tot
@@ -287,14 +285,14 @@ def main(
 
 
 if __name__ == "__main__":
-    power_arr = np.arange(100, 1300, 10)
-    mdot_h2o = np.arange(0, 0.1 + 1e-2, 1e-2)
+    power_arr = np.arange(64.5, 1223.0, 10)
+    mdot_h2o = np.arange(0, 0.1 + 1e-3, 1e-3)
 
     NOx_tot = main(power_arr=power_arr, mdot_h2o=mdot_h2o)
 
     P_grid, W_grid = np.meshgrid(power_arr, mdot_h2o, indexing='ij')
 
-    fig = plt.figure()
+    fig = plt.figure(dpi=600)
     ax = fig.add_subplot(111, projection='3d')
     surf = ax.plot_surface(W_grid, P_grid, NOx_tot, cmap='viridis')
 
@@ -310,7 +308,7 @@ if __name__ == "__main__":
 
     ax.set_xlabel('Water injection [kg/s]')
     ax.set_ylabel('Power [kW]')
-    ax.set_zlabel('Total NOx output [ppm]')
+    ax.set_zlabel('NOx output [ppm]')
     fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
     plt.show()
 
