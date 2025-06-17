@@ -6,7 +6,7 @@ def calc_cost(fc_cost, P_eps, m_sto, m_h2):
     # -----Initial costs-----
     #fc_init = FC_cost * P_FC
     sto_init = Sto_cost * m_h2
-    eps_init = P_eps * EPS_cost
+    eps_init = P_eps * EPS_cost / 1000  # Convert to kW
     
     purchase_cost = sto_init + eps_init + AC_purchase_cost + AC_dev_cost
     # print(f"Initial costs: FC={0}, STO={sto_init}, EPS={eps_init}, AC={AC_purchase_cost}, Dev={AC_dev_cost}, Total={purchase_cost}")
