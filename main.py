@@ -54,10 +54,6 @@ def main(minimum, maximum, no_of_splits, max_iter):
         ), np.nan)
 
     for i_split, split in enumerate(power_splits):
-        
-        # EPS
-        m_eps, Qdot_eps, V_elmo, co2_eps, P_elmo = eps_main(split)
-
         for i_toga, fc_toga_percentage in enumerate(fc_toga_percentages):
 
             for i_cruise, fc_cruise_percentage in enumerate(fc_cruise_percentages):
@@ -72,6 +68,8 @@ def main(minimum, maximum, no_of_splits, max_iter):
                 m_h2_prev      = 315.39
                 m_sto_prev     = 141.38
                 m_cargo_prev   = 714.05
+                
+                m_eps, Qdot_eps, V_elmo, co2_eps, P_elmo = eps_main(split)
                 
                 MTOW_prev = 0.0
                 MTOW = (
@@ -98,7 +96,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                 for i in range(max_iter):
                     print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}, ITER: {i}")
                     # --- FPP call ---
-                    TMS_inputs, m_h2, FC_outputs, _, loading_vector, emissions = fpp_main(
+                    TMS_inputs, m_h2, FC_outputs, _, loading_vector, emissions, P_fc_max = fpp_main(
                         split,
                         fc_toga_percentage,
                         fc_cruise_percentage,
@@ -107,6 +105,9 @@ def main(minimum, maximum, no_of_splits, max_iter):
                         aux_power,
                         dt=10
                     )
+                    
+                    # Update EPS variables
+                    m_eps, Qdot_eps, V_elmo, co2_eps, P_elmo = eps_main(P_fc_max/TOGA)
                     
                     m_fc = FC_outputs['m_fc']
                     cost_fc = FC_outputs['fc_cost']
@@ -159,11 +160,12 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     m_tms_aft = tms_outputs[4]
                     m_tms_mid = tms_outputs[3]
                     
-                    print(f"MTOW:{MTOW:.2f}, AUX POWER {aux_power:.2f}, DRAG PENALTY {D_rad:.6f}")
+                    # print(f"MTOW:{MTOW:.2f}, AUX POWER {aux_power:.2f}, DRAG PENALTY {D_rad:.6f}")
                     
                     # ----------------------------------------------------------
                     # FIXED-POINT UPDATE WITH UNDER-RELAXATION
                     # ----------------------------------------------------------
+                    
                     MTOW_candidate = (
                         OEW
                         + m_eps
@@ -256,8 +258,8 @@ def main(minimum, maximum, no_of_splits, max_iter):
 
 if __name__=="__main__":
     main(
-        minimum=np.array([0.1, 0.1, 0.0]),
+        minimum=np.array([0.1, 0.1, 0.1]),
         maximum=np.array([0.9, 1.0, 1.0]),
-        no_of_splits=np.array([9, 10, 10]),
+        no_of_splits=np.array([17, 19, 19]),
         max_iter=20
     )

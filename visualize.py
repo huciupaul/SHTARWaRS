@@ -5,6 +5,7 @@ import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
 import plotly.graph_objs as go
+import matplotlib.pyplot as plt
 
 # Local imports
 from global_constants import NOx_pPax_TO, NOx_pPax_cruise
@@ -183,35 +184,26 @@ def update_graph(weight, constraints, pareto_options):
     
     # Calculate GWP and cost
     GWP = f_gwp(GWP_fc, GWP_sto, GWP_eps, m_h2_nom, m_nox) / N_PAX
-    cost = f_cost(fc_cost, P_eps, m_sto, m_h2) / N_PAX
-    cost = cost / 1e6  # Convert cost to M€ to match analysis.py
-    
+    cost = f_cost(fc_cost, P_eps, m_sto, m_h2)/N_PAX
+    cost = cost / 1e6
+
     # Normalize using L2 norm as in analysis.py
     cost_flat = cost[valid3d]
     gwp_flat = GWP[valid3d]
     
-    if len(cost_flat) > 0:
-        obj = np.stack([cost_flat, gwp_flat], axis=-1)
-        norms = np.linalg.norm(obj, axis=-1, keepdims=True)
-        norms[norms == 0] = 1  # Avoid division by zero
-        obj_norm = obj / norms  # Normalize to unit sphere
-        cost_norm_flat = obj_norm[:, 0]  # Normalized cost
-        gwp_norm_flat = obj_norm[:, 1]  # Normalized GWP
-        
-        # Initialize normalized arrays with NaNs and fill valid positions
-        cost_norm = np.full_like(cost, np.nan)
-        gwp_norm = np.full_like(GWP, np.nan)
-        cost_norm[valid3d] = cost_norm_flat
-        gwp_norm[valid3d] = gwp_norm_flat
-    else:
-        cost_norm = np.zeros_like(cost)
-        gwp_norm = np.zeros_like(GWP)
+    c = cost_flat
+    g = gwp_flat
+    c_min, c_max = c.min(), c.max()
+    g_min, g_max = g.min(), g.max()
+
+    cost_norm = (c - c_min) / (c_max - c_min)
+    gwp_norm  = (g - g_min) / (g_max - g_min)
     
     # Calculate scalar field
     scalar_field = weight * cost_norm + (1 - weight) * gwp_norm
     
     # Calculate 1/(1+score) for visualization (higher value is better)
-    viz_field = 1 / (1 + scalar_field)
+    viz_field = scalar_field.copy()
     
     # Find optimal design
     min_value = np.nanmin(scalar_field)
@@ -228,7 +220,7 @@ def update_graph(weight, constraints, pareto_options):
             f"TOGA Throttle: {toga_throttle[opt_idx[1]]:.3f}",
             f"Cruise Throttle: {cruise_throttle[opt_idx[2]]:.3f}",
             f"\nPerformance Metrics:",
-            f"Lifetime cost: {performance_metrics[0]/1e6:.2f} M€/PAX",
+            f"Lifetime cost: {performance_metrics[0]:.2f} M€/PAX",
             f"GWP: {performance_metrics[1]:.2f} kg CO₂e/FLIGHT/PAX",
             "\nDesign Parameters:",
             f"m_EPS: {optimal_design[0]:.5f} kg",
@@ -279,6 +271,7 @@ def update_graph(weight, constraints, pareto_options):
         # Create cube markers with size based on score
         marker_sizes = 10 + 20 * norm_scores  # Size between 10 and 30 based on score
         
+        cmap = plt.cm.get_cmap('viridis').reversed()
         # Add scatter3d with cube markers
         fig.add_trace(go.Scatter3d(
             x=x_coords,
@@ -288,10 +281,10 @@ def update_graph(weight, constraints, pareto_options):
             marker=dict(
                 size=marker_sizes,
                 color=norm_scores,
-                colorscale='Viridis',
+                colorscale=cmap,
                 opacity=0.7,
                 symbol='square',  # Using square for a more cube-like appearance
-                colorbar=dict(title='1/(1+score)\n',
+                colorbar=dict(title='Score\n',
                               ypad=100)
             ),
             name='Design Space'

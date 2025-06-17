@@ -6,6 +6,7 @@ from scipy.optimize import fsolve
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Local imports
 import sys
@@ -759,21 +760,124 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
         max_mdot_NOx_cruise = max_NOx_cruise,
         m_H2_nom            = m_H2_nom[-1],
     )
+    
+    P_elmo = mission_H2.profile['P_fc'].max() - delta_AP
         
-    return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile, loading_points, emissions_outputs
+    return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile, loading_points, emissions_outputs, P_elmo
 
 if __name__ == "__main__":
     
     mission_H2 = fpp_main(
-        fc_split=0.1,
-        throttle_TOGA=1.0,
-        throttle_cruise=1.0,
-        MTOW=8037.6,
-        # CD_HEX=0.0,
-        # delta_AP=0.0,
+        fc_split=0.10,
+        throttle_TOGA=0.40,
+        throttle_cruise=0.40,
+        MTOW=6063.52,
+        CD_RAD=0.002,
+        delta_AP=20000,
         dt=0.1
     )
-    print(mission_H2[-1])
+    
+    print(mission_H2[5])
+    
+    # Add a cumulative FC/CC power split plot
+    P_cc = mission_H2[3]['P_cc']/1e3  # Convert to kW
+    P_fc = mission_H2[3]['P_fc']/1e3  # Convert to kW
+    t    = mission_H2[3]['time']
+    
+    AP = 28.4 # Auxiliary Power (kW)
+    
+    P_fc = P_fc + AP  # Add auxiliary power to fuel cell power
+
+    # Mask to highlight non-nominal phases
+    non_nominal = mission_H2[3]['phase'] == 'hold'
+
+    sns.set_theme(style="whitegrid")
+    palette = sns.color_palette("Paired")
+    fig, ax = plt.subplots(figsize=(8, 3))
+
+    # Fuel cell fill
+    ax.fill_between(
+        t,
+        0,
+        P_fc,  # This should be P_fc, not P_cc for fuel cell
+        color=palette[0],
+        alpha=0.6,
+        label="FC Power"
+    )
+    
+    # Auxiliary power fill
+    ax.fill_between(
+        t,
+        P_fc-AP,
+        P_fc,
+        color=palette[1],
+        alpha=0.6,
+        label="Auxiliary Power (AP)"
+    )
+
+    # Combustion chamber fill
+    ax.fill_between(
+        t,
+        P_fc,  # Start from P_fc
+        P_cc + P_fc,
+        color=palette[4],
+        alpha=0.6,
+        label="CC Power"
+    )
+
+    # Plot the total power
+    ax.plot(
+        t,
+        P_cc + P_fc,
+        lw=1.3,
+        color='k',
+        label="Total Power"
+    )
+
+    # Find the start and end of the non-nominal phase
+    if np.any(non_nominal):
+        non_nominal_indices = np.where(non_nominal)[0]
+        non_nominal_start = t[non_nominal_indices[0]]
+        non_nominal_end = t[non_nominal_indices[-1]]
+        
+        # Add vertical lines at the start and end
+        ax.axvline(non_nominal_start, color='r', linestyle='--')
+        ax.axvline(non_nominal_end, color='r', linestyle='--')
+        
+        # Add annotation with arrow between the vertical lines
+        y_arrow = 0.95 * (P_cc.max() + P_fc.max())
+        
+        ax.annotate(
+            '',                               # no text here
+            xy=(non_nominal_start, y_arrow),
+            xytext=(non_nominal_end,  y_arrow),
+            arrowprops=dict(arrowstyle='<->', color='r', lw=1.5)
+        )
+
+        x_mid = 0.5 * (non_nominal_start + non_nominal_end)
+        ax.text(
+            x_mid,
+            y_arrow + 0.02 * y_arrow,         # nudge up 2 % of the y-span
+            'Non-nominal Phase',
+            ha='center',
+            va='bottom',
+            color='r',
+            fontsize='medium',
+            weight='bold'
+        )
+
+    # Set labels and title
+    ax.set_xlim(t[0], t[-1])
+    ax.set_ylim(0, 1.1 * (P_cc.max() + P_fc.max()))
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("Power [kW]")
+    ax.set_title("Flight Profile Power Split")
+    ax.legend()
+
+    plt.tight_layout()
+    plt.show()
+    
+    # print(mission_H2[-1])
     # from mpl_toolkits.mplot3d import Axes3D
     # from matplotlib.animation import FuncAnimation, FFMpegWriter
     

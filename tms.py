@@ -1299,9 +1299,9 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
                 pass
                 # print(f"Pipe '{var_name}' diameter: {var_value.d_in:.4f} m")
 
-    print(f"Long Coolant pipe mass: {np.max(m_pipe_cool_1922):.2f} kg")
-    print(f"Long Coolant return pipe mass: {np.max(m_pipe_cool_2_3):.2f} kg")
-    print(f"Long H2 pipe mass: {np.max(m_pipe_h2_56):.2f} kg")
+    # print(f"Long Coolant pipe mass: {np.max(m_pipe_cool_1922):.2f} kg")
+    # print(f"Long Coolant return pipe mass: {np.max(m_pipe_cool_2_3):.2f} kg")
+    # print(f"Long H2 pipe mass: {np.max(m_pipe_h2_56):.2f} kg")
     
     
 
