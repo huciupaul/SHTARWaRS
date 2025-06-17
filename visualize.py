@@ -31,7 +31,7 @@ valid_mass = pws(loading_tensor)
 valid_NOx = (design_tensor[..., 15]/N_PAX < NOx_pPax_TO) & (design_tensor[..., 16]/N_PAX < NOx_pPax_cruise)
 
 # Define dimension bounds
-dim_bounds = np.array([[0.1, 1.0], [0.1, 1.0], [0.1, 1.0]])
+dim_bounds = np.array([[0.1, 0.9], [0.1, 1.0], [0.1, 1.0]])
 N, M, P, Q = design_tensor.shape
 power_splits = np.linspace(dim_bounds[0, 0], dim_bounds[0, 1], N)
 toga_throttle = np.linspace(dim_bounds[1, 0], dim_bounds[1, 1], M)
@@ -68,8 +68,20 @@ app.layout = html.Div([
                 value=['integration', 'mass', 'nox'],
                 inline=True
             ),
-        ], style={'width': '40%', 'display': 'inline-block'})
+        ], style={'width': '40%', 'display': 'inline-block'}),
+        
+        html.Div([
+            dcc.Checklist(
+                id='pareto-checkbox',
+                options=[
+                    {'label': 'Show Pareto Front', 'value': 'show_pareto'}
+                ],
+                value=['show_pareto'],
+                inline=True
+            ),
+        ], style={'width': '15%', 'display': 'inline-block'})
     ], style={'display': 'flex', 'alignItems': 'center', 'padding': '10px'}),
+
     
     # Main content area - horizontal layout with 3 sections
     html.Div([
@@ -107,15 +119,42 @@ app.layout = html.Div([
     })
 ])
 
+def find_pareto_front(cost, gwp):
+    """
+    Find the Pareto-optimal points from cost and GWP arrays.
+    
+    Args:
+        cost (np.ndarray): 1D array of cost values
+        gwp (np.ndarray): 1D array of GWP values
+        
+    Returns:
+        np.ndarray: Indices of Pareto-optimal points, sorted by increasing cost
+    """
+    # Stack cost and GWP
+    pts = np.column_stack((cost, gwp))
+    # Sort by cost
+    sort_idx = np.argsort(pts[:, 0])
+    pts_sorted = pts[sort_idx]
+    # Find points with minimum GWP up to each cost level
+    gwp_min_run = np.minimum.accumulate(pts_sorted[:, 1])
+    is_pareto = pts_sorted[:, 1] == gwp_min_run
+    # Get original indices of Pareto points
+    pareto_idx = sort_idx[is_pareto]
+    # Sort by cost for proper line ordering
+    pareto_sort = np.argsort(pts[pareto_idx][:, 0])
+    return pareto_idx[pareto_sort]
+
 # The callback function update_graph needs to be modified:
 @app.callback(
     [Output('3d-scatter', 'figure'),
      Output('design-info', 'children')],
     [Input('weight-slider', 'value'),
-     Input('constraint-checklist', 'value')]
+     Input('constraint-checklist', 'value'),
+     Input('pareto-checkbox', 'value')]
 )
-def update_graph(weight, constraints):
-    # Apply selected masks - same as before
+
+def update_graph(weight, constraints, pareto_options):
+    # Apply selected masks
     valid3d = np.ones(design_tensor.shape[:-1], dtype=bool)
     if 'integration' in constraints:
         valid3d = valid3d & valid_integration
@@ -123,9 +162,6 @@ def update_graph(weight, constraints):
         valid3d = valid3d & valid_mass
     if 'nox' in constraints:
         valid3d = valid3d & valid_NOx
-    
-    # Rest of the processing - same as before until the voxel creation
-    # [code for calculating scalar_field, viz_field, finding optimal design]
     
     # Calculate cost and GWP components
     design = copy.deepcopy(design_tensor)
@@ -147,23 +183,32 @@ def update_graph(weight, constraints):
     
     # Calculate GWP and cost
     GWP = f_gwp(GWP_fc, GWP_sto, GWP_eps, m_h2_nom, m_nox) / N_PAX
-    cost = f_cost(fc_cost, P_eps, m_sto, m_h2_nom, m_h2) / N_PAX
+    cost = f_cost(fc_cost, P_eps, m_sto, m_h2) / N_PAX
+    cost = cost / 1e6  # Convert cost to M€ to match analysis.py
     
-    # Normalize values
-    valid_gwp = ~np.isnan(GWP)
-    valid_cost = ~np.isnan(cost)
-    if np.any(valid_gwp):
-        GWP_norm = GWP / np.nanmax(GWP)
-    else:
-        GWP_norm = np.zeros_like(GWP)
+    # Normalize using L2 norm as in analysis.py
+    cost_flat = cost[valid3d]
+    gwp_flat = GWP[valid3d]
     
-    if np.any(valid_cost):
-        cost_norm = cost / np.nanmax(cost)
+    if len(cost_flat) > 0:
+        obj = np.stack([cost_flat, gwp_flat], axis=-1)
+        norms = np.linalg.norm(obj, axis=-1, keepdims=True)
+        norms[norms == 0] = 1  # Avoid division by zero
+        obj_norm = obj / norms  # Normalize to unit sphere
+        cost_norm_flat = obj_norm[:, 0]  # Normalized cost
+        gwp_norm_flat = obj_norm[:, 1]  # Normalized GWP
+        
+        # Initialize normalized arrays with NaNs and fill valid positions
+        cost_norm = np.full_like(cost, np.nan)
+        gwp_norm = np.full_like(GWP, np.nan)
+        cost_norm[valid3d] = cost_norm_flat
+        gwp_norm[valid3d] = gwp_norm_flat
     else:
         cost_norm = np.zeros_like(cost)
+        gwp_norm = np.zeros_like(GWP)
     
     # Calculate scalar field
-    scalar_field = weight * cost_norm + (1 - weight) * GWP_norm
+    scalar_field = weight * cost_norm + (1 - weight) * gwp_norm
     
     # Calculate 1/(1+score) for visualization (higher value is better)
     viz_field = 1 / (1 + scalar_field)
@@ -190,7 +235,10 @@ def update_graph(weight, constraints):
             f"m_FC: {optimal_design[1]:.5f} kg",
             f"m_H2: {optimal_design[2]:.5f} kg",
             f"m_storage: {optimal_design[3]:.5f} kg",
-            f"m_TMS: {np.sum(optimal_design[11:14]):.5f} kg",
+            f"m_TMS_total: {np.sum(optimal_design[11:14]):.5f} kg",
+            f"m_TMS_front: {optimal_design[11]:.5f} kg",
+            f"m_TMS_aft: {optimal_design[12]:.5f} kg",
+            f"m_TMS_mid: {optimal_design[13]:.5f} kg",
             f"V_FC: {optimal_design[4]:.5f} m³",
             f"V_storage: {optimal_design[5]:.5f} m³",
             f"V_ELMO: {optimal_design[6]:.5f} m³",
@@ -201,9 +249,7 @@ def update_graph(weight, constraints):
     else:
         opt_idx = None
         design_info_str = "No valid designs found with current constraints."
-    
-    # REPLACEMENT CODE STARTS HERE - Fix for voxel visualization
-    
+        
     # Create the figure
     fig = go.Figure()
     
@@ -250,6 +296,58 @@ def update_graph(weight, constraints):
             ),
             name='Design Space'
         ))
+        
+        if 'show_pareto' in pareto_options and len(x_coords) > 2:
+            # Prepare data for Pareto front
+            design_points = np.column_stack((
+                x_coords, y_coords, z_coords, 
+                cost[x_idx, y_idx, z_idx], 
+                GWP[x_idx, y_idx, z_idx]
+            ))
+            
+            # Find Pareto-optimal points
+            pareto_indices = find_pareto_front(design_points[:, 3], design_points[:, 4])
+            
+            if len(pareto_indices) > 1:
+                pareto_points = design_points[pareto_indices]
+                
+                # Extract coordinates of Pareto-optimal points
+                pareto_x = pareto_points[:, 0]
+                pareto_y = pareto_points[:, 1]
+                pareto_z = pareto_points[:, 2]
+                
+                # Add Pareto points as distinct markers (no connecting lines)
+                fig.add_trace(go.Scatter3d(
+                    x=pareto_x,
+                    y=pareto_y,
+                    z=pareto_z,
+                    mode='markers',
+                    marker=dict(
+                        size=10,  # Larger than regular points
+                        color='#00A6D6', # Delft Blue :)
+                        symbol='diamond',
+                        opacity=0.7,
+                        line=dict(color='black', width=1)  # Add outline for better visibility
+                    ),
+                    name='Pareto Optimal'
+                ))
+                
+                # Add text about number of Pareto-optimal designs
+                pareto_count = len(pareto_indices)
+                fig.add_annotation(
+                    x=0.02,
+                    y=0.98,
+                    xref="paper",
+                    yref="paper",
+                    text=f"Found {pareto_count} Pareto optimal designs",
+                    showarrow=False,
+                    font=dict(color="#00A6D6", size=14),
+                    align="left",
+                    bgcolor="rgba(255, 255, 255, 0.7)",
+                    bordercolor="#00A6D6",
+                    borderwidth=1,
+                    borderpad=4
+                )
 
     # Add optimal design point if it exists (same as before)
     if opt_idx is not None:

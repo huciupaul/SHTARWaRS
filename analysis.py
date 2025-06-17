@@ -6,6 +6,12 @@ import numpy as np
 import pickle
 import copy
 from typing import Tuple
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.spatial import ConvexHull
+from scipy.stats import gaussian_kde
+
+
 
 # Local imports
 from global_constants import Beechcraft_1900D, NOx_pPax_TO, NOx_pPax_cruise
@@ -65,19 +71,209 @@ def objective_function(weight: float=0.5, design: np.ndarray=None, N_PAX: np.nda
     
     # Calculate GWP and cost for each design (per passenger)
     GWP = f_gwp(GWP_fc, GWP_sto, GWP_eps, m_h2_nom, m_nox)/N_PAX
-    cost = f_cost(fc_cost, P_eps, m_sto, m_h2_nom, m_h2)/N_PAX
-    # Store GWP and cost in the selection tensor
-    selection_tensor[..., 0] = cost
-    selection_tensor[..., 1] = GWP
+    cost = f_cost(fc_cost, P_eps, m_sto, m_h2)/N_PAX
+    cost = cost / 1e6  # Convert cost to M€
     
-    # Normalize the GWP and cost values
-    GWP_norm = GWP / np.nanmax(GWP)
-    cost_norm = cost / np.nanmax(cost)
+    # Normalize cost and GWP via L^2 norm
+    obj = np.stack([cost, GWP], axis=-1)
+    norms = np.linalg.norm(obj, axis=-1, keepdims=True)
+    norms[norms == 0] = 1  # Avoid division by zero
+    obj_norm = obj / norms  # Normalize to unit sphere
+    cost_norm = obj_norm[..., 0]  # Normalized cost
+    GWP_norm = obj_norm[..., 1]  # Normalized GWP 
     
     # Calculate the scalar field as a weighted sum of cost and GWP
     scalar_field = weight * cost_norm + (1 - weight) * GWP_norm
     
+    selection_tensor[..., 0] = cost 
+    selection_tensor[..., 1] = GWP
+    
     return scalar_field, selection_tensor
+
+
+def score_distribution(
+        selection_tensor: np.ndarray,
+        fpath: str = "data/plots/cost_gwp_distrib.png",
+        dpi: int = 600,
+        method: str | None = None,        # 'auto', 'hex', 'kde', 'scatter'
+        bins: int = 60,                   # for hex / hist
+    ) -> None:
+    """
+    Visualise the distribution of cost vs GWP with a smarter default than
+    a blunt 2-D histogram.
+
+    Parameters
+    ----------
+    method : str | None
+        'hex', 'kde', 'scatter', or None => choose automatically.
+    """
+
+    cost = selection_tensor[..., 0].ravel()
+    gwp  = selection_tensor[..., 1].ravel()
+    mask = np.isfinite(cost) & np.isfinite(gwp)
+    cost, gwp = cost[mask], gwp[mask]
+    N = len(cost)
+
+    if method is None:
+        # choose automatically
+        if N > 3e5:
+            method = "hex"
+        elif N > 5e4:
+            method = "scatter"
+        else:
+            method = "kde"
+
+    sns.set_theme(style="whitegrid")
+    g = sns.JointGrid(x=cost, y=gwp, height=6, space=0)
+
+    if method == "hex":
+        hb = g.ax_joint.hexbin(cost, gwp, gridsize=bins, cmap="viridis",
+                               norm=plt.LogNorm(), mincnt=1)
+        cb = g.figure.colorbar(hb, ax=g.ax_joint, label="counts (log-scaled)")
+    elif method == "kde":
+        # joint KDE
+        xy = np.vstack([cost, gwp])
+        kde = gaussian_kde(xy)(xy)
+        idx = kde.argsort()
+        g.ax_joint.scatter(cost[idx], gwp[idx], c=kde[idx], s=8,
+                           cmap="viridis", edgecolors="none")
+        # filled contour lines (levels = 10%, 30%, 50%, 70%, 90%)
+        levels = kde.max() * np.array([.1, .3, .5, .7, .9])
+        g.ax_joint.tricontourf(cost, gwp, kde, levels=levels,
+                               alpha=.25, cmap="viridis")
+        cb = g.figure.colorbar(plt.cm.ScalarMappable(cmap="viridis"),
+                            ax=g.ax_joint, label="relative density")
+    elif method == "scatter":
+        # compute local density for colour
+        xy = np.vstack([cost, gwp])
+        kde = gaussian_kde(xy)(xy)
+        idx = kde.argsort()
+        g.ax_joint.scatter(cost[idx], gwp[idx], c=kde[idx], s=4,
+                           cmap="viridis", edgecolors="none")
+        cb = g.figure.colorbar(plt.cm.ScalarMappable(cmap="viridis"),
+                            ax=g.ax_joint, label="relative density")
+    else:
+        raise ValueError("method must be 'hex', 'kde', 'scatter', or None")
+
+    # marginals
+    g.ax_marg_x.hist(cost, bins=bins, color="grey", alpha=.7)
+    g.ax_marg_y.hist(gwp,  bins=bins, color="grey", alpha=.7, orientation="horizontal")
+
+    # labels
+    g.ax_joint.set_xlabel("Lifetime cost [M€/PAX]")
+    g.ax_joint.set_ylabel(r"GWP [kg CO$_2$e/PAX]")
+    g.figure.suptitle(f"Cost vs GWP distribution  (N = {N:,})", y=.98)
+    g.figure.tight_layout()
+    g.figure.savefig(fpath, dpi=dpi)
+    plt.close(g.figure)
+
+def pareto_front(
+        selection_tensor: np.ndarray,
+        fpath: str = "data/plots/pareto_front.png",
+        dpi: int = 600,
+        remove_outliers: bool = True,
+        outlier_threshold: float = 1.5,
+        bounds: np.ndarray = np.array([[0.1, 1.0],
+                                       [0.1, 1.0],
+                                       [0.1, 1.0]]),
+        annotate_weights: bool = True,
+    ) -> None:
+    """
+    Plot Pareto front (cost vs GWP) and report the frontier segment weights.
+
+    Parameters
+    ----------
+    selection_tensor : ndarray, shape (..., 2)
+        Last axis = (cost, GWP) *per PAX* (any NaN => ignored).
+    fpath : str
+        Where to save the .png.
+    remove_outliers : bool
+        If True, remove points lying outside `outlier_threshold`·IQR
+        in either objective.
+    annotate_weights : bool
+        Write the weight that makes each frontier vertex optimal.
+    """
+
+    cost   = selection_tensor[..., 0].ravel()
+    gwp    = selection_tensor[..., 1].ravel()
+    mask   = np.isfinite(cost) & np.isfinite(gwp)
+    cost, gwp = cost[mask], gwp[mask]
+
+    if remove_outliers:
+        def _cut(x):
+            q1, q3 = np.percentile(x, [25, 75])
+            iqr = q3 - q1
+            lo, hi = q1 - outlier_threshold*iqr, q3 + outlier_threshold*iqr
+            return (x >= lo) & (x <= hi)
+        keep = _cut(cost) & _cut(gwp)
+        cost, gwp = cost[keep], gwp[keep]
+
+    pts = np.column_stack((cost, gwp))
+    sort_idx    = np.argsort(pts[:, 0])
+    pts_sorted  = pts[sort_idx]
+    gwp_min_run = np.minimum.accumulate(pts_sorted[:, 1])
+    is_pareto   = pts_sorted[:, 1] == gwp_min_run
+    pareto_idx  = sort_idx[is_pareto]
+    P           = pts[pareto_idx]
+    # Now strictly ascending cost, strictly descending GWP
+    P = P[np.argsort(P[:, 0])]
+
+    Cn = (P[:, 0] - P[:, 0].min()) / (np.ptp(P[:, 0]) or 1)
+    Gn = (P[:, 1] - P[:, 1].min()) / (np.ptp(P[:, 1]) or 1)
+
+    # Slopes between consecutive frontier vertices (negative values)
+    dC, dG = np.diff(Cn), np.diff(Gn)
+    slopes = dG / dC                                   # shape (k-1,)
+    w_opt  = np.abs(slopes) / (1 + np.abs(slopes))     # [0,1]
+    
+    dC, dG = np.diff(Cn), np.diff(Gn)
+    w_star  = np.abs(dG) / (np.abs(dG) + np.abs(dC))
+    w_vertices = np.concatenate(([1.0], w_star, [0.0]))
+
+    # Pick the “knee” = slope closest to -1
+    knee_seg = np.argmin(np.abs(np.abs(slopes) - 1))
+    knee_pt  = P[knee_seg + 1] # second vertex in that segment
+
+    sns.set_theme(style="whitegrid")
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    ax.scatter(pts[:, 0], pts[:, 1], s=8, alpha=.3, label="all designs")
+    ax.plot(P[:, 0], P[:, 1], "r-", lw=2, label="Pareto front")
+    ax.scatter(P[:, 0], P[:, 1], c="red", edgecolors="k", zorder=3)
+
+    # annotate frontier vertices with w*
+    if annotate_weights:
+        for (c, g), wv in zip(P, w_vertices):
+            ax.annotate(f"w={wv:0.2f}", xy=(c, g), xytext=(4,-6),
+                        textcoords="offset points", fontsize=7)
+    # if annotate_weights:
+    #     for i, (c, g) in enumerate(P):
+    #         if i in (0, len(P)-1):
+    #             txt = "w=1" if i == 0 else "w=0"
+    #         elif i-1 < len(w_opt):
+    #             txt = f"w≈{w_opt[i-1]:.2f}"
+    #         else:
+    #             continue
+
+
+    # highlight knee
+    ax.scatter(*knee_pt, s=70, marker="*", zorder=5, label="knee (slope≈-1)")
+
+    ax.set_xlabel("Lifetime cost [M€/PAX]")
+    ax.set_ylabel(r"GWP [kg CO$_2$e/PAX]")
+    ax.set_title("Pareto front: cost vs GWP")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(fpath, dpi=dpi)
+    plt.close(fig)
+
+    # ---------- Console read-out ----------
+    print(f"Total designs kept: {len(pts)}")
+    print(f"Pareto-optimal designs: {len(P)}")
+    print("Frontier segment slopes & optimal weights:")
+    for s, w in zip(slopes, w_opt):
+        print(f"  slope = {s:6.3f} -> weight* -> {w:5.3f}")
+    print(f"Knee point @ cost = {knee_pt[0]:.3f} M€,  GWP = {knee_pt[1]:.1f} kg")
 
 def main(weight: float=0.5,
          dim_bounds: np.ndarray=np.array([[0.1, 1.0],
@@ -104,6 +300,11 @@ def main(weight: float=0.5,
         loading = load_tensor(fpath_loading)
     except FileNotFoundError:
         raise FileNotFoundError(f"File not found: {fpath_loading}")
+    
+    try:
+        convergence = load_tensor('data/logs/convergence_tensor.pkl')
+    except FileNotFoundError:
+        raise FileNotFoundError("Convergence tensor not found. Please run the main.py script to generate it.")
     
     print(f"Design space tensor shape: {tensor.shape}")
     print(f"Loading space tensor shape: {loading.shape}")
@@ -135,18 +336,28 @@ def main(weight: float=0.5,
     # Keep only valid designs, fill rest with np.nan
     # lift into a 4th dim so it matches (N, M, P, Q)
     valid4d = valid3d[..., None]        # shape (N, M, P, 1)
-    valid4d = np.broadcast_to(valid4d, design.shape)
+    valid4d = np.broadcast_to(valid4d, design.shape[:-1] + (2,))  # shape (N, M, P, 2)
+    # valid4d = np.broadcast_to(valid4d, design.shape)
 
-    # now prune
-    design[~valid4d] = np.nan
+    # # now prune
+    # design[~valid4d] = np.nan
     
     print(f"Percentage pruned by integration: {np.sum(~valid_integration) / np.prod(design.shape[:-1]) * 100:.2f}%")
     print(f"Percentage pruned by mass loading: {np.sum(~valid_mass) / np.prod(design.shape[:-1]) * 100:.2f}%")
     print(f"Percentage pruned by NOx emissions: {np.sum(~valid_NOx) / np.prod(design.shape[:-1]) * 100:.2f}%")
-    print(f"Total percentage pruned from design space: {np.sum(~valid4d) / np.prod(design.shape) * 100:.2f}%")
     
     # Calculate the scalar field and selection tensor
     scalar_field, selection_tensor = objective_function(weight, design, N_PAX)
+    
+    # Create a Pareto front plot
+    pareto_front(selection_tensor, fpath="data/plots/pareto_front_no_cons.png", dpi=600)
+    
+    # Generate a score distribution plot
+    score_distribution(selection_tensor, fpath="data/plots/cost_gwp_distrib.png", dpi=600, method='kde')
+    constrained_selection_tensor = selection_tensor.copy()
+    # TODO: BROKEN, NEEDS FIXING
+    # constrained_selection_tensor[~valid4d] = np.nan  # Apply the valid mask to the selection tensor
+    # pareto_front(constrained_selection_tensor, fpath="data/plots/pareto_front.png", dpi=600)
     
     # Save the scalar field and selection tensor to a pickle file
     with open('data/logs/CostnSus.pkl', 'wb') as f:
@@ -155,6 +366,23 @@ def main(weight: float=0.5,
     with open('data/logs/SWAG_score.pkl', 'wb') as f:
         pickle.dump(scalar_field, f)
     
+    # Determine optimal point index
+    optimal_index = np.nanargmin(scalar_field)
+    optimal_params = np.unravel_index(optimal_index, scalar_field.shape)
+    optimal_split = splits[optimal_params[0]]
+    optimal_toga = toga_throttle[optimal_params[1]]
+    optimal_cruise = cruise_throttle[optimal_params[2]]
+    
+    print(f"Optimal point found at index {optimal_index} with parameters:"
+          f"\n  Power split: {optimal_split:.2f}"
+          f"\n  TOGA throttle: {optimal_toga:.2f}"
+          f"\n  Cruise throttle: {optimal_cruise:.2f}")
+    
+    optimal_convergence = convergence[optimal_params]
+    # print(optimal_convergence)
+    plt.plot(optimal_convergence)
+    plt.show()
+    
     print(f"Scalar field shape: {scalar_field.shape}")
     
     
@@ -162,7 +390,7 @@ def main(weight: float=0.5,
 if __name__ == "__main__":
     main(
         weight=0.5,
-        dim_bounds=np.array([[0.1, 1.0],
+        dim_bounds=np.array([[0.1, 0.9],
                              [0.1, 1.0],
                              [0.1, 1.0]]),
         fpath_design='data/logs/result_tensor.pkl',

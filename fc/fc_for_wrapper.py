@@ -50,7 +50,7 @@ class FuelCell:
         self.fc_mass = self.power_max_throttle / gc.mass_specific_power  # [kg] Mass of the fuel cell stack
         self.fc_volume = self.power_max_throttle / gc.volume_specific_power
         self.fc_gwp = self.power_max_throttle * gc.FC_prod_gwp / 1000  # [kg CO2] GWP of the fuel cell production
-        self.fc_cost = self.power_req_max / 1000 * gc.FC_cost_no_bop * 3 + self.power_max_throttle * (gc.FC_cost - gc.FC_cost_no_bop) + self.fc_mass * gc.FC_disposal_cost + gc.FC_maint_cost * self.power_req_max /1000
+        self.fc_cost = self.power_req_max /1000 * gc.FC_cost_no_bop * 3 + self.power_max_throttle / 1000 * (gc.FC_cost - gc.FC_cost_no_bop) + self.fc_mass * gc.FC_disposal_cost + gc.FC_maint_cost * self.power_req_max /1000
         self.power_max_throttle * gc.FC_cost / 1000
     
     

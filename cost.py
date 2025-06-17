@@ -1,42 +1,48 @@
 from global_constants import *
 
 
-def calc_cost(P_FC, P_eps, m_sto, m_fc, m_h2):
-    """
-    Calculate the cost of the aircraft and its fuel over its lifetime.
-    Pilot costs are not included.
-    :param fc_cost: cost of the fuel cell over lifetime [EUR]
-    :param P_eps: max power used by the electric propulsion system [kW]
-    :param m_fc: mass of the fuel cell [kg]
-    :param m_sto: mass of the storage system [kg]
-    :param m_h2_nom: nominal mass of hydrogen used [kg]
-    :param m_h2: total mass of hydrogen stored [kg]
+def calc_cost(fc_cost, P_eps, m_sto, m_h2):
 
-    :return: total cost of the aircraft and its fuel over its lifetime [EUR]
-    """
-    # Initial costs
-    fc_init = FC_cost * P_FC
+    # -----Initial costs-----
+    #fc_init = FC_cost * P_FC
     sto_init = Sto_cost * m_h2
     eps_init = P_eps * EPS_cost
-
-    purchase_cost = fc_init + sto_init + eps_init + AC_purchase_cost + AC_dev_cost
-
-    # Operational costs  per year
-    fc_maint = FC_maint_cost * P_FC / years_of_life
-    sto_maint = Sto_maint_cost * m_sto / years_of_life
-    landing =  7.5 * Landing_tax / years_of_life
-    crew = Crew_cost / years_of_life
-    fuel_cost = H2_cost * m_h2 * 0.72  # 28% is reserve fuel
-    insurance = Insurance_cost / years_of_life
-
-    operational_costs = fc_maint + sto_maint + landing + crew + fuel_cost + insurance + AC_maint_cost
-
-    # Disposal costs
-    fc_disposal = FC_disposal_cost * m_fc 
-    sto_disposal = Sto_disposal_cost * m_sto
-    disposal_cost =  fc_disposal + sto_disposal + AC_disposal_cost
     
-    # Total cost
-    total_cost = purchase_cost + operational_costs * years_of_life + disposal_cost
-    return total_cost
+    purchase_cost = sto_init + eps_init + AC_purchase_cost + AC_dev_cost
+    # print(f"Initial costs: FC={0}, STO={sto_init}, EPS={eps_init}, AC={AC_purchase_cost}, Dev={AC_dev_cost}, Total={purchase_cost}")
 
+
+    # -----Operational costs  per year-----
+    #fc_maint = FC_maint_cost * P_FC / years_of_life
+    sto_maint = Sto_maint_cost * m_sto 
+    landing =  7.5 * Landing_tax / years_of_life # 7.5 tones weight range
+    crew = Crew_cost / years_of_life
+    fuel_cost = H2_cost * m_h2 * 0.72 * flights_per_year # 28% is reserve fuel, 920 flights/year
+    insurance = Insurance_cost / years_of_life
+    
+    operational_costs = sto_maint + landing + crew + fuel_cost + insurance + AC_maint_cost
+    # print(f"Operational costs per year: FC={0}, STO={sto_maint}, Landing={landing}, Crew={crew}, Fuel={fuel_cost}, Insurance={insurance}, Total={operational_costs}")
+
+
+    # -----Disposal costs-----
+    #fc_disposal = FC_disposal_cost * m_fc 
+    sto_disposal = Sto_disposal_cost * m_sto
+
+    disposal_cost =  sto_disposal + AC_disposal_cost
+    # print(f"Disposal costs: FC={0}, STO={sto_disposal}, Total={disposal_cost}")
+
+
+    # -----Depreciation-----
+    depreciation = purchase_cost - (purchase_cost / ((1 + depreciation_rate) ** years_of_life))
+    
+
+    # -----Total cost-----
+    total_cost = purchase_cost + operational_costs * years_of_life + disposal_cost + depreciation + fc_cost
+    #print(f"Total cost: {total_cost}")
+
+
+    # -----Ticket calculator-----
+    avg_ticket_price = total_cost / (15 * flight_lifetime) # 15 pax
+    return total_cost #, avg_ticket_price
+
+# print(calc_cost(940835, 500*.99*.97, 275, 250))

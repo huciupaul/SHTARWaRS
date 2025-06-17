@@ -81,8 +81,10 @@ T_FC = 273.15 + 160,                                    # [K] Fuel Cell Temperat
 
 # Aircraft lifetime:
 years_of_life = 20                                      # [years] Aircraft lifetime  
-flight_lifetime = 920 * years_of_life                   # number of flights over the aircraft's lifetime
-time_lifetime = flight_lifetime * 1.5                   # number of flight hours over the aircraft's lifetime
+flights_per_year = 920                                    # [flights/year] Average number of flights per year
+flight_lifetime = flights_per_year * years_of_life                   # number of flights over the aircraft's lifetime
+avg_flight_duration = 1.5                                   # [h] Average flight duration
+time_lifetime = flight_lifetime * avg_flight_duration                   # number of flight hours over the aircraft's lifetime
 num_aircraft = 500                                      # number of aircraft in the fleet
 
 # Costs and emissions
@@ -98,6 +100,7 @@ Insurance_cost = 19000 * years_of_life                            # [EUR] Insura
 Crew_cost = 2 * 89 * time_lifetime                      # [EUR] Crew cost of the aircraft over its lifetime
 Landing_tax = 53.54 * flight_lifetime                   # [EUR] Landing tax of the aircraft over its lifetime
 Beech_maint_cost = 1100 * time_lifetime * 555/640       # [EUR] Maintenance cost of the Beechcraft 1900D https://www.guardianjet.com/jet-aircraft-online-tools/aircraft-brochure.cfm?m=Beech-1900D-198
+depreciation_rate = 0.05                                # [-] Depreciation rate of the aircraft
 
 Sto_cost = 212                                          # [EUR/kgH2] Cost of the storage system https://www.horizon-europe.gouv.fr/advanced-materials-hydrogen-storage-tanks-34822
 EPS_cost = 94                                           # [EUR/kWELMO] Cost of the electrical power system 

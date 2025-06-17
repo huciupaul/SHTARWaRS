@@ -134,9 +134,9 @@ class RamAirHeatExchanger():
             # --- ratio we want to drive to 1 -----------------------------------------
             ratio = (mf_air * cp_air * T) / (self.U_ra * dT_lm)
             if abs(ratio - self.required_area) < tol:           # close enough
-                print(mf_air, "kg/s")
-                print(front_area_rad, "front area rad")
-                print(T, "K")
+                # print(mf_air, "kg/s")
+                # print(front_area_rad, "front area rad")
+                # print(T, "K")
                 break
 
 
@@ -158,9 +158,7 @@ class RamAirHeatExchanger():
         pressure_drop_HX = mu_air /(2* g_c * self.ambient_conditions['rho']) * (4 * L /D_h**2) * (mf_air/A_0) * (f * Re) 
         pressure_drop_duct = (0.5*self.ambient_conditions['rho']*self.ambient_conditions['V']**2)*(eff_duct)*(1-1/AR**2)
         pressure_drop = pressure_drop_duct + pressure_drop_HX
-        print(pressure_drop, "Pa")
         eta_p = 1 - pressure_drop / P_air 
-        print(eta_p, "-")
 
         cool_out = Fluid_Coolant(name = "Coolant Out", T = coolant_temp_out, P = self.fluid.P, 
                          mf = self.fluid.mf_given, fluid_type = self.fluid.fluid_type)
@@ -495,10 +493,14 @@ class Fluid_Coolant():
 class Pipe():
     def __init__(self, length, d_in, fluid, type = 'normal', cryo = False):
         """Initialize the Heat Pipe Analyzer"""
-        self.mat_density = 7900
         self.length = length
         self.d_in = d_in
-        self.d_out = self.d_in + 1e-3 # https://www.swagelok.com/downloads/webcatalogs/EN/MS-01-107.PDF
+        if isinstance(fluid, Fluid_Coolant):
+            self.d_out = 0.027
+            self.mat_density = 0.9e3
+        else:
+            self.d_out = self.d_in + 1e-3 # https://www.swagelok.com/downloads/webcatalogs/EN/MS-01-107.PDF
+            self.mat_density = 7900
         if cryo:
             self.d_is = self.d_out * 5e-3 
         else:
@@ -620,6 +622,7 @@ class Pipe():
         Returns:
         float: mass of the pipe in kg
         """
+    
         mass = self.mat_density * self.length * np.pi * ((self.d_out / 2) ** 2 - (self.d_in / 2) ** 2)
         mass += (self.d_in/2)**2 * np.pi * self.length * self.fluid.rho
         return mass
@@ -819,9 +822,10 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
             mf=h2_mf_fc + h2_mf_cc,
             fluid_type='ParaHydrogen'
         )
-        diam_est = 0.10
-        diam_est_cool = diam_est *3
-        ratio_h2_to_fc = h2_mf_fc / (h2_mf_fc + h2_mf_cc)   
+        diam_est = 0.05
+        diam_est_cool =  0.019 # Calculated from 2m/s flow velocity in longest coolant pipes
+        ratio_h2_to_fc = h2_mf_fc / (h2_mf_fc + h2_mf_cc)  
+        
         size_pipes_h2(h2_mf_fc, h2_mf_cc, p_sto,h2_test, diam_est)
 
         # Initialize -----------------------------
@@ -999,8 +1003,11 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
 
         # FC Cooling ----------------------------------------
 
+        # D_cool_2_3 = np.sqrt(4 * cool_2.mf_given / (np.pi * cool_2.rho))
+        # print(f"Diameter of pipe 2-3: {D_cool_2_3:.3f} m")
+        
         # Pipe cool 2-3
-        pipe_cool_2_3 = Pipe(4.96, diam_est_cool * ratio_to_hex, cool_2)  
+        pipe_cool_2_3 = Pipe(4.96, diam_est_cool, cool_2)  
         m_pipe_cool_2_3.append(pipe_cool_2_3.mass())
         cool_3 = pipe_cool_2_3.analyze_heat_pipe("Cool_3")
 
@@ -1008,7 +1015,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         cool_4 = Fluid_Coolant(name="Cool_4", T=cool_3.T, P=cool_3.P, C=0, mf=cool_3.mf_given/2, fluid_type=coolant) 
 
         # Pipe cool 4-5
-        pipe_cool_4_5 = Pipe(1.56, diam_est_cool*ratio_to_hex*0.5, cool_4)
+        pipe_cool_4_5 = Pipe(1.56, diam_est_cool, cool_4)
         m_pipe_cool_4_5.append( pipe_cool_4_5.mass()*2 )
         cool_5 = pipe_cool_4_5.analyze_heat_pipe("Cool_5")
 
@@ -1021,13 +1028,13 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         cool_21 = Fluid_Coolant(name="Cool_21", T=cool_22.T, P=cool_22.P, C=0, mf=cool_22.mf_given/2, fluid_type=coolant)
 
         # Pipe 21-20
-        pipe_cool_21_20 = Pipe(2.83, diam_est_cool *ratio_to_hex* 0.5, cool_21, type='inv') 
+        pipe_cool_21_20 = Pipe(2.83, diam_est_cool, cool_21, type='inv') 
         m_pipe_cool_2120.append(pipe_cool_21_20.mass() * 2)
         cool_20 = pipe_cool_21_20.analyze_heat_pipe("Cool_20")
 
         # Pipe 12-13
         cool_12 = Fluid_Coolant(name="Cool_12", T=T_fc, P=p_cool, C=0, mf=cool_mf_per_fc, fluid_type=coolant)  # Coolant to FC
-        pipe_cool_12_13 = Pipe(1.42, diam_est_cool * 0.5, cool_12)  
+        pipe_cool_12_13 = Pipe(1.42, diam_est_cool, cool_12)  
         m_pipe_cool_12_13.append(pipe_cool_12_13.mass() * 2)
         cool_13 = pipe_cool_12_13.analyze_heat_pipe("Cool_13")
 
@@ -1039,7 +1046,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         
         # Pipe 14-15
         ratio_to_wing = (cool_14.mf_given / (2 * cool_mf_per_fc))
-        pipe_cool_14_15 = Pipe(0.71, diam_est_cool * ratio_to_wing, cool_14)  
+        pipe_cool_14_15 = Pipe(0.71, diam_est_cool, cool_14)  
         m_pipe_cool_1415.append(pipe_cool_14_15.mass() * 2)
         cool_15 = pipe_cool_14_15.analyze_heat_pipe("Cool_15")
 
@@ -1059,7 +1066,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         if cool_17_mf > 0.0001:
             cool_17 = Fluid_Coolant(name="Cool_17", T=cool_15.T, P=cool_15.P, C=0, mf=cool_17_mf, fluid_type=coolant)  # Coolant to FC
             # Pipe 17-18
-            pipe_cool_17_18 = Pipe(0.43, diam_est_cool * ratio_to_wing, cool_17)   
+            pipe_cool_17_18 = Pipe(0.43, diam_est_cool, cool_17)   
             m_pipe_cool_1718.append(pipe_cool_17_18.mass() * 2)
             cool_18 = pipe_cool_17_18.analyze_heat_pipe("Cool_18")
 
@@ -1075,7 +1082,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
             Q_dot_rem -= Q_abs  
 
             # Pipe cool 23
-            pipe_cool_23 = Pipe(0.43, diam_est_cool * ratio_to_wing, cool_23)
+            pipe_cool_23 = Pipe(0.43, diam_est_cool, cool_23)
             m_pipe_cool_23.append(pipe_cool_23.mass() * 2)
             cool_23_out = pipe_cool_23.analyze_heat_pipe("Cool_23_prime")
             if Q_dot_rem > 0:
@@ -1113,12 +1120,12 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
             fan_powers.append(power_fan*2)
 
             # Pipe 24
-            pipe_cool_24 = Pipe(0.43, diam_est_cool * ratio_to_wing, cool_24)
+            pipe_cool_24 = Pipe(0.43, diam_est_cool, cool_24)
             m_pipe_cool_24.append(pipe_cool_24.mass() * 2)
             cool_24_out = pipe_cool_24.analyze_heat_pipe("Cool_24_Out")
 
             # Pipe 16-24
-            pipe_cool_16_24 = Pipe(1.28, diam_est_cool * ratio_to_wing, cool_16)
+            pipe_cool_16_24 = Pipe(1.28, diam_est_cool, cool_16)
             m_pipe_cool_16_24.append(pipe_cool_16_24.mass() * 2)
             cool_24_prime = pipe_cool_16_24.analyze_heat_pipe("Cool_24_prime")
 
@@ -1128,7 +1135,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
                             C=0, mf=cool_24_out.mf_given + cool_24_prime.mf_given, fluid_type=coolant)  
         else:
             # Pipe 16-24
-            pipe_cool_16_24 = Pipe(1.28, diam_est_cool * ratio_to_wing, cool_16)
+            pipe_cool_16_24 = Pipe(1.28, diam_est_cool, cool_16)
             m_pipe_cool_16_24.append(pipe_cool_16_24.mass() * 2)
             cool_24_prime = pipe_cool_16_24.analyze_heat_pipe("Cool_24_prime")
 
@@ -1141,7 +1148,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
                         P=cool_24_new.P, C=0, mf=cool_24_new.mf_given + cool_5.mf_given, fluid_type=coolant) 
         
         #Pipe Cool 25
-        pipe_cool_25 = Pipe(0.28, diam_est_cool * ratio_to_wing, cool_25)
+        pipe_cool_25 = Pipe(0.28, diam_est_cool, cool_25)
         m_pipe_cool_25.append(pipe_cool_25.mass() * 2)
         cool_25_out = pipe_cool_25.analyze_heat_pipe("Cool_25_out")
 
@@ -1154,7 +1161,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         cool_26 = Fluid_Coolant(name="Cool_26", T= cool_25_out.T + Q_dot_heater / (cool_25_out.cp * cool_25_out.mf_given), P=cool_25_out.P, C=0, mf=cool_25_out.mf_given, fluid_type=coolant) 
 
         # Pipe 26
-        pipe_cool_26 = Pipe(0.28, diam_est_cool * ratio_to_wing, cool_26)
+        pipe_cool_26 = Pipe(0.28, diam_est_cool, cool_26)
         m_pipe_cool_26.append(pipe_cool_26.mass() * 2)
         cool_26_out = pipe_cool_26.analyze_heat_pipe("Cool_26_out")
 
@@ -1167,7 +1174,7 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
         cool_27 = Fluid_Coolant(name="Cool_27", T=cool_26_out.T, P=p_cool, C=0, mf=cool_26_out.mf_given, fluid_type=coolant)  # Coolant to FC after pump
 
         # Pipe 27
-        pipe_cool_27 = Pipe(0.43, diam_est_cool * ratio_to_wing, cool_27)
+        pipe_cool_27 = Pipe(0.43, diam_est_cool, cool_27)
         m_pipe_cool_27.append(pipe_cool_27.mass() * 2)
         cool_27_out = pipe_cool_27.analyze_heat_pipe("Cool_27_out")
 
@@ -1280,6 +1287,21 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
     m_front, 
     m_mid, 
     m_rear]
+
+    # print(f"Front TMS mass: {m_front:.2f} kg")
+    # print(f"Mid TMS mass: {m_mid:.2f} kg")
+    # print(f"Rear TMS mass: {m_rear:.2f} kg")
+
+    # Print the diameter for every Pipe instance
+    for var_name, var_value in locals().items():
+        if isinstance(var_value, Pipe):
+            if var_name == 'pipe_cool_2_3' or var_name == 'pipe_cool_19_22':
+                pass
+                # print(f"Pipe '{var_name}' diameter: {var_value.d_in:.4f} m")
+
+    print(f"Long Coolant pipe mass: {np.max(m_pipe_cool_1922):.2f} kg")
+    print(f"Long Coolant return pipe mass: {np.max(m_pipe_cool_2_3):.2f} kg")
+    print(f"Long H2 pipe mass: {np.max(m_pipe_h2_56):.2f} kg")
     
     
 
