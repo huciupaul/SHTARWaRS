@@ -6,7 +6,7 @@ def calc_cost(fc_cost, P_eps, m_sto, m_h2):
     # -----Initial costs-----
     #fc_init = FC_cost * P_FC
     sto_init = Sto_cost * m_h2
-    eps_init = P_eps * EPS_cost
+    eps_init = P_eps * EPS_cost / 1000  # Convert to kW
     
     purchase_cost = sto_init + eps_init + AC_purchase_cost + AC_dev_cost
     # print(f"Initial costs: FC={0}, STO={sto_init}, EPS={eps_init}, AC={AC_purchase_cost}, Dev={AC_dev_cost}, Total={purchase_cost}")
@@ -14,8 +14,8 @@ def calc_cost(fc_cost, P_eps, m_sto, m_h2):
 
     # -----Operational costs  per year-----
     #fc_maint = FC_maint_cost * P_FC / years_of_life
-    sto_maint = Sto_maint_cost * m_sto 
-    landing =  7.5 * Landing_tax / years_of_life # 7.5 tones weight range
+    sto_maint = Sto_maint_cost * m_h2 
+    landing = Landing_tax / years_of_life # 7.5 tones weight range
     crew = Crew_cost / years_of_life
     fuel_cost = H2_cost * m_h2 * 0.72 * flights_per_year # 28% is reserve fuel, 920 flights/year
     insurance = Insurance_cost / years_of_life
