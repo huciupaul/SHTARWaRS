@@ -1,23 +1,4 @@
-"""
-01_setup_cases.py
------------------
-Pre‑processing script that interpolates the validated engine map
-(E2035 running line) to a user‑defined list of shaft‑power settings,
-computes the compressor exit state on a standard (ISA) day using the
-map pressure ratio and polytropic efficiency, and derives the rich‑
-combustor air/fuel split for an equivalence ratio of φ₁ = 5.
 
-Outputs
--------
-cases_setup.json   # persistent list containing the operating points
-
-Execution
----------
-$ python 01_setup_cases.py   # no CLI options; edit POWERS_TARGET below
-
-The script is deliberately self‑contained, requiring only *NumPy*,
-*SciPy*, and the helper functions shipped in *mixture_properties.py*.
-"""
 from __future__ import annotations
 
 import json
@@ -30,17 +11,13 @@ from scipy.interpolate import PchipInterpolator
 # ---------------------------------------------------------------------------
 # 0 – USER INPUTS
 # ---------------------------------------------------------------------------
-# Shaft‑power settings [kW] for which maps will be generated in the rich and
-# lean combustion simulations.  Replace this list programmatically or edit
-# here as required.
-POWERS_TARGET = [200,1200] #np.linspace(100,1223, 100)   # kW
-PHI_RICH = 5.0                                  # equivalence ratio in rich stage
+
+POWERS_TARGET = [64.5,813.5,1223]   # kW
+PHI_RICH = 5.0
 
 # ---------------------------------------------------------------------------
-# 1 – ENGINE MAP DATA  (E2035 running line)
+# 1 – ENGINE MAP DATA
 # ---------------------------------------------------------------------------
-# The arrays below are strictly monotone w.r.t. shaft power and therefore
-# suitable for one‑to‑one interpolation.
 
 power_2035 = np.array([
      64.45787192,  74.99710015,  86.47285163,  99.10713429, 112.5426231 ,
@@ -121,9 +98,7 @@ def compressor_exit_temperature(T1: float, PR: float, eta_c: float) -> float:
 # ---------------------------------------------------------------------------
 # 4 – HELPER FUNCTIONS FROM mixture_properties ------------------------------
 # ---------------------------------------------------------------------------
-# The project ships a custom *mixture_properties.py* helper collection that
-# already defines stoichiometric functions consistently with the mechanism
-# file used throughout the project.  Re‑use it here!
+
 
 from mixture_properties import air_mass_flow_for_phi, kerosene_to_h2, MECH  # noqa: E402
 
@@ -139,32 +114,30 @@ cases: dict[str, object] = {
 }
 
 for P_req in POWERS_TARGET:
-    # --- 5.1 – base map look‑ups -------------------------------------------
+
     m_air  = float(_air_from_P(P_req))     # kg/s (corrected)
     m_fuel = float(_fuel_from_P(P_req))    # kg/s (kerosene)
     PR     = float(_PR_from_P(P_req))
     eta_c  = float(_eta_c_from_P(P_req))
 
-    # --- 5.2 – compressor exit state --------------------------------------
+
     T2 = compressor_exit_temperature(T_STD, PR, eta_c)   # K
     P2 = P_STD * PR                                      # Pa
 
-    # --- 5.3 – convert kerosene budget to H2 equivalent -------------------
-    m_H2 = kerosene_to_h2(m_fuel)                        # kg/s hydrogen
+    m_H2 = m_fuel
 
     # --- 5.4 – air split for rich flame at φ = 5 --------------------------
     mdot_air_rich = air_mass_flow_for_phi(m_H2, PHI_RICH,X_air=X_AIR)
     mdot_air_lean = m_air - mdot_air_rich
     if mdot_air_lean < 0:
         raise RuntimeError(
-            f"At {P_req:.1f} kW the total air ({m_air:.3f} kg/s) is insufficient "
-            f"to sustain φ₁ = {PHI_RICH} (needs {mdot_air_rich:.3f} kg/s).")
+            f"At {P_req:.1f}kW the total air ({m_air:.3f}kg/s) is insufficient "
+            f"to sustain φ₁={PHI_RICH} (needs {mdot_air_rich:.3f}kg/s).")
 
     # --- 5.5 – store the case --------------------------------------------
     cases["cases"].append({
         "power_kW":        P_req,
         "m_air":           m_air,
-        "m_kerosene":     m_fuel,
         "m_H2":           m_H2,
         "mdot_air_rich":  mdot_air_rich,
         "mdot_air_lean":  mdot_air_lean,

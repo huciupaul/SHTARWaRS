@@ -1,19 +1,4 @@
-"""
-02_run_rich_stage.py
---------------------
-Iterates over the *cases_setup.json* produced by **01_setup_cases.py**, runs a
-free premixed rich flame (φ₁ = 5) for each operating point using Cantera, and
-serialises the burnt‑gas state plus thermodynamic fluxes required for the
-lean‑stage mapper.
 
-Outputs
--------
-rich_cases.json   # persistent, power‑indexed dictionary of rich‑stage data
-
-Execution
----------
-$ python 02_run_rich_stage.py
-"""
 from __future__ import annotations
 
 import json
@@ -25,33 +10,26 @@ ct.suppress_thermo_warnings()
 
 from mixture_properties import (
     mixture_properties,
-    kerosene_to_h2,
-    air_mass_flow_for_phi,
+
     MECH,
 )
 
-# ---------------------------------------------------------------------------
-# 0 – CONSTANTS & INPUTS
-# ---------------------------------------------------------------------------
-PHI_RICH = 5.0                           # φ₁ maintained across all power points
-X_AIR    = "N2:0.78084, O2:0.20946"      # dry air, mole fractions
-X_H2     = "H2:1"
-WIDTH_RICH = 0.04                       # m – domain length for free flame
 
-# ---------------------------------------------------------------------------
-# 1 – LOAD OPERATING POINTS FROM SETUP
-# ---------------------------------------------------------------------------
+PHI_RICH = 5.0
+X_AIR    = "N2:0.78084, O2:0.20946"
+X_H2     = "H2:1"
+WIDTH_RICH = 0.04
+
+
 setup_file = Path("cases_setup.json")
 if not setup_file.exists():
     raise FileNotFoundError("Run 01_setup_cases.py first; 'cases_setup.json' missing.")
 
 cases_setup = json.loads(setup_file.read_text())
 
-# container for (possibly pre‑existing) results
 rich_file = Path("rich_cases.json")
 if rich_file.exists():
     rich_data = json.loads(rich_file.read_text())
-    # build fast lookup by power so we can update/append
     existing = {c["power_kW"]: c for c in rich_data.get("cases", [])}
 else:
     rich_data = {"created": cases_setup["created"], "MECH": MECH, "cases": []}
@@ -63,10 +41,10 @@ else:
 for case in cases_setup["cases"]:
     pwr = case["power_kW"]
     if pwr in existing:
-        print(f"[rich] {pwr:.1f} kW → already solved; skipping.")
+        print(f"[rich] {pwr:.1f}kW → already solved; skipping.")
         continue
 
-    print(f"[rich] Solving free flame for {pwr:.1f} kW …")
+    print(f"[rich] Solving free flame for {pwr:.1f}kW …")
 
     T_inlet = case["T_inlet_K"]
     P_inlet = case["P_inlet_Pa"]
@@ -74,9 +52,7 @@ for case in cases_setup["cases"]:
     mdot_air1 = case["mdot_air_rich"]
     TOTAL_AIR = case["m_air"]
 
-    # -----------------------------------------------------------------------
-    # 2.1 – build premixed reactant state at compressor exit conditions
-    # -----------------------------------------------------------------------
+
     X_mix, mdot_rich_burn, _ = mixture_properties(
         mdot1=mdot_H2, X1=X_H2,
         mdot2=mdot_air1, X2=X_AIR,
@@ -91,9 +67,6 @@ for case in cases_setup["cases"]:
     flame_rich.set_refine_criteria(ratio=6.0, slope=0.01, curve=0.02)
     flame_rich.solve(loglevel=0, auto=True, refine_grid=True)
 
-    # -----------------------------------------------------------------------
-    # 2.2 – burnt gas state immediately downstream of the rich stage
-    # -----------------------------------------------------------------------
     exit_gas = ct.Solution(MECH)
     exit_gas.TPX = flame_rich.T[-1], P_inlet, flame_rich.X[:, -1]
 
@@ -104,9 +77,6 @@ for case in cases_setup["cases"]:
     X_NO  = flame_rich.X[idx("NO"),  -1] if idx("NO")  >= 0 else 0.0
     X_N2O = flame_rich.X[idx("N2O"), -1] if idx("N2O") >= 0 else 0.0
 
-    # -----------------------------------------------------------------------
-    # 2.3 – assemble case dictionary
-    # -----------------------------------------------------------------------
     result = {
         "power_kW":        pwr,
         "T_inlet_K":       T_inlet,
@@ -124,9 +94,6 @@ for case in cases_setup["cases"]:
 
     existing[pwr] = result
 
-# ---------------------------------------------------------------------------
-# 3 – WRITE/UPDATE OUTPUT FILE
-# ---------------------------------------------------------------------------
 rich_data["cases"] = list(existing.values())
 rich_data["updated"] = datetime.utcnow().isoformat() + "Z"
 
