@@ -3,10 +3,10 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 import matplotlib.pyplot as plt
 
-from global_constants import Beechcraft_1900D, seat_pitch, rho_cargo, M_PAX, \
-    X_most_fwd, X_most_aft, X_cargo_fwd, X_first_seat, \
-        X_wing_end, V_cargo_fwd, V_wing,\
-            X_wing, M_cargo_fwd, M_cargo_per_PAX
+from global_constants import Beechcraft_1900D, seat_pitch, M_PAX, \
+        X_most_fwd, X_most_aft, X_cargo_fwd, X_first_seat, \
+        X_wing_end, V_wing, X_EPS, \
+        X_wing, M_cargo_fwd, M_cargo_per_PAX
 from performance.Integration import aft_configuration as acfg
 
 def X_PAX(num_PAX) -> float:
@@ -15,24 +15,11 @@ def X_PAX(num_PAX) -> float:
 
 
 def X_OEW(M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_TMS, X_tank_front) -> Tuple[float, float]:
-    """Calculate the center of gravity position of the original aircraft's empty weight."""
-    """Original aircraft OEW"""
-    # M_cargo_og = V_cargo_fwd * rho_cargo + Beechcraft_1900D['M_cargo_aft']
-    # X_cargo_og = (V_cargo_fwd * rho_cargo * X_cargo_fwd + Beechcraft_1900D['M_cargo_aft'] * Beechcraft_1900D['X_cargo_aft']) / M_cargo_og
-
-    # M_PAX_og = Beechcraft_1900D['num_PAX'] * M_PAX
-    # X_PAX_og = X_PAX(Beechcraft_1900D['num_PAX'])
-
-    # M_payload_og = M_cargo_og + M_PAX_og
-    # X_payload_og = (M_PAX_og * X_PAX_og + M_cargo_og*X_cargo_og) / M_payload_og
-
-    # # CG position of the OEW of Beechcraft 1900D based on its most forward MTOW CG position
-    # # TODO: rethink this choice
-    # X_OEW_og = (Beechcraft_1900D['MTOW'] * X_most_fwd - Beechcraft_1900D['M_fuel'] * X_wing - M_payload_og * X_payload_og) / Beechcraft_1900D['OEW']
+    """Calculate the center of gravity position of the aircraft's empty weight."""
     X_OEW_og = Beechcraft_1900D['X_OEW']
 
     OEW_H2D2 = Beechcraft_1900D['OEW'] + M_FC + M_EPS + M_TMS_fwd + M_TMS_aft + M_tank + M_TMS_mid
-    X_OEW_H2D2 = (Beechcraft_1900D['OEW'] * X_OEW_og + (M_FC + M_EPS + M_TMS_fwd) * X_wing + (M_TMS_aft + M_tank) * X_tank_TMS + M_TMS_mid * (X_wing_end + X_tank_front) / 2) / OEW_H2D2
+    X_OEW_H2D2 = (Beechcraft_1900D['OEW'] * X_OEW_og + M_EPS * X_EPS + (M_FC + M_TMS_fwd) * X_wing + (M_TMS_aft + M_tank) * X_tank_TMS + M_TMS_mid * (X_wing_end + X_tank_front) / 2) / OEW_H2D2
 
     return OEW_H2D2, X_OEW_H2D2
 
@@ -135,9 +122,9 @@ def min_max_X_cg_positions(
     ):
     """Find the minimum and maximum center of gravity positions."""
     OEW_H2D2, X_OEW_H2D2 = X_OEW(M_FC, M_TMS_fwd, M_TMS_aft, M_TMS_mid, M_EPS, M_tank, X_tank_TMS, X_tank_front) 
-    X_cargo_front, W_cargo_front, X_cargo_back, W_cargo_back = __cargo(X_cargo_aft, M_cargo_aft, X_OEW_H2D2, OEW_H2D2)
-    X_seat_front, W_seat_front, X_seat_back, W_seat_back = __passengers(X_cargo_front, W_cargo_front, num_PAX)
-    X_fuel, W_fuel = __fuel(X_seat_front, W_seat_front, M_fuel, X_tank_TMS)
+    X_cargo_front, W_cargo_front, X_cargo_back, _ = __cargo(X_cargo_aft, M_cargo_aft, X_OEW_H2D2, OEW_H2D2)
+    X_seat_front, W_seat_front, X_seat_back, _ = __passengers(X_cargo_front, W_cargo_front, num_PAX)
+    X_fuel, _ = __fuel(X_seat_front, W_seat_front, M_fuel, X_tank_TMS)
 
     arrays = [X_cargo_front, X_cargo_back, X_seat_front, X_seat_back, X_fuel]
     array_names = ["X_cargo", "X_seat_front", "X_seat_back", "X_fuel"]
@@ -145,8 +132,8 @@ def min_max_X_cg_positions(
     min_cg = np.min(np.hstack(arrays))
     max_cg = np.max(np.hstack(arrays))
 
-    min_index = np.argmin(np.hstack(arrays))
-    max_index = np.argmax(np.hstack(arrays))
+    # min_index = np.argmin(np.hstack(arrays))
+    # max_index = np.argmax(np.hstack(arrays))
     
     # delta = ((M_tank + M_TMS_aft) * X_tank_TMS
     #      - (M_FC + M_EPS + M_TMS_fwd) * X_wing) / OEW_H2D2
@@ -156,17 +143,16 @@ def min_max_X_cg_positions(
     original_loading = Beechcraft_1900D['M_cargo_aft']
     
     delta = back_loading - original_loading    
-    
 
     cumulative_lengths = np.cumsum([len(arr) for arr in arrays])
 
-    def __find_source_array_and_index(flat_index):
-        """Finds the original array and the index within that array."""
-        for i, length in enumerate(cumulative_lengths):
-            if flat_index < length:
-                original_index = flat_index - (cumulative_lengths[i - 1] if i > 0 else 0)
-                return array_names[i], original_index
-        return None, None
+    # def __find_source_array_and_index(flat_index):
+    #     """Finds the original array and the index within that array."""
+    #     for i, length in enumerate(cumulative_lengths):
+    #         if flat_index < length:
+    #             original_index = flat_index - (cumulative_lengths[i - 1] if i > 0 else 0)
+    #             return array_names[i], original_index
+    #     return None, None
 
     # # Get source array names and indices
     # min_source, min_array_index = __find_source_array_and_index(min_index)
