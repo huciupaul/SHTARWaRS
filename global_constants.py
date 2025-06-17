@@ -103,7 +103,7 @@ Beech_maint_cost = 1100 * time_lifetime * 555/640       # [EUR] Maintenance cost
 depreciation_rate = 0.05                                # [-] Depreciation rate of the aircraft
 
 Sto_cost = 212                                          # [EUR/kgH2] Cost of the storage system https://www.horizon-europe.gouv.fr/advanced-materials-hydrogen-storage-tanks-34822
-EPS_cost = 94                                           # [EUR/kWELMO] Cost of the electrical power system 
+EPS_cost = 267                                          # [EUR/kWELMO] Cost of the electrical power system 
 AC_dev_cost = 255900000 / num_aircraft                  # [EUR] Development cost of the aircraft per aircraft https://www.mdpi.com/2226-4310/9/7/349
 AC_purchase_cost = 1_300_000                            # [EUR] Purchase cost of the aircraft (1.5 times the development cost)
 AC_maint_cost = 1_311_000                               # [EUR] Maintenance cost of the aircraft over its lifetime per aircraft
