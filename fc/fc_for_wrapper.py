@@ -50,7 +50,7 @@ class FuelCell:
         self.fc_mass = self.power_max_throttle / gc.mass_specific_power  # [kg] Mass of the fuel cell stack
         self.fc_volume = self.power_max_throttle / gc.volume_specific_power
         self.fc_gwp = self.power_max_throttle * gc.FC_prod_gwp / 1000  # [kg CO2] GWP of the fuel cell production
-        self.fc_cost = self.power_req_max /1000 * gc.FC_cost_no_bop * 3 + self.power_max_throttle / 1000 * (gc.FC_cost - gc.FC_cost_no_bop) + self.fc_mass * gc.FC_disposal_cost + gc.FC_maint_cost * self.power_req_max /1000
+        self.fc_cost = self.power_req_max /1000 * gc.FC_cost_no_bop * 2 + self.power_max_throttle / 1000 * (gc.FC_cost - gc.FC_cost_no_bop) + self.fc_mass * gc.FC_disposal_cost + gc.FC_maint_cost * self.power_req_max /1000
         self.power_max_throttle * gc.FC_cost / 1000
     
     
@@ -124,10 +124,10 @@ class FuelCell:
 
 
 if __name__ == "__main__":
-    fuel_cell = FuelCell(name="HTPEM", power_req_max=1000000, throttle_TOGA=0.85)
+    fuel_cell = FuelCell(name="HTPEM", power_req_max=500000, throttle_TOGA=0.5)
     print(f"Fuel Cell Name: {fuel_cell.name}")
     print(f"Fuel Cell Mass: {fuel_cell.fc_mass:.2f} kg")
     print(f"Fuel Cell Volume: {fuel_cell.fc_volume:.2f} m^3")
     Qdot_FC, m_H2_FC, m_air_FC_in, m_air_FC_out, m_H20_FC, m_H2_recirculation = fuel_cell.get_TMS_values(power=500000)
-    print(fuel_cell.get_TMS_values(power=500000))
+    print(fuel_cell.fc_cost)
 
