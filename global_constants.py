@@ -98,7 +98,7 @@ Sto_maint_cost = 37                                     # [EUR/kgH2/yr] Maintena
 AC_disposal_cost = 6.693 * 4932                         # [EUR/kgAC] Disposal cost of the aircraft per kg of aircraft
 Insurance_cost = 19000 * years_of_life                            # [EUR] Insurance cost of the aircraft over its lifetime
 Crew_cost = 2 * 89 * time_lifetime                      # [EUR] Crew cost of the aircraft over its lifetime
-Landing_tax = 53.54 * flight_lifetime                   # [EUR] Landing tax of the aircraft over its lifetime
+Landing_tax = 54.53 * flight_lifetime                   # [EUR] Landing tax of the aircraft over its lifetime
 Beech_maint_cost = 1100 * time_lifetime * 555/640       # [EUR] Maintenance cost of the Beechcraft 1900D https://www.guardianjet.com/jet-aircraft-online-tools/aircraft-brochure.cfm?m=Beech-1900D-198
 depreciation_rate = 0.05                                # [-] Depreciation rate of the aircraft
 
