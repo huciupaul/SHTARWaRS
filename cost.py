@@ -1,7 +1,7 @@
 from global_constants import *
 
 
-def calc_cost(fc_cost, P_eps, m_sto, m_h2):
+def calc_cost(fc_cost, P_eps, m_sto, m_h2, m_h2_used):
 
     # -----Initial costs-----
     #fc_init = FC_cost * P_FC
@@ -17,7 +17,7 @@ def calc_cost(fc_cost, P_eps, m_sto, m_h2):
     sto_maint = Sto_maint_cost * m_h2 
     landing = Landing_tax / years_of_life # 7.5 tones weight range
     crew = Crew_cost / years_of_life
-    fuel_cost = H2_cost * m_h2 * 0.72 * flights_per_year # 28% is reserve fuel, 920 flights/year
+    fuel_cost = H2_cost * m_h2_used * flights_per_year # 28% is reserve fuel, 920 flights/year
     insurance = Insurance_cost / years_of_life
     
     operational_costs = sto_maint + landing + crew + fuel_cost + insurance + AC_maint_cost
