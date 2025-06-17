@@ -282,11 +282,3 @@ reynolds_air = 1e7  # depends on temperature?
 # -- FC
 deltaT_fc = 20
 HEX_1_deltaT = 20 # Evaporator HX
-
-
-######################
-# Quench Zone Sim
-######################
-Power = []
-T_rich = []
-P_rich = []
