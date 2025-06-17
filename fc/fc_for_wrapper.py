@@ -50,7 +50,6 @@ class FuelCell:
         self.fc_mass = self.power_max_throttle / gc.mass_specific_power  # [kg] Mass of the fuel cell stack
         self.fc_volume = self.power_max_throttle / gc.volume_specific_power
         self.fc_gwp = self.power_max_throttle * gc.FC_prod_gwp / 1000  # [kg CO2] GWP of the fuel cell production
-        self.fc_cost = self.power_req_max /1000 * gc.FC_cost_no_bop * 2 + self.power_max_throttle / 1000 * (gc.FC_cost - gc.FC_cost_no_bop) + self.fc_mass * gc.FC_disposal_cost + gc.FC_maint_cost * self.power_req_max /1000
         self.power_max_throttle * gc.FC_cost / 1000
     
     
@@ -64,6 +63,18 @@ class FuelCell:
         
         return gc.efficiency_per_throttle(Throttle)  # Get the efficiency based on the throttle setting
      
+    def get_fc_cost(self, P_req_max):
+        """
+        Calculate the cost of the fuel cell based on the maximum power required.
+        Args:
+            P_req_max (float): Maximum power required by the fuel cell in watts.
+        Returns:
+            float: Cost of the fuel cell in Euros for entire lifetime.
+        """
+        self.fc_cost = self.power_max_throttle /1000 * gc.FC_cost_no_bop * 2 + P_req_max / 1000 * (gc.FC_cost - gc.FC_cost_no_bop) + self.fc_mass * gc.FC_disposal_cost + gc.FC_maint_cost * P_req_max /1000
+
+        return self.fc_cost  # [€] Cost of the fuel cell for the entire lifetime
+
 
     def get_TMS_spec(self):
         """
