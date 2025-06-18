@@ -120,7 +120,7 @@ class FuelCell:
         self.m_H2_FC = power / (gc.LHV_H2 * efficiency)  # [kg/s] Mass flow rate of hydrogen in the fuel cell
         
         # Calculate the mass flow rate of air required for the fuel cell
-        self.m_air_FC_in = self.m_H2_FC * gc.stoic_ratio_C #self.m_H2_FC * gc.stoic_ratio_C * 15.999 / 2.01568 / 0.2314
+        self.m_air_FC_in = self.m_H2_FC * gc.stoic_ratio_C * 15.999 / 2.01568 / 0.2314
 
         # Calculate the mass flow rate of fluid out of the fuel cell
         self.m_air_FC_out = self.m_air_FC_in + self.m_H2_FC
