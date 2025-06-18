@@ -1073,7 +1073,13 @@ def tms_main(Q_dot_fc_l, Q_dot_eps_l, p_fc_l, p_cc_l, h2_mf_fc_l, h2_mf_cc_l, T_
 
             # Skin Heat Exchanger
             # -------------------------------------------------------------------------------------------------
-            skin_hx = SkinHeatExchanger(area = area_wing*2, fluid = cool_18, U = 80)
+            Pr_coolant = cool_18.mu * cool_18.cp / cool_18.k
+            Re_coolant = cool_18.mf_calculated * 4/  (np.pi * diam_est_cool * ratio_to_wing * cool_18.mu)
+            f_coolant = (0.79 * np.log(Re_coolant) - 1.64) ** -2 
+            Nu_coolant = ((f_coolant/8)*(Re_coolant-1000)*Pr_coolant)/(1+12.7*(f_coolant/8)**0.5 * (Pr_coolant**(2/3)-1))  # Nusselt number for coolant
+            h_int = cool_18.k * Nu_coolant / (diam_est_cool * ratio_to_wing)
+            U_cool = 1 / (1/h_int + 1/h_ext_w)  
+            skin_hx = SkinHeatExchanger(area = area_wing*2, fluid = cool_18, U = U_cool )
             skin_hx.set_ambient(T_ambient_K = ambient_conditions['T'])
             Q_abs, t_cool_out = skin_hx.absorb_heat(Q_dot_rem)
             skin_hx_mass = area_wing * 2 * 7900 * 1e-3
