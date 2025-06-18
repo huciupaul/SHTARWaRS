@@ -71,9 +71,14 @@ class FuelCell:
         Returns:
             float: Cost of the fuel cell in Euros for entire lifetime.
         """
+        prod_cost = self.power_max_throttle /1000 * gc.FC_cost_no_bop * 2
+        bop_cost = P_req_max / 1000 * (gc.FC_cost - gc.FC_cost_no_bop)  # Balance of Plant cost
+        maint_cost = gc.FC_maint_cost * P_req_max / 1000  # Maintenance cost
+        disposal_cost = self.fc_mass * gc.FC_disposal_cost  # Disposal cost of the
+
         self.fc_cost = self.power_max_throttle /1000 * gc.FC_cost_no_bop * 2 + P_req_max / 1000 * (gc.FC_cost - gc.FC_cost_no_bop) + self.fc_mass * gc.FC_disposal_cost + gc.FC_maint_cost * P_req_max /1000
 
-        return self.fc_cost  # [€] Cost of the fuel cell for the entire lifetime
+        return self.fc_cost, prod_cost, bop_cost, maint_cost, disposal_cost  # [€] Cost of the fuel cell for the entire lifetime
 
 
     def get_TMS_spec(self):
@@ -115,7 +120,7 @@ class FuelCell:
         self.m_H2_FC = power / (gc.LHV_H2 * efficiency)  # [kg/s] Mass flow rate of hydrogen in the fuel cell
         
         # Calculate the mass flow rate of air required for the fuel cell
-        self.m_air_FC_in = self.m_H2_FC * gc.stoic_ratio_C
+        self.m_air_FC_in = self.m_H2_FC * gc.stoic_ratio_C * 15.999 / 2.01568 / 0.2314
 
         # Calculate the mass flow rate of fluid out of the fuel cell
         self.m_air_FC_out = self.m_air_FC_in + self.m_H2_FC
@@ -139,6 +144,17 @@ if __name__ == "__main__":
     print(f"Fuel Cell Name: {fuel_cell.name}")
     print(f"Fuel Cell Mass: {fuel_cell.fc_mass:.2f} kg")
     print(f"Fuel Cell Volume: {fuel_cell.fc_volume:.2f} m^3")
-    Qdot_FC, m_H2_FC, m_air_FC_in, m_air_FC_out, m_H20_FC, m_H2_recirculation = fuel_cell.get_TMS_values(power=500000)
-    print(fuel_cell.fc_cost)
+    Qdot_FC, m_H2_FC, m_air_FC_in, m_air_FC_out, m_H20_FC, m_H2_recirculation, m_H2_recirculation_CC = fuel_cell.get_TMS_values(power=500000)
+
+    print(f"proportion of flow rate of H2 in the fuel cell: {m_H2_FC/m_air_FC_out:.4f} [%]")
+    print(f"proportion of flow rate of O2 in the fuel cell: {m_air_FC_in*0.2314/m_air_FC_out:.4f} [%]")
+    
+    print(f"proportion of flow rate of O2 out of the fuel cell: {m_air_FC_in*0.2314*0.6/1.6/m_air_FC_out:.4f} [%]")
+    print(f"proportion of flow rate of air in the fuel cell: {m_air_FC_in/m_air_FC_out:.4f} [%]")
+    print(f"proportion of flow rate of water in the fuel cell: {m_H20_FC/m_air_FC_out:.4f} [%]")
+    print(f"proportion of flow rate of H2 recirc in the fuel cell: {m_H2_recirculation/m_air_FC_out:.4f} [%]")
+
+
+
+    # print(fuel_cell.fc_cost())
 
