@@ -728,7 +728,7 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
     # Reshape the TMS inputs to match the indexes
     TMS_inputs = {key: np.array([mission_H2.TMS_inputs[key][i] for i in indexes]) for key in mission_H2.TMS_inputs.keys()}
 
-    fc_costs = np.array(fc_model.get_fc_cost(P_req_max=mission_H2.profile["P_fc"].max()))) # easiest way to do it
+    fc_costs = np.array(fc_model.get_fc_cost(P_req_max=mission_H2.profile["P_fc"].max())) # easiest way to do it
                        
     # Determine the maximum fuel cell power across the three splits
     FC_outputs = dict(m_fc=fc_model.fc_mass,
@@ -738,7 +738,7 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
                       fc_stack_prod_cost = fc_costs[1],
                       fc_bop_cost = fc_costs[2],
                       fc_maintenance_cost = fc_costs[3],
-                      fc_disposal_cost = fc_costs[4],)
+                      fc_disposal_cost = fc_costs[4])
     # mission_H2.quicklook()  # Show quicklook plots
     
     # Get H2 mass, NOx mass, and max(mdot_NOx) for a nominal mission (- hold)
