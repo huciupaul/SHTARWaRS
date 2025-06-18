@@ -732,7 +732,12 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
     FC_outputs = dict(m_fc=fc_model.fc_mass,
                       V_fc=fc_model.fc_volume,
                       co2_fc=fc_model.fc_gwp,
-                      fc_cost=fc_model.get_fc_cost(P_req_max=mission_H2.profile["P_fc"].max()))
+                      fc_costs=fc_model.get_fc_cost(P_req_max=mission_H2.profile["P_fc"].max())
+                      fc_cost = fc_costs[0],
+                      fc_stack_prod_cost = fc_costs[1],
+                      fc_bop_cost = fc_costs[2],
+                      fc_maintenance_cost = fc_costs[3],
+                      fc_disposal_cost = fc_costs[4],)
     # mission_H2.quicklook()  # Show quicklook plots
     
     # Get H2 mass, NOx mass, and max(mdot_NOx) for a nominal mission (- hold)
