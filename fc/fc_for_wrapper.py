@@ -78,7 +78,7 @@ class FuelCell:
 
         self.fc_cost = self.power_max_throttle /1000 * gc.FC_cost_no_bop * 2 + P_req_max / 1000 * (gc.FC_cost - gc.FC_cost_no_bop) + self.fc_mass * gc.FC_disposal_cost + gc.FC_maint_cost * P_req_max /1000
 
-        return self.fc_cost, prod_cost, bop_cost, maint_cost, disposal_cost  # [€] Cost of the fuel cell for the entire lifetime
+        return [self.fc_cost, prod_cost, bop_cost, maint_cost, disposal_cost]  # [€] Cost of the fuel cell for the entire lifetime
 
 
     def get_TMS_spec(self):
@@ -120,7 +120,7 @@ class FuelCell:
         self.m_H2_FC = power / (gc.LHV_H2 * efficiency)  # [kg/s] Mass flow rate of hydrogen in the fuel cell
         
         # Calculate the mass flow rate of air required for the fuel cell
-        self.m_air_FC_in = self.m_H2_FC * gc.stoic_ratio_C * 15.999 / 2.01568 / 0.2314
+        self.m_air_FC_in = self.m_H2_FC * gc.stoic_ratio_C #self.m_H2_FC * gc.stoic_ratio_C * 15.999 / 2.01568 / 0.2314
 
         # Calculate the mass flow rate of fluid out of the fuel cell
         self.m_air_FC_out = self.m_air_FC_in + self.m_H2_FC
