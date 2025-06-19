@@ -140,19 +140,23 @@ class FuelCell:
 
 
 if __name__ == "__main__":
-    fuel_cell = FuelCell(name="HTPEM", power_req_max=500000, throttle_TOGA=0.5)
+    idle_throttle = 0.09
+    # cruise = 
+    fuel_cell = FuelCell(name="HTPEM", power_req_max=1908000*0.35, throttle_TOGA=0.275)
     print(f"Fuel Cell Name: {fuel_cell.name}")
     print(f"Fuel Cell Mass: {fuel_cell.fc_mass:.2f} kg")
     print(f"Fuel Cell Volume: {fuel_cell.fc_volume:.2f} m^3")
-    Qdot_FC, m_H2_FC, m_air_FC_in, m_air_FC_out, m_H20_FC, m_H2_recirculation, m_H2_recirculation_CC = fuel_cell.get_TMS_values(power=500000)
+    Qdot_FC, m_H2_FC, m_air_FC_in, m_air_FC_out, m_H20_FC, m_H2_recirculation, m_H2_recirculation_CC = fuel_cell.get_TMS_values(power=1908000*0.35*0.325/0.275)
 
-    print(f"proportion of flow rate of H2 in the fuel cell: {m_H2_FC/m_air_FC_out:.4f} [%]")
+    print(f"proportion of flow rate of H2 in the fuel cell: {m_H2_FC:.4f} [%]")
     print(f"proportion of flow rate of O2 in the fuel cell: {m_air_FC_in*0.2314/m_air_FC_out:.4f} [%]")
     
     print(f"proportion of flow rate of O2 out of the fuel cell: {m_air_FC_in*0.2314*0.6/1.6/m_air_FC_out:.4f} [%]")
     print(f"proportion of flow rate of air in the fuel cell: {m_air_FC_in/m_air_FC_out:.4f} [%]")
-    print(f"proportion of flow rate of water in the fuel cell: {m_H20_FC/m_air_FC_out:.4f} [%]")
+    print(f"proportion of flow rate of water in the fuel cell: {m_H20_FC * 0.85} [%]")
     print(f"proportion of flow rate of H2 recirc in the fuel cell: {m_H2_recirculation/m_air_FC_out:.4f} [%]")
+
+    print(fuel_cell.get_fc_cost(1908000*0.35*0.325/0.275))
 
 
 
