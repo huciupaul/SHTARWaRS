@@ -92,8 +92,8 @@ def calc_cost_breakdown(fc_cost, P_eps, m_sto, m_h2, m_h2_used):
 
     cost_breakdown = dict(
         purchase_cost=purchase_cost,
-        disposal_cost=disposal_cost,
-        depreciation=depreciation,
+        # disposal_cost=disposal_cost,
+        # depreciation=depreciation,
         fc_cost=fc_cost,
         sto_prod=sto_init,
         eps_prod=eps_init,

@@ -167,7 +167,7 @@ def score_distribution(
     # labels
     g.ax_joint.set_xlabel("Lifetime cost [M€/PAX]")
     g.ax_joint.set_ylabel(r"GWP [kg CO$_2$e/PAX]")
-    g.figure.suptitle(f"Cost vs GWP distribution  (N = {N:,})", y=.98)
+    # g.figure.suptitle(f"Cost vs GWP distribution  (N = {N:,})", y=.98)
     g.figure.tight_layout()
     g.figure.show()
     g.figure.savefig(fpath, dpi=dpi)
@@ -180,27 +180,27 @@ def print_design_point(point_name, tensor_point, n_pax=None):
     
     # Masses
     print(f"Mass Variables:")
-    print(f"  m_eps:          {tensor_point[0]:.2f} kg  (Electric Propulsion System)")
-    print(f"  m_fc:           {tensor_point[1]:.2f} kg  (Fuel Cell)")
-    print(f"  m_h2:           {tensor_point[2]:.2f} kg  (Hydrogen)")
-    print(f"  m_sto:          {tensor_point[3]:.2f} kg  (Storage System)")
-    print(f"  m_tms_front:    {tensor_point[11]:.2f} kg  (Thermal Management - Front)")
-    print(f"  m_tms_aft:      {tensor_point[12]:.2f} kg  (Thermal Management - Aft)")
-    print(f"  m_tms_mid:      {tensor_point[13]:.2f} kg  (Thermal Management - Mid)")
-    print(f"  m_h2_nom:       {tensor_point[18]:.2f} kg  (Nominal Hydrogen Usage)")
+    print(f"  m_eps:          {tensor_point[0]} kg  (Electric Propulsion System)")
+    print(f"  m_fc:           {tensor_point[1]} kg  (Fuel Cell)")
+    print(f"  m_h2:           {tensor_point[2]} kg  (Hydrogen)")
+    print(f"  m_sto:          {tensor_point[3]} kg  (Storage System)")
+    print(f"  m_tms_front:    {tensor_point[11]} kg  (Thermal Management - Front)")
+    print(f"  m_tms_aft:      {tensor_point[12]} kg  (Thermal Management - Aft)")
+    print(f"  m_tms_mid:      {tensor_point[13]} kg  (Thermal Management - Mid)")
+    print(f"  m_h2_nom:       {tensor_point[18]} kg  (Nominal Hydrogen Usage)")
     
     # Volumes
     print(f"\nVolume Variables:")
-    print(f"  V_fc:           {tensor_point[4]:.2f} m³  (Fuel Cell Volume)")
-    print(f"  V_sto:          {tensor_point[5]:.2f} m³  (Storage System Volume)")
-    print(f"  V_elmo:         {tensor_point[6]:.2f} m³  (Electric Motor Volume)")
+    print(f"  V_fc:           {tensor_point[4]} m³  (Fuel Cell Volume)")
+    print(f"  V_sto:          {tensor_point[5]} m³  (Storage System Volume)")
+    print(f"  V_elmo:         {tensor_point[6]} m³  (Electric Motor Volume)")
     
     # Aircraft properties
     print(f"\nAircraft Properties:")
-    print(f"  MTOW:           {tensor_point[7]:.2f} kg  (Maximum Take-Off Weight)")
-    print(f"  length_sto:     {tensor_point[8]:.2f} m   (Storage System Length)")
-    print(f"  diameter_sto:   {tensor_point[9]:.2f} m   (Storage System Diameter)")
-    print(f"  M_aft_cargo:    {tensor_point[10]:.2f} kg (Aft Cargo Mass)")
+    print(f"  MTOW:           {tensor_point[7]} kg  (Maximum Take-Off Weight)")
+    print(f"  length_sto:     {tensor_point[8]} m   (Storage System Length)")
+    print(f"  diameter_sto:   {tensor_point[9]} m   (Storage System Diameter)")
+    print(f"  M_aft_cargo:    {tensor_point[10]} kg (Aft Cargo Mass)")
     print(f"  N_PAX:          {n_pax} pax   (Number of Passengers)") if n_pax is not None else print(f"  N_PAX:         {tensor_point[23]:.2f} pax  (Number of Passengers)")
     
     # Emissions & Power
@@ -212,10 +212,10 @@ def print_design_point(point_name, tensor_point, n_pax=None):
     
     # Cost & Environmental Impact
     print(f"\nCost & Environmental Impact:")
-    print(f"  cost_fc:        {tensor_point[17]/1e6:.2f} M€  (Fuel Cell Cost)")
-    print(f"  co2_fc:         {tensor_point[20]:.2f} kg CO₂e  (Fuel Cell GWP)")
-    print(f"  co2_sto:        {tensor_point[21]:.2f} kg CO₂e  (Storage System GWP)")
-    print(f"  co2_eps:        {tensor_point[22]:.2f} kg CO₂e  (Electric Propulsion System GWP)")
+    print(f"  cost_fc:        {tensor_point[17]/1e6} M€  (Fuel Cell Cost)")
+    print(f"  co2_fc:         {tensor_point[20]} kg CO₂e  (Fuel Cell GWP)")
+    print(f"  co2_sto:        {tensor_point[21]} kg CO₂e  (Storage System GWP)")
+    print(f"  co2_eps:        {tensor_point[22]} kg CO₂e  (Electric Propulsion System GWP)")
 
 def _pareto_mask(selection_tensor: np.ndarray) -> np.ndarray:
     """Return a boolean mask of Pareto-optimal points (dominance on cost & gwp)."""
@@ -254,7 +254,7 @@ def pareto_front(
         selection_tensor: np.ndarray,
         fpath: str = "data/plots/pareto_front.png",
         dpi: int = 600,
-        remove_outliers: bool = True,
+        remove_outliers: bool = False,
         outlier_threshold: float = 1.5,
         bounds: np.ndarray = np.array([[0.1, 1.0],
                                        [0.1, 1.0],
@@ -344,7 +344,7 @@ def pareto_front(
 
     ax.set_xlabel("Lifetime cost [M€/PAX]")
     ax.set_ylabel(r"GWP [kg CO$_2$e/PAX]")
-    ax.set_title("Pareto front: cost vs GWP")
+    # ax.set_title("Pareto front: cost vs GWP")
     ax.legend()
     fig.tight_layout()
     # fig.savefig(fpath, dpi=dpi)
@@ -429,6 +429,7 @@ def main(weight: float=0.5,
     print(f"Percentage pruned by integration: {np.sum(~valid_integration) / np.prod(design.shape[:-1]) * 100:.2f}%")
     print(f"Percentage pruned by mass loading: {np.sum(~valid_mass) / np.prod(design.shape[:-1]) * 100:.2f}%")
     print(f"Percentage pruned by NOx emissions: {np.sum(~valid_NOx) / np.prod(design.shape[:-1]) * 100:.2f}%")
+    print(f"Percentage pruned by all constraints: {np.sum(~valid3d) / np.prod(design.shape[:-1]) * 100:.2f}%")
     
     # Calculate the scalar field and selection tensor
     scalar_field, selection_tensor = objective_function(weight, design, N_PAX)
@@ -437,12 +438,12 @@ def main(weight: float=0.5,
     # pareto_front(selection_tensor, fpath="data/plots/pareto_front_no_cons.png", dpi=600)
     
     # # Generate a score distribution plot
-    score_distribution(selection_tensor, fpath="data/plots/cost_gwp_distrib.png", dpi=600, method='kde')
+    # score_distribution(selection_tensor, fpath="data/plots/cost_gwp_distrib.png", dpi=600, method='kde')
     constrained_selection_tensor = selection_tensor.copy()
     constrained_selection_tensor[~valid4d] = np.nan  # Apply the valid mask to the selection tensor
     
     pareto_front(constrained_selection_tensor, fpath="data/plots/pareto_front.png", dpi=600)
-    score_distribution(constrained_selection_tensor, fpath="data/plots/cost_gwp_distrib_constrained.png", dpi=600, method='kde')
+    # score_distribution(constrained_selection_tensor, fpath="data/plots/cost_gwp_distrib_constrained.png", dpi=600, method='kde')
     
     # Save the scalar field and selection tensor to a pickle file
     with open('data/logs/CostnSus.pkl', 'wb') as f:
@@ -453,11 +454,11 @@ def main(weight: float=0.5,
     
     
     # — Simple scalar‑weighted optimum (for comparison) —
-    scalar_opt_flat = np.nanargmin(scalar_field)
-    scalar_opt_idx = np.unravel_index(scalar_opt_flat, selection_tensor.shape)
+    # scalar_opt_flat = np.nanargmin(scalar_field)
+    # scalar_opt_idx = np.unravel_index(scalar_opt_flat, selection_tensor.shape)
     
-    scalar_opt_flat = np.nanargmin(scalar_field)
-    scalar_opt_idx = np.unravel_index(scalar_opt_flat, selection_tensor.shape)
+    # scalar_opt_flat = np.nanargmin(scalar_field)
+    # scalar_opt_idx = np.unravel_index(scalar_opt_flat, selection_tensor.shape)
     
     pareto_boundary = _pareto_mask(constrained_selection_tensor)
     # Add dimension for broadcasting
@@ -470,69 +471,108 @@ def main(weight: float=0.5,
     print(pareto_options.shape)
     pareto_options[~pareto_boundary] = np.nan  # Apply the Pareto mask
     
-    head = np.argwhere(
-        (pareto_options[..., 0] > 3.320) & (pareto_options[..., 0] < 3.321) &\
-            (pareto_options[..., 1] > 25.48) & (pareto_options[..., 1] < 25.49)
-    )
-    head = np.array(head)
+    # head = np.argwhere(
+    #     (pareto_options[..., 0] > 3.4325) & (pareto_options[..., 0] < 3.4350) &\
+    #         (pareto_options[..., 1] > 23.65) & (pareto_options[..., 1] < 23.70)
+    # )
+    # # head = np.array(head)
     
-    knee = np.argwhere(
-        (pareto_options[..., 0] > 3.380) & (pareto_options[..., 0] < 3.385) &\
-            (pareto_options[..., 1] > 23.05) & (pareto_options[..., 1] < 23.1)
-    )
+    # knee = np.argwhere(
+    #     (pareto_options[..., 0] > 3.4450) & (pareto_options[..., 0] < 3.4475) &\
+    #         (pareto_options[..., 1] > 23.598) & (pareto_options[..., 1] < 23.602)
+    # )
     
-    ankle = np.argwhere(
-        (pareto_options[..., 0] > 3.385) & (pareto_options[..., 0] < 3.390) &\
-            (pareto_options[..., 1] > 22.95) & (pareto_options[..., 1] < 23.0)
-    )
+    # ankle = np.argwhere(
+    #     (pareto_options[..., 0] > -np.inf) & (pareto_options[..., 0] < np.inf) &\
+    #         (pareto_options[..., 1] > -np.inf) & (pareto_options[..., 1] < np.inf)
+    # )
     
-    toe = np.argwhere(
-        (pareto_options[..., 0] > 3.4) & (pareto_options[..., 0] < 3.405) &\
-            (pareto_options[..., 1] > 22.85) & (pareto_options[..., 1] < 22.90)
-    )
+    # toe = np.argwhere(
+    #     (pareto_options[..., 0] > 3.432) & (pareto_options[..., 0] < 3.434) &\
+    #         (pareto_options[..., 1] > 23.65) & (pareto_options[..., 1] < 23.7)
+    # )
     
     toenail = np.argwhere(
-        (pareto_options[..., 0] > 3.461) & (pareto_options[..., 0] < 3.462) &\
-            (pareto_options[..., 1] > 22.75) & (pareto_options[..., 1] < 22.85)
+        (pareto_options[..., 0] > 3.439) & (pareto_options[..., 0] < 3.440) &\
+            (pareto_options[..., 1] > 23.6) & (pareto_options[..., 1] < 23.65)
     )
     
     # print(knee)
     # print(constrained_selection_tensor[*knee[0], ...])
     
     
-    print("\n=== PARETO OPTIMAL POINTS ===")
+    # print("\n=== PARETO OPTIMAL POINTS ===")
     
-    # For the head point
-    print_design_point("head", tensor[*head[0], ...], N_PAX[*head[0]])
-    print(f"Configuration: Split = {splits[head[0, 0]]:.2f}, TOGA = {toga_throttle[head[0, 1]]:.2f}, Cruise = {cruise_throttle[head[0, 2]]:.2f}")
+    # # For the head point
+    # print_design_point("head", tensor[*head[0], ...], N_PAX[*head[0]])
+    # print(f"Configuration: Split = {splits[head[0, 0]]}, TOGA = {toga_throttle[head[0, 1]]}, Cruise = {cruise_throttle[head[0, 2]]}")
 
-    # For the knee point
-    print_design_point("knee", tensor[*knee[0], ...], N_PAX[*knee[0]])
-    print(f"Configuration: Split = {splits[knee[0, 0]]:.2f}, TOGA = {toga_throttle[knee[0, 1]]:.2f}, Cruise = {cruise_throttle[knee[0, 2]]:.2f}")
-    # print(f"Objectives: Cost = {constrained_selection_tensor[*knee[0], 0]:.2f} M€/PAX, GWP = {constrained_selection_tensor[*knee[0], 1]:.2f} kg CO₂e/PAX")
+    # # For the knee point
+    # print_design_point("knee", tensor[*knee[0], ...], N_PAX[*knee[0]])
+    # print(f"Configuration: Split = {splits[knee[0, 0]]}, TOGA = {toga_throttle[knee[0, 1]]}, Cruise = {cruise_throttle[knee[0, 2]]}")
+    # # print(f"Objectives: Cost = {constrained_selection_tensor[*knee[0], 0]:.2f} M€/PAX, GWP = {constrained_selection_tensor[*knee[0], 1]:.2f} kg CO₂e/PAX")
 
     # For the ankle point
-    print_design_point("ankle", tensor[*ankle[0], ...], N_PAX[*ankle[0]])
-    print(f"Configuration: Split = {splits[ankle[0, 0]]:.2f}, TOGA = {toga_throttle[ankle[0, 1]]:.2f}, Cruise = {cruise_throttle[ankle[0, 2]]:.2f}")
+    # print_design_point("ankle", tensor[*ankle[0], ...], N_PAX[*ankle[0]])
+    # print(f"Configuration: Split = {splits[ankle[0, 0]]}, TOGA = {toga_throttle[ankle[0, 1]]}, Cruise = {cruise_throttle[ankle[0, 2]]}")
     # print(f"Objectives: Cost = {constrained_selection_tensor[*ankle[0], 0]:.2f} M€/PAX, GWP = {constrained_selection_tensor[*ankle[0], 1]:.2f} kg CO₂e/PAX")
 
     # For the toe point
-    print_design_point("toe", tensor[*toe[0], ...], N_PAX[*toe[0]])
-    print(f"Configuration: Split = {splits[toe[0, 0]]:.2f}, TOGA = {toga_throttle[toe[0, 1]]:.2f}, Cruise = {cruise_throttle[toe[0, 2]]:.2f}")
+    # print_design_point("toe", tensor[*toe[0], ...], N_PAX[*toe[0]])
+    # print(f"Configuration: Split = {splits[toe[0, 0]]:.2f}, TOGA = {toga_throttle[toe[0, 1]]:.2f}, Cruise = {cruise_throttle[toe[0, 2]]:.2f}")
     # print(f"Objectives: Cost = {constrained_selection_tensor[*toe[0], 0]:.2f} M€/PAX, GWP = {constrained_selection_tensor[*toe[0], 1]:.2f} kg CO₂e/PAX")
     
     print_design_point("toenail", tensor[*toenail[0], ...], N_PAX[*toenail[0]])
     print(f"Configuration: Split = {splits[toenail[0, 0]]:.2f}, TOGA = {toga_throttle[toenail[0, 1]]:.2f}, Cruise = {cruise_throttle[toenail[0, 2]]:.2f}")
+    print(f"Objectives: Cost = {constrained_selection_tensor[*toenail[0], 0]:.2f} M€/PAX, GWP = {constrained_selection_tensor[*toenail[0], 1]:.2f} kg CO₂e/PAX")
+   
+    # Get percentage change for pareto-optimal points
+    x = pareto_options[..., 0].ravel()
+    y = pareto_options[..., 1].ravel()
+
+    # Filter out NaN values
+    valid = np.isfinite(x) & np.isfinite(y)
+    x_valid = x[valid]
+    y_valid = y[valid]
+
+    # Sort by x (cost) to ensure proper Pareto front ordering
+    sort_idx = np.argsort(x_valid)
+    x_sorted = x_valid[sort_idx]
+    y_sorted = y_valid[sort_idx]
+
+    # Calculate percentage changes and slopes
+    x_percent_change = (x_sorted[1:] - x_sorted[:-1]) * 2 / (x_sorted[1:] + x_sorted[:-1])
+    y_percent_change = (y_sorted[1:] - y_sorted[:-1]) * 2 / (y_sorted[1:] + y_sorted[:-1])
+
+    # Calculate slopes, handling possible division by zero
+    with np.errstate(divide='ignore', invalid='ignore'):
+        slope = y_percent_change / x_percent_change
+        
+    # Filter out any remaining infinities or NaNs
+    valid_slopes = np.isfinite(slope)
+    clean_slopes = slope[valid_slopes]
+
+    print(f"Number of valid Pareto points: {len(x_valid)}")
+    print(f"Number of valid slopes: {len(clean_slopes)}")
     
+    # Use the corresponding x values for plotting slopes
+    # Since slopes are calculated between adjacent points, 
+    # we'll use the x values at the start of each segment
+    plt.plot(x_sorted[:-1][valid_slopes], clean_slopes, 'o', markersize=2, label='Pareto Points')
+    plt.xlabel('Cost [M€/PAX]')
+    plt.ylabel('Slope (GWP change / Cost change)')
+    plt.show()
     
     
 if __name__ == "__main__":
     weight = 0.5  # Default weight for cost vs GWP
     main(
         weight=weight,
-        dim_bounds=np.array([[0.1, 0.9],
-                            [0.1, 1.0],
-                            [0.1, 1.0]]),
+        dim_bounds=np.array([
+            [0.25, 0.35],
+            [0.2, 0.35],
+            [0.25, 0.4]
+            ]),
         fpath_design='data/logs/result_tensor.pkl',
         fpath_loading='data/logs/loading_tensor.pkl'
     )

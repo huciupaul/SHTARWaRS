@@ -775,10 +775,10 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
 if __name__ == "__main__":
     
     mission_H2 = fpp_main(
-        fc_split=0.10,
-        throttle_TOGA=0.40,
-        throttle_cruise=0.40,
-        MTOW=6063.52,
+        fc_split=0.3,
+        throttle_TOGA=0.275,
+        throttle_cruise=0.325,
+        MTOW=7895.114629666458,
         CD_RAD=0.002,
         delta_AP=20000,
         dt=0.1

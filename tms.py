@@ -82,8 +82,8 @@ class RamAirHeatExchanger():
 
         # Reynolds calc
         Re = 4*self.mf_coolant/(np.pi * dh * self.dyn_visc)
-        if Re < 2300:
-            raise ValueError("Reynolds number in laminar regime, use a turbulent/combined relation correlation.")
+        # if Re < 2300:
+        #     raise ValueError("Reynolds number in laminar regime, use a turbulent/combined relation correlation.")
         
         # Nusselt calc
         f = (0.79 * np.log(Re) - 1.64) ** -2
@@ -476,6 +476,10 @@ class Fluid_Coolant():
         self.P = P  # Pressure in Pascals
         i_T = np.searchsorted(T_list, T)
         i_P = np.searchsorted(P_list, P)
+        if i_P == 1000:
+            i_P = 999
+        if i_T == 1000:
+            i_T = 999
         self.cp = cp_meg[i_T, i_P] 
         self.C = C if C is not None else self.cp * mf  # Heat capacity rate
         self.mf_calculated = self.C/self.cp

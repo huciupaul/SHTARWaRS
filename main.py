@@ -68,6 +68,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                 m_h2_prev      = 315.39
                 m_sto_prev     = 141.38
                 m_cargo_prev   = 714.05
+                m_pax          = 1596 # No passengers in this configuration  
                 
                 m_eps, Qdot_eps, V_elmo, co2_eps, P_elmo = eps_main(split)
                 
@@ -79,6 +80,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     + m_h2_prev
                     + m_sto_prev
                     + m_cargo_prev
+                    + m_pax
                 )
 
                 alpha      = 0.5     # Under-relaxation factor
@@ -94,7 +96,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                 
                 # Convergence of MTOW, stop if the change is less than 1% of the previous MTOW or reached max number of iterations
                 for i in range(max_iter):
-                    print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}, ITER: {i}")
+                    # print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}, ITER: {i}")
                     # --- FPP call ---
                     TMS_inputs, m_h2, FC_outputs, _, loading_vector, emissions, P_fc_max = fpp_main(
                         split,
@@ -128,6 +130,8 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     # --- CARGO call ---
                     result = cargo_main(length_sto, diameter_sto)
                     M_aft_cargo = result["M_aft_cargo"]
+                    m_PAX       = result["num_PAX"] * M_PAX
+                    
                     
                     
                     _, tms_outputs = tms_main(
@@ -173,6 +177,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                         + m_h2
                         + m_sto
                         + M_aft_cargo
+                        + m_PAX
                     )
                     delta = MTOW_candidate - MTOW_prev
 
@@ -257,9 +262,14 @@ def main(minimum, maximum, no_of_splits, max_iter):
 
 
 if __name__=="__main__":
+    # min_ = np.array([0.25, 0.2, 0.25])  # Minimum values for the splits
+    # max_ = np.array([0.35, 0.35, 0.4])
+    min_ = np.array([0.32, 0.29, 0.30])  # Minimum values for the splits
+    max_ = np.array([0.32, 0.29, 0.30])
+    
     main(
-        minimum=np.array([0.1, 0.1, 0.1]),
-        maximum=np.array([0.9, 1.0, 1.0]),
-        no_of_splits=np.array([17, 19, 19]),
+        minimum=min_,
+        maximum=max_,
+        no_of_splits=np.array((max_-min_)/0.01 + 1, dtype=int),  # Number of splits for each parameter
         max_iter=20
     )

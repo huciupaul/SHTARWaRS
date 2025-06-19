@@ -32,7 +32,8 @@ C_d_0_orig = 0.023
 AR, e = 10.808, 0.735809
 k = 1 / (np.pi * AR * e)
 S = 28.79                                               # [m²]
-MTOW_orig = 7_765   * G_0                               # [N] Original Maximum Take-Off Weight
+# MTOW_orig = 7_765   * G_0                               # [N] Original Maximum Take-Off Weight
+MTOW_orig = 8037.9 * G_0                               # [N] Original Maximum Take-Off Weight (from FZO report)
 
 # Modified Aircraft MTOW (requirement)PLACEHOLDER
 MTOW_mod  = 9459.6* G_0                               # [N] Modified Maximum Take-Off Weight  
@@ -234,6 +235,7 @@ l_aft_cone  = 1.18
 
 Beechcraft_1900D = dict(
     MTOW        = 7766,
+    # MTOW        = 8037.9,
     M_fuel      = 300,
     OEW         = 4932,
     X_OEW       = 6.76,
