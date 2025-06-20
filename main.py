@@ -164,7 +164,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     m_tms_aft = tms_outputs[4]
                     m_tms_mid = tms_outputs[3]
                     
-                    # print(f"MTOW:{MTOW:.2f}, AUX POWER {aux_power:.2f}, DRAG PENALTY {D_rad:.6f}")
+                    print(f"MTOW:{MTOW:.2f}, AUX POWER {aux_power:.2f}, DRAG PENALTY {D_rad:.6f}")
                     
                     # ----------------------------------------------------------
                     # FIXED-POINT UPDATE WITH UNDER-RELAXATION
@@ -264,8 +264,8 @@ def main(minimum, maximum, no_of_splits, max_iter):
 if __name__=="__main__":
     # min_ = np.array([0.25, 0.2, 0.25])  # Minimum values for the splits
     # max_ = np.array([0.35, 0.35, 0.4])
-    min_ = np.array([0.32, 0.29, 0.30])  # Minimum values for the splits
-    max_ = np.array([0.32, 0.29, 0.30])
+    min_ = np.array([0.33, 0.29, 0.30])  # Minimum values for the splits
+    max_ = np.array([0.33, 0.29, 0.30])
     
     main(
         minimum=min_,

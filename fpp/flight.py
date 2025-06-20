@@ -669,7 +669,7 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
         eng=turboprop_H2,
         fc=fc_model,
         MTOW=MTOW,
-        P_cc_min=0.056 * TOGA,  # [W] Minimum combustion chamber power
+        P_cc_min=0.057 * MAXC,  # [W] Minimum combustion chamber power
         delta_AP=delta_AP,  # [W] Thermal Management System power
     )
     
@@ -775,12 +775,12 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
 if __name__ == "__main__":
     
     mission_H2 = fpp_main(
-        fc_split=0.3,
-        throttle_TOGA=0.275,
-        throttle_cruise=0.325,
+        fc_split=0.33,
+        throttle_TOGA=0.29,
+        throttle_cruise=0.30,
         MTOW=7895.114629666458,
-        CD_RAD=0.002,
-        delta_AP=20000,
+        CD_RAD=0.001013,
+        delta_AP=160488.79,
         dt=0.1
     )
     
@@ -791,9 +791,9 @@ if __name__ == "__main__":
     P_fc = mission_H2[3]['P_fc']/1e3  # Convert to kW
     t    = mission_H2[3]['time']
     
-    AP = 28.4 # Auxiliary Power (kW)
+    AP = 160488.79/1e3 + 2 * 8.4  # Auxiliary Power (kW)
     
-    P_fc = P_fc + AP  # Add auxiliary power to fuel cell power
+    P_fc = P_fc + AP   # Add auxiliary power to fuel cell power
 
     # Mask to highlight non-nominal phases
     non_nominal = mission_H2[3]['phase'] == 'hold'
@@ -876,7 +876,7 @@ if __name__ == "__main__":
     # Set labels and title
     ax.set_xlim(t[0], t[-1])
     ax.set_ylim(0, 1.1 * (P_cc.max() + P_fc.max()))
-    ax.set_xlabel("Time [s]")
+    ax.set_xlabel("Time [h]")
     ax.set_ylabel("Power [kW]")
     ax.set_title("Flight Profile Power Split")
     ax.legend()

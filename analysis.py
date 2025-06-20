@@ -347,9 +347,9 @@ def pareto_front(
     # ax.set_title("Pareto front: cost vs GWP")
     ax.legend()
     fig.tight_layout()
-    # fig.savefig(fpath, dpi=dpi)
-    # plt.close(fig)
-    plt.show()
+    fig.savefig(fpath, dpi=dpi)
+    plt.close(fig)
+    # plt.show()
 
     # # ---------- Console read-out ----------
     # print(f"Total designs kept: {len(pts)}")
@@ -435,7 +435,7 @@ def main(weight: float=0.5,
     scalar_field, selection_tensor = objective_function(weight, design, N_PAX)
     
     # Create a Pareto front plot
-    # pareto_front(selection_tensor, fpath="data/plots/pareto_front_no_cons.png", dpi=600)
+    pareto_front(selection_tensor, fpath="data/plots/pareto_front_no_cons.png", dpi=600)
     
     # # Generate a score distribution plot
     # score_distribution(selection_tensor, fpath="data/plots/cost_gwp_distrib.png", dpi=600, method='kde')
@@ -471,31 +471,30 @@ def main(weight: float=0.5,
     print(pareto_options.shape)
     pareto_options[~pareto_boundary] = np.nan  # Apply the Pareto mask
     
-    # head = np.argwhere(
-    #     (pareto_options[..., 0] > 3.4325) & (pareto_options[..., 0] < 3.4350) &\
-    #         (pareto_options[..., 1] > 23.65) & (pareto_options[..., 1] < 23.70)
-    # )
-    # # head = np.array(head)
-    
-    # knee = np.argwhere(
-    #     (pareto_options[..., 0] > 3.4450) & (pareto_options[..., 0] < 3.4475) &\
-    #         (pareto_options[..., 1] > 23.598) & (pareto_options[..., 1] < 23.602)
-    # )
-    
-    # ankle = np.argwhere(
-    #     (pareto_options[..., 0] > -np.inf) & (pareto_options[..., 0] < np.inf) &\
-    #         (pareto_options[..., 1] > -np.inf) & (pareto_options[..., 1] < np.inf)
-    # )
-    
-    # toe = np.argwhere(
-    #     (pareto_options[..., 0] > 3.432) & (pareto_options[..., 0] < 3.434) &\
-    #         (pareto_options[..., 1] > 23.65) & (pareto_options[..., 1] < 23.7)
-    # )
-    
-    toenail = np.argwhere(
-        (pareto_options[..., 0] > 3.439) & (pareto_options[..., 0] < 3.440) &\
-            (pareto_options[..., 1] > 23.6) & (pareto_options[..., 1] < 23.65)
+    head = np.argwhere(
+        (pareto_options[..., 0] > 3.4325) & (pareto_options[..., 0] < 3.4350) &\
+            (pareto_options[..., 1] > 23.65) & (pareto_options[..., 1] < 23.70)
     )
+        
+    knee = np.argwhere(
+        (pareto_options[..., 0] > 3.4450) & (pareto_options[..., 0] < 3.4475) &\
+            (pareto_options[..., 1] > 23.598) & (pareto_options[..., 1] < 23.602)
+    )
+    
+    ankle = np.argwhere(
+        (pareto_options[..., 0] > -np.inf) & (pareto_options[..., 0] < np.inf) &\
+            (pareto_options[..., 1] > -np.inf) & (pareto_options[..., 1] < np.inf)
+    )
+    
+    toe = np.argwhere(
+        (pareto_options[..., 0] > 3.432) & (pareto_options[..., 0] < 3.434) &\
+            (pareto_options[..., 1] > 23.65) & (pareto_options[..., 1] < 23.7)
+    )
+    
+    # toenail = np.argwhere(
+    #     (pareto_options[..., 0] > 3.4416) & (pareto_options[..., 0] < 3.4418) &\
+    #         (pareto_options[..., 1] > 23.61) & (pareto_options[..., 1] < 23.62)
+    # )
     
     # print(knee)
     # print(constrained_selection_tensor[*knee[0], ...])
@@ -513,18 +512,18 @@ def main(weight: float=0.5,
     # # print(f"Objectives: Cost = {constrained_selection_tensor[*knee[0], 0]:.2f} M€/PAX, GWP = {constrained_selection_tensor[*knee[0], 1]:.2f} kg CO₂e/PAX")
 
     # For the ankle point
-    # print_design_point("ankle", tensor[*ankle[0], ...], N_PAX[*ankle[0]])
-    # print(f"Configuration: Split = {splits[ankle[0, 0]]}, TOGA = {toga_throttle[ankle[0, 1]]}, Cruise = {cruise_throttle[ankle[0, 2]]}")
-    # print(f"Objectives: Cost = {constrained_selection_tensor[*ankle[0], 0]:.2f} M€/PAX, GWP = {constrained_selection_tensor[*ankle[0], 1]:.2f} kg CO₂e/PAX")
+    print_design_point("ankle", tensor[*ankle[0], ...], N_PAX[*ankle[0]])
+    print(f"Configuration: Split = {splits[ankle[0, 0]]}, TOGA = {toga_throttle[ankle[0, 1]]}, Cruise = {cruise_throttle[ankle[0, 2]]}")
+    print(f"Objectives: Cost = {constrained_selection_tensor[*ankle[0], 0]} M€/PAX, GWP = {constrained_selection_tensor[*ankle[0], 1]} kg CO₂e/PAX")
 
-    # For the toe point
+    # # For the toe point
     # print_design_point("toe", tensor[*toe[0], ...], N_PAX[*toe[0]])
     # print(f"Configuration: Split = {splits[toe[0, 0]]:.2f}, TOGA = {toga_throttle[toe[0, 1]]:.2f}, Cruise = {cruise_throttle[toe[0, 2]]:.2f}")
     # print(f"Objectives: Cost = {constrained_selection_tensor[*toe[0], 0]:.2f} M€/PAX, GWP = {constrained_selection_tensor[*toe[0], 1]:.2f} kg CO₂e/PAX")
     
-    print_design_point("toenail", tensor[*toenail[0], ...], N_PAX[*toenail[0]])
-    print(f"Configuration: Split = {splits[toenail[0, 0]]:.2f}, TOGA = {toga_throttle[toenail[0, 1]]:.2f}, Cruise = {cruise_throttle[toenail[0, 2]]:.2f}")
-    print(f"Objectives: Cost = {constrained_selection_tensor[*toenail[0], 0]:.2f} M€/PAX, GWP = {constrained_selection_tensor[*toenail[0], 1]:.2f} kg CO₂e/PAX")
+    # print_design_point("toenail", tensor[*toenail[0], ...], N_PAX[*toenail[0]])
+    # print(f"Configuration: Split = {splits[toenail[0, 0]]:.2f}, TOGA = {toga_throttle[toenail[0, 1]]:.2f}, Cruise = {cruise_throttle[toenail[0, 2]]:.2f}")
+    # print(f"Objectives: Cost = {constrained_selection_tensor[*toenail[0], 0]:.2f} M€/PAX, GWP = {constrained_selection_tensor[*toenail[0], 1]:.2f} kg CO₂e/PAX")
    
     # Get percentage change for pareto-optimal points
     x = pareto_options[..., 0].ravel()
