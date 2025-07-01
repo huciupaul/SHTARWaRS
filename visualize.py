@@ -1,11 +1,12 @@
 import numpy as np
 import pickle
-import copy
-import dash
-from dash import dcc, html
-from dash.dependencies import Input, Output, State
-import plotly.graph_objs as go
+import os
+import imageio.v2 as imageio
+import math
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+import matplotlib as mpl
 
 # Local imports
 from global_constants import NOx_pPax_TO, NOx_pPax_cruise
@@ -14,22 +15,131 @@ from performance.Integration.integration import main as cg_excursion
 from cost import calc_cost as f_cost
 from sus import get_sus as f_gwp
 
-# Load data once when app starts
+# Define a function to create the visualization with given mask
+def create_visualization(valid_mask, output_filename, title):
+    # Get indices
+    x_idx, y_idx, z_idx = np.where(valid_mask)
+    
+    # Skip if no valid points
+    if len(x_idx) == 0:
+        print(f"No valid points for {title}. Skipping...")
+        return
+    
+    # Convert indices to actual coordinate values
+    x_coords = power_splits[x_idx]
+    y_coords = toga_throttle[y_idx] 
+    z_coords = cruise_throttle[z_idx]
+    
+    # Generate frames for the rotation
+    print(f"Generating frames for {title}...")
+    num_frames = 120  # For a smooth animation (120 frames = 4s at 30fps)
+    
+    # Set figure size (in inches) and DPI for higher quality
+    fig_width, fig_height = 10, 10
+    dpi = 150
+    
+    # Create color gradient based on position
+    colormap = cm.viridis
+    colors = colormap((x_coords - dim_bounds[0, 0]) / (dim_bounds[0, 1] - dim_bounds[0, 0]))
+    
+    # Define starting and ending angles for exactly one rotation
+    start_angle = 0
+    end_angle = 360  # Full 360 rotation
+    
+    # Create frames directory if it doesn't exist
+    frames_dir = f"frames_{output_filename.replace('.gif', '')}"
+    if not os.path.exists(frames_dir):
+        os.makedirs(frames_dir)
+    
+    for i in range(num_frames):
+        # Create a new figure for each frame with fixed size
+        fig = plt.figure(figsize=(fig_width, fig_height), dpi=dpi, facecolor='black')
+        ax = fig.add_subplot(111, projection='3d', facecolor='black')
+        
+        # Enhanced scatter plot
+        scatter = ax.scatter(x_coords, y_coords, z_coords, 
+                   c=colors,
+                   s=50,  # Larger marker size for better visibility
+                   alpha=0.8,
+                   marker='o',  # Circular markers look more modern
+                   edgecolors='white',  # Add white edges to markers
+                   linewidth=0.5)
+        
+        # Add a subtle grid for better spatial perception
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+        
+        ax.xaxis.pane.set_edgecolor('white')
+        ax.yaxis.pane.set_edgecolor('white')
+        ax.zaxis.pane.set_edgecolor('white')
+        
+        ax.xaxis.pane.set_alpha(0.2)
+        ax.yaxis.pane.set_alpha(0.2)
+        ax.zaxis.pane.set_alpha(0.2)
+        
+        ax.grid(True, alpha=0.2)
+        
+        # Add title
+        # plt.title(title, fontsize=30, color='white', pad=20)
+        
+        # Improved axis labels with custom styling
+        ax.set_xlabel('Power Split', fontsize=30, labelpad=20, color='white')
+        ax.set_ylabel('TOGA Throttle', fontsize=30, labelpad=20, color='white')
+        ax.set_zlabel('Cruise Throttle', fontsize=30, labelpad=20, color='white')
+        
+        # Make tick labels white
+        ax.tick_params(axis='x', colors='white')
+        ax.tick_params(axis='y', colors='white')
+        ax.tick_params(axis='z', colors='white')
+        
+        # Set axis limits
+        ax.set_xlim(dim_bounds[0, 0], dim_bounds[0, 1])
+        ax.set_ylim(dim_bounds[1, 0], dim_bounds[1, 1])
+        ax.set_zlim(dim_bounds[2, 0], dim_bounds[2, 1])
+        
+        # Set the view angle - simplified to ensure exactly one rotation
+        # Linear interpolation from start_angle to end_angle
+        azim = start_angle + i * (end_angle - start_angle) / (num_frames - 1)
+        elev = 25
+        ax.view_init(elev=elev, azim=azim)
+        
+        # Adjust axis aspect ratio for better cube shape
+        ax.set_box_aspect([1, 1, 1])
+        
+        # Leave some padding around the plot
+        plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9)
+        
+        # Save the frame WITHOUT bbox_inches='tight' to ensure consistent size
+        frame_filename = f'{frames_dir}/frame_{i:03d}.png'
+        plt.savefig(frame_filename, facecolor='black')
+        plt.close(fig)  # Close the figure to free memory
+        print(f"Saved frame {i+1}/{num_frames}")
+    
+    # Create GIF from frames
+    print(f"Creating GIF for {title}...")
+    images = []
+    for i in range(num_frames):
+        filename = f'{frames_dir}/frame_{i:03d}.png'
+        images.append(imageio.imread(filename))
+    
+    # Save the GIF with smoother animation - set loop=0 for no looping
+    imageio.mimsave(output_filename, images, duration=0.033, loop=1)
+    print(f"GIF saved as {output_filename}")
+
+
+# Set better visualization style
+plt.style.use('dark_background')
+mpl.rcParams['font.family'] = 'Avenir'
+mpl.rcParams['font.size'] = 25
+
+# Load data
 print("Loading tensors...")
 with open('data/logs/result_tensor.pkl', 'rb') as f:
     design_tensor = pickle.load(f)
 
 with open('data/logs/loading_tensor.pkl', 'rb') as f:
     loading_tensor = pickle.load(f)
-    
-with open('data/logs/CostnSus.pkl', 'rb') as f:
-    cost_gwp_tensor = pickle.load(f)
-
-# Pre-calculate constraint masks
-print("Calculating constraint masks...")
-valid_integration, N_PAX, m_cargo = cg_excursion(design_tensor)
-valid_mass = pws(loading_tensor)
-valid_NOx = (design_tensor[..., 15]/N_PAX < NOx_pPax_TO) & (design_tensor[..., 16]/N_PAX < NOx_pPax_cruise)
 
 # Define dimension bounds
 dim_bounds = np.array([[0.1, 0.9], [0.1, 1.0], [0.1, 1.0]])
@@ -38,354 +148,40 @@ power_splits = np.linspace(dim_bounds[0, 0], dim_bounds[0, 1], N)
 toga_throttle = np.linspace(dim_bounds[1, 0], dim_bounds[1, 1], M)
 cruise_throttle = np.linspace(dim_bounds[2, 0], dim_bounds[2, 1], P)
 
-# Initialize the dash app
-app = dash.Dash(__name__)
+# Create unconstrained visualization
+unconstrained_mask = np.ones(design_tensor.shape[:-1], dtype=bool)
+create_visualization(unconstrained_mask, 'design_space_unconstrained.gif', 'Design Space (No Constraints)')
 
-app.layout = html.Div([
-    html.H1("Design Space Visualization", style={'textAlign': 'center', 'margin': '10px'}),
-    
-    # Controls row - compact at the top
-    html.Div([
-        html.Div([
-            html.Label("Cost Weight:"),
-            dcc.Slider(
-                id='weight-slider',
-                min=0,
-                max=1,
-                step=0.01,
-                value=0.5,
-                marks={i/10: str(i/10) for i in range(11)}
-            ),
-        ], style={'width': '60%', 'display': 'inline-block'}),
-        
-        html.Div([
-            dcc.Checklist(
-                id='constraint-checklist',
-                options=[
-                    {'label': 'Integration Constraint', 'value': 'integration'},
-                    {'label': 'Mass Constraint', 'value': 'mass'},
-                    {'label': 'NOx Constraint', 'value': 'nox'}
-                ],
-                value=['integration', 'mass', 'nox'],
-                inline=True
-            ),
-        ], style={'width': '40%', 'display': 'inline-block'}),
-        
-        html.Div([
-            dcc.Checklist(
-                id='pareto-checkbox',
-                options=[
-                    {'label': 'Show Pareto Front', 'value': 'show_pareto'}
-                ],
-                value=['show_pareto'],
-                inline=True
-            ),
-        ], style={'width': '15%', 'display': 'inline-block'})
-    ], style={'display': 'flex', 'alignItems': 'center', 'padding': '10px'}),
-
-    
-    # Main content area - horizontal layout with 3 sections
-    html.Div([
-        # Left panel - Optimal design details
-        html.Div([
-            html.H3("Optimal Design Details", style={'marginTop': '0'}),
-            html.Pre(id='design-info', style={
-                'backgroundColor': '#f8f9fa', 
-                'padding': '10px',
-                'borderRadius': '5px',
-                'height': 'calc(100vh - 200px)',
-                'overflowY': 'auto'
-            })
-        ], style={
-            'width': '25%', 
-            'padding': '10px',
-            'boxSizing': 'border-box'
-        }),
-        
-        # Middle panel - 3D graph
-        html.Div([
-            dcc.Graph(
-                id='3d-scatter',
-                style={'height': 'calc(100vh - 150px)'},
-                config={'displayModeBar': True}
-            )
-        ], style={
-            'width': '75%',
-            'boxSizing': 'border-box'
-        })
-    ], style={
-        'display': 'flex',
-        'flexWrap': 'nowrap',
-        'height': 'calc(100vh - 150px)'
-    })
-])
-
-def find_pareto_front(cost, gwp):
-    """
-    Find the Pareto-optimal points from cost and GWP arrays.
-    
-    Args:
-        cost (np.ndarray): 1D array of cost values
-        gwp (np.ndarray): 1D array of GWP values
-        
-    Returns:
-        np.ndarray: Indices of Pareto-optimal points, sorted by increasing cost
-    """
-    # Stack cost and GWP
-    pts = np.column_stack((cost, gwp))
-    # Sort by cost
-    sort_idx = np.argsort(pts[:, 0])
-    pts_sorted = pts[sort_idx]
-    # Find points with minimum GWP up to each cost level
-    gwp_min_run = np.minimum.accumulate(pts_sorted[:, 1])
-    is_pareto = pts_sorted[:, 1] == gwp_min_run
-    # Get original indices of Pareto points
-    pareto_idx = sort_idx[is_pareto]
-    # Sort by cost for proper line ordering
-    pareto_sort = np.argsort(pts[pareto_idx][:, 0])
-    return pareto_idx[pareto_sort]
-
-# The callback function update_graph needs to be modified:
-@app.callback(
-    [Output('3d-scatter', 'figure'),
-     Output('design-info', 'children')],
-    [Input('weight-slider', 'value'),
-     Input('constraint-checklist', 'value'),
-     Input('pareto-checkbox', 'value')]
-)
-
-def update_graph(weight, constraints, pareto_options):
-    # Apply selected masks
-    valid3d = np.ones(design_tensor.shape[:-1], dtype=bool)
-    if 'integration' in constraints:
-        valid3d = valid3d & valid_integration
-    if 'mass' in constraints:
-        valid3d = valid3d & valid_mass
-    if 'nox' in constraints:
-        valid3d = valid3d & valid_NOx
-    
-    # Calculate cost and GWP components
-    design = copy.deepcopy(design_tensor)
-    valid4d = valid3d[..., None]
-    valid4d = np.broadcast_to(valid4d, design.shape)
-    design[~valid4d] = np.nan
-    
-    # Calculate cost and GWP components
-    GWP_fc = design[..., 20]  # GWP of fuel cell production/disposal
-    GWP_sto = design[..., 21]  # GWP of storage system production/disposal
-    GWP_eps = design[..., 22]  # GWP of EPS production/disposal
-    m_h2_nom = design[..., 18]   # Nominal mass of hydrogen used
-    m_nox = design[..., 14]  # Mass of NOx produced
-    
-    fc_cost = design[..., 17]  # Cost of the fuel cell
-    P_eps = design[..., 19]  # Max power used by electric propulsion system
-    m_sto = design[..., 3]  # Mass of the storage system
-    m_h2 = design[..., 2]  # Total mass of hydrogen stored
-    
-    # Calculate GWP and cost
-    GWP = f_gwp(GWP_fc, GWP_sto, GWP_eps, m_h2_nom, m_nox) / N_PAX
-    cost = f_cost(fc_cost, P_eps, m_sto, m_h2)/N_PAX
-    cost = cost / 1e6
-
-    # Normalize using L2 norm as in analysis.py
-    cost_flat = cost[valid3d]
-    gwp_flat = GWP[valid3d]
-    
-    c = cost_flat
-    g = gwp_flat
-    c_min, c_max = c.min(), c.max()
-    g_min, g_max = g.min(), g.max()
-
-    cost_norm = (c - c_min) / (c_max - c_min)
-    gwp_norm  = (g - g_min) / (g_max - g_min)
-    
-    # Calculate scalar field
-    scalar_field = weight * cost_norm + (1 - weight) * gwp_norm
-    
-    # Calculate 1/(1+score) for visualization (higher value is better)
-    viz_field = scalar_field.copy()
-    
-    # Find optimal design
-    min_value = np.nanmin(scalar_field)
-    if not np.isnan(min_value):
-        min_idx = np.where(scalar_field == min_value)
-        opt_idx = (min_idx[0][0], min_idx[1][0], min_idx[2][0])
-        optimal_design = design_tensor[opt_idx]
-        performance_metrics = cost_gwp_tensor[opt_idx]
-        
-        # Prepare optimal design info text as before...
-        design_info = [
-            f"Optimal Design Score: {min_value:.4f}:",
-            f"Power Split: {power_splits[opt_idx[0]]:.3f}",
-            f"TOGA Throttle: {toga_throttle[opt_idx[1]]:.3f}",
-            f"Cruise Throttle: {cruise_throttle[opt_idx[2]]:.3f}",
-            f"\nPerformance Metrics:",
-            f"Lifetime cost: {performance_metrics[0]:.2f} M€/PAX",
-            f"GWP: {performance_metrics[1]:.2f} kg CO₂e/FLIGHT/PAX",
-            "\nDesign Parameters:",
-            f"m_EPS: {optimal_design[0]:.5f} kg",
-            f"m_FC: {optimal_design[1]:.5f} kg",
-            f"m_H2: {optimal_design[2]:.5f} kg",
-            f"m_storage: {optimal_design[3]:.5f} kg",
-            f"m_TMS_total: {np.sum(optimal_design[11:14]):.5f} kg",
-            f"m_TMS_front: {optimal_design[11]:.5f} kg",
-            f"m_TMS_aft: {optimal_design[12]:.5f} kg",
-            f"m_TMS_mid: {optimal_design[13]:.5f} kg",
-            f"V_FC: {optimal_design[4]:.5f} m³",
-            f"V_storage: {optimal_design[5]:.5f} m³",
-            f"V_ELMO: {optimal_design[6]:.5f} m³",
-            f"MTOW: {optimal_design[7]:.5f} kg\n"
-            f"m_NOx: {optimal_design[14]:.5f} kg"
-        ]
-        design_info_str = "\n".join(design_info)
+# Create constrained visualization
+try:
+    print("Applying constraints...")
+    # The cg_excursion function returns a tuple where the first element is the mask
+    valid_integration_tuple = cg_excursion(design_tensor)
+    if isinstance(valid_integration_tuple, tuple):
+        valid_integration = valid_integration_tuple[0]
     else:
-        opt_idx = None
-        design_info_str = "No valid designs found with current constraints."
-        
-    # Create the figure
-    fig = go.Figure()
+        valid_integration = valid_integration_tuple
     
-    # Instead of volume, use scatter3d with visible cubes
-    if np.any(valid3d):
-        # Get indices where we have valid data
-        x_idx, y_idx, z_idx = np.where(valid3d)
-        
-        # Get scores for these points
-        scores = viz_field[x_idx, y_idx, z_idx]
-        
-        # Normalize scores for sizing and coloring
-        if len(scores) > 0:
-            max_score = np.max(scores)
-            if max_score > 0:
-                norm_scores = scores / max_score
-            else:
-                norm_scores = scores
-        else:
-            norm_scores = []
-        
-        # Convert indices to actual coordinate values
-        x_coords = power_splits[x_idx]
-        y_coords = toga_throttle[y_idx] 
-        z_coords = cruise_throttle[z_idx]
-        
-        # Create cube markers with size based on score
-        marker_sizes = 10 + 20 * norm_scores  # Size between 10 and 30 based on score
-        
-        cmap = plt.cm.get_cmap('viridis').reversed()
-        # Add scatter3d with cube markers
-        fig.add_trace(go.Scatter3d(
-            x=x_coords,
-            y=y_coords,
-            z=z_coords,
-            mode='markers',
-            marker=dict(
-                size=marker_sizes,
-                color=norm_scores,
-                colorscale=cmap,
-                opacity=0.7,
-                symbol='square',  # Using square for a more cube-like appearance
-                colorbar=dict(title='Score\n',
-                              ypad=100)
-            ),
-            name='Design Space'
-        ))
-        
-        if 'show_pareto' in pareto_options and len(x_coords) > 2:
-            # Prepare data for Pareto front
-            design_points = np.column_stack((
-                x_coords, y_coords, z_coords, 
-                cost[x_idx, y_idx, z_idx], 
-                GWP[x_idx, y_idx, z_idx]
-            ))
-            
-            # Find Pareto-optimal points
-            pareto_indices = find_pareto_front(design_points[:, 3], design_points[:, 4])
-            
-            if len(pareto_indices) > 1:
-                pareto_points = design_points[pareto_indices]
-                
-                # Extract coordinates of Pareto-optimal points
-                pareto_x = pareto_points[:, 0]
-                pareto_y = pareto_points[:, 1]
-                pareto_z = pareto_points[:, 2]
-                
-                # Add Pareto points as distinct markers (no connecting lines)
-                fig.add_trace(go.Scatter3d(
-                    x=pareto_x,
-                    y=pareto_y,
-                    z=pareto_z,
-                    mode='markers',
-                    marker=dict(
-                        size=10,  # Larger than regular points
-                        color='#00A6D6', # Delft Blue :)
-                        symbol='diamond',
-                        opacity=0.7,
-                        line=dict(color='black', width=1)  # Add outline for better visibility
-                    ),
-                    name='Pareto Optimal'
-                ))
-                
-                # Add text about number of Pareto-optimal designs
-                pareto_count = len(pareto_indices)
-                fig.add_annotation(
-                    x=0.02,
-                    y=0.98,
-                    xref="paper",
-                    yref="paper",
-                    text=f"Found {pareto_count} Pareto optimal designs",
-                    showarrow=False,
-                    font=dict(color="#00A6D6", size=14),
-                    align="left",
-                    bgcolor="rgba(255, 255, 255, 0.7)",
-                    bordercolor="#00A6D6",
-                    borderwidth=1,
-                    borderpad=4
-                )
-
-    # Add optimal design point if it exists (same as before)
-    if opt_idx is not None:
-        opt_point = go.Scatter3d(
-            x=[power_splits[opt_idx[0]]],
-            y=[toga_throttle[opt_idx[1]]],
-            z=[cruise_throttle[opt_idx[2]]],
-            mode='markers',
-            marker=dict(
-                size=15,
-                color='red',
-                symbol='diamond',
-                line=dict(color='black', width=1)  # Add outline for better visibility
-            ),
-            name='Optimal Design'
-        )
-        fig.add_trace(opt_point)
+    # Ensure valid_integration is boolean
+    valid_integration = np.array(valid_integration, dtype=bool)
     
-    # Update layout with fixed axes (same as before)
-    fig.update_layout(
-        scene=dict(
-            xaxis=dict(
-                title='Power Split',
-                range=[dim_bounds[0, 0], dim_bounds[0, 1]],
-                autorange=False
-            ),
-            yaxis=dict(
-                title='TOGA Throttle',
-                range=[dim_bounds[1, 0], dim_bounds[1, 1]],
-                autorange=False
-            ),
-            zaxis=dict(
-                title='Cruise Throttle',
-                range=[dim_bounds[2, 0], dim_bounds[2, 1]],
-                autorange=False
-            ),
-            aspectmode='cube'  # Keep the axes proportional
-        ),
-        title=f"Design Space Visualization (Cost Weight: {weight:.2f})",
-        margin=dict(l=0, r=60, b=10, t=40),  # Increased right margin for colorbar
-        autosize=True
-    )
+    # The pws function might also return a tuple
+    valid_mass_result = pws(loading_tensor)
+    if isinstance(valid_mass_result, tuple):
+        valid_mass = valid_mass_result[0]
+    else:
+        valid_mass = valid_mass_result
     
-    return fig, design_info_str
-
-if __name__ == '__main__':
-    print("Starting Dash server at http://127.0.0.1:8050/")
-    app.run(debug=True)
+    # Ensure valid_mass is boolean
+    valid_mass = np.array(valid_mass, dtype=bool)
+    
+    # Apply constraints
+    constrained_mask = unconstrained_mask.copy()
+    constrained_mask &= valid_integration
+    constrained_mask &= valid_mass
+    
+    create_visualization(constrained_mask, 'design_space_constrained.gif', 'Design Space (With Constraints)')
+    
+except Exception as e:
+    print(f"Error applying constraints: {e}")
+    print("Only the unconstrained visualization was created.")

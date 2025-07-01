@@ -10,6 +10,10 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.spatial import ConvexHull
 from scipy.stats import gaussian_kde
+from matplotlib.collections import LineCollection
+from matplotlib.colors import LinearSegmentedColormap
+import plotly.graph_objects as go
+import pandas as pd
 
 
 
@@ -19,6 +23,7 @@ from performance.MTOW.mtow import power_and_wing_loading as pws
 from performance.Integration.integration import main as cg_excursion
 from cost import calc_cost as f_cost
 from sus import get_sus as f_gwp
+from cost import calc_cost_breakdown
 
 # Cached constants
 M_CARGO_AFT = Beechcraft_1900D["M_cargo_aft"]  # [kg] Cargo mass in the aft compartment
@@ -249,20 +254,228 @@ def _pareto_mask(selection_tensor: np.ndarray) -> np.ndarray:
     # Reshape to original dimensions
     return full_mask.reshape(original_shape)
 
+def interactive_pareto_front(
+        selection_tensor: np.ndarray,
+        design_tensor: np.ndarray,
+        splits: np.ndarray,
+        toga_throttle: np.ndarray,
+        cruise_throttle: np.ndarray,
+        N_PAX: np.ndarray,
+        fpath: str = "data/plots/interactive_pareto.html",
+        remove_outliers: bool = False,
+        outlier_threshold: float = 1.5,
+        star_boy: np.ndarray | None = None,
+):
+    """
+    Create an interactive Plotly plot of the Pareto front where hovering over points
+    shows design variables.
+    """
+    # Extract cost and GWP data
+    cost = selection_tensor[..., 0].ravel()
+    gwp = selection_tensor[..., 1].ravel()
+    mask = np.isfinite(cost) & np.isfinite(gwp)
+    cost, gwp = cost[mask], gwp[mask]
+    
+    # Get indices of valid points for mapping back to design tensor
+    valid_indices = np.where(mask)[0]
+    original_shape = selection_tensor.shape[:-1]
+    point_indices = np.array([np.unravel_index(idx, original_shape) for idx in valid_indices])
+    
+    if remove_outliers:
+        def _cut(x):
+            q1, q3 = np.percentile(x, [25, 75])
+            iqr = q3 - q1
+            lo, hi = q1 - outlier_threshold*iqr, q3 + outlier_threshold*iqr
+            return (x >= lo) & (x <= hi)
+        keep = _cut(cost) & _cut(gwp)
+        cost, gwp = cost[keep], gwp[keep]
+        point_indices = point_indices[keep]
+    
+    # Prepare data for Pareto front
+    pts = np.column_stack((cost, gwp))
+    sort_idx = np.argsort(pts[:, 0])
+    pts_sorted = pts[sort_idx]
+    gwp_min_run = np.minimum.accumulate(pts_sorted[:, 1])
+    is_pareto = pts_sorted[:, 1] == gwp_min_run
+    
+    # Get Pareto front points
+    pareto_idx = sort_idx[is_pareto]
+    P = pts[pareto_idx]
+    pareto_point_indices = point_indices[pareto_idx]
+    
+    # Sort Pareto points by cost
+    pareto_sort = np.argsort(P[:, 0])
+    P = P[pareto_sort]
+    pareto_point_indices = pareto_point_indices[pareto_sort]
+    
+    # Create data for the plot
+    data = []
+    
+    # All feasible points
+    df_all = pd.DataFrame({
+        'cost': pts[:, 0],
+        'gwp': pts[:, 1],
+    })
+    
+    # Add design variables for all points
+    for i, idx in enumerate(point_indices):
+        idx_tuple = tuple(idx)
+        df_all.loc[i, 'power_split'] = splits[idx_tuple[0]]
+        df_all.loc[i, 'toga_throttle'] = toga_throttle[idx_tuple[1]]
+        df_all.loc[i, 'cruise_throttle'] = cruise_throttle[idx_tuple[2]]
+        df_all.loc[i, 'n_pax'] = N_PAX[idx_tuple]
+        
+        # Add key design variables
+        design_point = design_tensor[idx_tuple]
+        df_all.loc[i, 'm_eps'] = design_point[0]  # Electric Propulsion System mass
+        df_all.loc[i, 'm_fc'] = design_point[1]   # Fuel Cell mass
+        df_all.loc[i, 'm_h2'] = design_point[2]   # Hydrogen mass
+        df_all.loc[i, 'm_sto'] = design_point[3]  # Storage System mass
+        df_all.loc[i, 'mtow'] = design_point[7]   # MTOW
+    
+    # All feasible points scatter
+    scatter_all = go.Scatter(
+        x=df_all['cost'],
+        y=df_all['gwp'],
+        mode='markers',
+        marker=dict(
+            size=5,
+            color='blue',
+            opacity=0.3,
+        ),
+        name='Feasible Designs',
+        hovertemplate=(
+            '<b>Feasible Design</b><br>'
+            'Cost: %{x:.4f} M€/PAX<br>'
+            'GWP: %{y:.4f} kg CO₂e/PAX<br>'
+            'Power Split: %{customdata[0]:.2f}<br>'
+            'TOGA Throttle: %{customdata[1]:.2f}<br>'
+            'Cruise Throttle: %{customdata[2]:.2f}<br>'
+            'PAX: %{customdata[3]:.1f}<br>'
+            'MTOW: %{customdata[4]:.1f} kg<br>'
+            'm_EPS: %{customdata[5]:.1f} kg<br>'
+            'm_FC: %{customdata[6]:.1f} kg<br>'
+            'm_H2: %{customdata[7]:.1f} kg<br>'
+            'm_STO: %{customdata[8]:.1f} kg<br>'
+        ),
+        customdata=df_all[['power_split', 'toga_throttle', 'cruise_throttle', 'n_pax', 
+                           'mtow', 'm_eps', 'm_fc', 'm_h2', 'm_sto']].values
+    )
+    data.append(scatter_all)
+    
+    # Create dataframe for Pareto points
+    df_pareto = pd.DataFrame({
+        'cost': P[:, 0],
+        'gwp': P[:, 1],
+    })
+    
+    # Add design variables for Pareto points
+    for i, idx in enumerate(pareto_point_indices):
+        idx_tuple = tuple(idx)
+        df_pareto.loc[i, 'power_split'] = splits[idx_tuple[0]]
+        df_pareto.loc[i, 'toga_throttle'] = toga_throttle[idx_tuple[1]]
+        df_pareto.loc[i, 'cruise_throttle'] = cruise_throttle[idx_tuple[2]]
+        df_pareto.loc[i, 'n_pax'] = N_PAX[idx_tuple]
+        
+        # Add key design variables
+        design_point = design_tensor[idx_tuple]
+        df_pareto.loc[i, 'm_eps'] = design_point[0]
+        df_pareto.loc[i, 'm_fc'] = design_point[1]
+        df_pareto.loc[i, 'm_h2'] = design_point[2]
+        df_pareto.loc[i, 'm_sto'] = design_point[3]
+        df_pareto.loc[i, 'mtow'] = design_point[7]
+    
+    # Pareto front line
+    pareto_line = go.Scatter(
+        x=df_pareto['cost'],
+        y=df_pareto['gwp'],
+        mode='lines',
+        line=dict(color='red', width=2),
+        name='Pareto Front',
+        hoverinfo='skip'
+    )
+    data.append(pareto_line)
+    
+    # Pareto points
+    pareto_points = go.Scatter(
+        x=df_pareto['cost'],
+        y=df_pareto['gwp'],
+        mode='markers',
+        marker=dict(
+            size=8,
+            color='red',
+            line=dict(color='black', width=1)
+        ),
+        name='Pareto Optimal',
+        hovertemplate=(
+            '<b>Pareto Optimal Design</b><br>'
+            'Cost: %{x:.4f} M€/PAX<br>'
+            'GWP: %{y:.4f} kg CO₂e/PAX<br>'
+            'Power Split: %{customdata[0]:.2f}<br>'
+            'TOGA Throttle: %{customdata[1]:.2f}<br>'
+            'Cruise Throttle: %{customdata[2]:.2f}<br>'
+            'PAX: %{customdata[3]:.1f}<br>'
+            'MTOW: %{customdata[4]:.1f} kg<br>'
+            'm_EPS: %{customdata[5]:.1f} kg<br>'
+            'm_FC: %{customdata[6]:.1f} kg<br>'
+            'm_H2: %{customdata[7]:.1f} kg<br>'
+            'm_STO: %{customdata[8]:.1f} kg<br>'
+        ),
+        customdata=df_pareto[['power_split', 'toga_throttle', 'cruise_throttle', 'n_pax',
+                             'mtow', 'm_eps', 'm_fc', 'm_h2', 'm_sto']].values
+    )
+    data.append(pareto_points)
+    
+    # Add star_boy point if provided
+    if star_boy is not None:
+        star = go.Scatter(
+            x=[star_boy[0]],
+            y=[star_boy[1]],
+            mode='markers',
+            marker=dict(
+                size=15,
+                symbol='star',
+                color='gold',
+                line=dict(color='black', width=1)
+            ),
+            name='Sensitivity-Optimal Design',
+            hoverinfo='name'
+        )
+        data.append(star)
+    
+    # Create the figure
+    layout = go.Layout(
+        title='Pareto Front: Cost vs GWP (Interactive)',
+        xaxis=dict(title='Lifetime cost [M€/PAX]'),
+        yaxis=dict(title='GWP [kg CO₂e/PAX]'),
+        hovermode='closest',
+        legend=dict(x=0.01, y=0.99, bordercolor='Black', borderwidth=1),
+        template='plotly_white'
+    )
+    
+    fig = go.Figure(data=data, layout=layout)
+    
+    # Save to HTML
+    fig.write_html(fpath)
+    
+    return fig
 
 def pareto_front(
         selection_tensor: np.ndarray,
         fpath: str = "data/plots/pareto_front.png",
-        dpi: int = 600,
+        dpi: int = 1200,
         remove_outliers: bool = False,
         outlier_threshold: float = 1.5,
         bounds: np.ndarray = np.array([[0.1, 1.0],
                                        [0.1, 1.0],
                                        [0.1, 1.0]]),
         annotate_weights: bool = True,
+        star_boy: np.ndarray | None = None,
+        chosen_section: tuple = None,  # ((x1, y1), (x2, y2))
+        focus_point: tuple = None,
     ) -> None:
     """
-    Plot Pareto front (cost vs GWP) and report the frontier segment weights.
+    Plot Pareto front (cost vs GWP) with optional highlight region.
 
     Parameters
     ----------
@@ -275,6 +488,11 @@ def pareto_front(
         in either objective.
     annotate_weights : bool
         Write the weight that makes each frontier vertex optimal.
+    star_boy : ndarray | None
+        If provided, highlights this point with a star marker.
+    chosen_section : tuple
+        If provided, highlights this section of the Pareto front with an 
+        organic-looking shaded region. Format: ((x1, y1), (x2, y2))
     """
 
     cost   = selection_tensor[..., 0].ravel()
@@ -301,64 +519,156 @@ def pareto_front(
     # Now strictly ascending cost, strictly descending GWP
     P = P[np.argsort(P[:, 0])]
 
-    # Cn = (P[:, 0] - P[:, 0].min()) / (np.ptp(P[:, 0]) or 1)
-    # Gn = (P[:, 1] - P[:, 1].min()) / (np.ptp(P[:, 1]) or 1)
-
-    # # Slopes between consecutive frontier vertices (negative values)
-    # dC, dG = np.diff(Cn), np.diff(Gn)
-    # slopes = dG / dC                                   # shape (k-1,)
-    # w_opt  = np.abs(slopes) / (1 + np.abs(slopes))     # [0,1]
-    
-    # dC, dG = np.diff(Cn), np.diff(Gn)
-    # w_star  = np.abs(dG) / (np.abs(dG) + np.abs(dC))
-    # w_vertices = np.concatenate(([1.0], w_star, [0.0]))
-
-    # # Pick the “knee” = slope closest to -1
-    # knee_seg = np.argmin(np.abs(np.abs(slopes) - 1))
-    # knee_pt  = P[knee_seg + 1] # second vertex in that segment
-
     sns.set_theme(style="whitegrid")
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    ax.scatter(pts[:, 0], pts[:, 1], s=8, alpha=.3, label="all designs")
-    ax.plot(P[:, 0], P[:, 1], "r-", lw=2, label="Pareto front")
+    ax.scatter(pts[:, 0], pts[:, 1], s=8, alpha=.3, label="Feasible Design")
+    ax.plot(P[:, 0], P[:, 1], "r-", lw=2, label="Pareto Front")
     ax.scatter(P[:, 0], P[:, 1], c="red", edgecolors="k", zorder=3)
 
-    # annotate frontier vertices with w*
-    # if annotate_weights:
-    #     for (c, g), wv in zip(P, w_vertices):
-    #         ax.annotate(f"w={wv:0.2f}", xy=(c, g), xytext=(4,-6),
-    #                     textcoords="offset points", fontsize=7)
-    # if annotate_weights:
-    #     for i, (c, g) in enumerate(P):
-    #         if i in (0, len(P)-1):
-    #             txt = "w=1" if i == 0 else "w=0"
-    #         elif i-1 < len(w_opt):
-    #             txt = f"w≈{w_opt[i-1]:.2f}"
-    #         else:
-    #             continue
+    # Add a gold star for the head point
+    if star_boy is not None:
+        ax.scatter(star_boy[0], star_boy[1], s=350, marker="*", color="gold", edgecolors="k", zorder=5, label="Chosen Design Point")
+    
+    # Create an organic-looking shaded region for the chosen section
+    if chosen_section is not None:
+        (x1, y1), (x2, y2) = chosen_section
+        
+        # Find Pareto points within the x range
+        mask = (P[:, 0] >= min(x1, x2)) & (P[:, 0] <= max(x1, x2))
+        section_points = P[mask]
+        
+        if len(section_points) > 1:
+            # Create organic shape around the section
+            x_pareto = section_points[:, 0]
+            y_pareto = section_points[:, 1]
+            
+            # Extend the x-range slightly for a more organic look
+            x_range = max(x_pareto) - min(x_pareto)
+            x_ext = [min(x_pareto) - x_range * 0.05, max(x_pareto) + x_range * 0.05]
+            
+            # Get smoothed versions of the curves with more points for organic look
+            from scipy.interpolate import make_interp_spline
+            
+            if len(x_pareto) >= 4:  # Need at least 4 points for cubic spline
+                x_smooth = np.linspace(min(x_pareto), max(x_pareto), 100)
+                spl = make_interp_spline(x_pareto, y_pareto, k=3)  # cubic spline
+                y_smooth = spl(x_smooth)
+            else:
+                x_smooth = x_pareto
+                y_smooth = y_pareto
+            
+            # Create upper and lower boundaries for the shaded region
+            y_offset = np.max(y_smooth) * 0.15  # 15% of max y for bubble height
+            
+            # Upper boundary (higher GWP) - create wavy organic top
+            y_upper = y_smooth + y_offset * np.sin(np.linspace(0, 3*np.pi, len(x_smooth))) * 0.5 + y_offset
+            
+            # Lower boundary (follows Pareto curve closely with small buffer)
+            y_buffer = y_offset * 0.3  # Smaller buffer near the Pareto front
+            y_lower = y_smooth - y_buffer
+            
+            # Create polygon vertices by going around the region
+            x_polygon = np.concatenate([x_smooth, x_smooth[::-1]])
+            y_polygon = np.concatenate([y_upper, y_lower[::-1]])
+            
+            # Plot the shaded region with a nice gradient alpha
+            ax.fill(x_polygon, y_polygon, color='#8A2BE2', alpha=0.15, 
+                    zorder=2, label="Chosen Design Space")
+    
+            
+            points = np.array([x_polygon, y_polygon]).T.reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            
+            # Create a custom colormap with varying transparency
+            cmap = LinearSegmentedColormap.from_list(
+                "custom_purple", [(0.54, 0.17, 0.89, 0.6), (0.54, 0.17, 0.89, 0.1)])
+            
+            lc = LineCollection(segments, cmap=cmap, alpha=0.5, linewidth=1.5)
+            line_colors = np.linspace(0, 1, len(segments))
+            lc.set_array(line_colors)
+            ax.add_collection(lc)
+    
+    if focus_point is not None:
+        center_x, center_y, radius = focus_point
+        
+        # Find Pareto points within the radius
+        distances = np.sqrt((P[:, 0] - center_x)**2 + (P[:, 1] - center_y)**2)
+        mask = distances <= radius
+        section_points = P[mask]
+        
+        if len(section_points) > 1:
+            # Sort points by x-coordinate for proper interpolation
+            sort_idx = np.argsort(section_points[:, 0])
+            x_pareto = section_points[sort_idx, 0]
+            y_pareto = section_points[sort_idx, 1]
+            
+            # Handle duplicate x values by keeping only unique x values
+            unique_indices = []
+            seen_x = set()
+            for i, x in enumerate(x_pareto):
+                if x not in seen_x:
+                    seen_x.add(x)
+                    unique_indices.append(i)
+            
+            x_pareto = x_pareto[unique_indices]
+            y_pareto = y_pareto[unique_indices]
+            
+            # Get smoothed versions of the curves
+            from scipy.interpolate import make_interp_spline, interp1d
+            
+            if len(x_pareto) >= 4:  # Need at least 4 points for cubic spline
+                x_smooth = np.linspace(min(x_pareto), max(x_pareto), 100)
+                spl = make_interp_spline(x_pareto, y_pareto, k=3)  # cubic spline
+                y_smooth = spl(x_smooth)
+            elif len(x_pareto) >= 2:  # Fall back to linear interpolation
+                x_smooth = np.linspace(min(x_pareto), max(x_pareto), 100)
+                f = interp1d(x_pareto, y_pareto)
+                y_smooth = f(x_smooth)
+            else:
+                x_smooth = x_pareto
+                y_smooth = y_pareto
+            
+            # Create bubble-like shape around the points
+            y_offset = radius * 0.5  # Scale the bubble height based on radius
+            
+            # Create an organic, bubble-like shape with varying offsets
+            theta = np.linspace(0, 2*np.pi, len(x_smooth))
+            y_upper = y_smooth + y_offset * (0.8 + 0.2 * np.sin(3*theta))
+            y_lower = y_smooth - y_offset * 0.3  # Smaller buffer near the Pareto front
+            
+            # Create polygon vertices by going around the bubble
+            x_polygon = np.concatenate([x_smooth, x_smooth[::-1]])
+            y_polygon = np.concatenate([y_upper, y_lower[::-1]])
+            
+            # Plot the shaded region with gradient alpha
+            ax.fill(x_polygon, y_polygon, color='#8A2BE2', alpha=0.15, 
+                    zorder=2, label="Chosen Design Space")
+            
+            # Add a subtle outline with gradient transparency
+            points = np.array([x_polygon, y_polygon]).T.reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            
+            # Create custom colormap for the outline
+            cmap = LinearSegmentedColormap.from_list(
+                "custom_purple", [(0.54, 0.17, 0.89, 0.6), (0.54, 0.17, 0.89, 0.1)])
+            
+            lc = LineCollection(segments, cmap=cmap, alpha=0.5, linewidth=1.5)
+            line_colors = np.linspace(0, 1, len(segments))
+            lc.set_array(line_colors)
+            ax.add_collection(lc)
+            
+            # Draw a small semi-transparent circle at the center point
+            ax.scatter([center_x], [center_y], color='#8A2BE2', alpha=0.3, 
+                      s=80, zorder=4, edgecolors='none')
 
-
-    # highlight knee
-    # ax.scatter(*knee_pt, s=70, marker="*", zorder=5, label="knee (slope≈-1)")
-
-    ax.set_xlabel("Lifetime cost [M€/PAX]")
-    ax.set_ylabel(r"GWP [kg CO$_2$e/PAX]")
-    # ax.set_title("Pareto front: cost vs GWP")
-    ax.legend()
+    ax.set_xlabel("Lifetime Cost [M€/PAX]")
+    ax.set_ylabel(r"Global Warming Potential [kg CO$_\text{2,eq}$/PAX]")
+    ax.legend(loc="upper right")
     fig.tight_layout()
     fig.savefig(fpath, dpi=dpi)
-    plt.close(fig)
-    # plt.show()
-
-    # # ---------- Console read-out ----------
-    # print(f"Total designs kept: {len(pts)}")
-    # print(f"Pareto-optimal designs: {len(P)}")
-    # print("Frontier segment slopes & optimal weights:")
-    # for s, w in zip(slopes, w_opt):
-    #     print(f"  slope = {s:6.3f} -> weight* -> {w:5.3f}")
-    # print(f"Knee point @ cost = {knee_pt[0]:.3f} M€,  GWP = {knee_pt[1]:.1f} kg")
-
+    plt.show()
+    
 def main(weight: float=0.5,
          dim_bounds: np.ndarray=np.array([[0.1, 1.0],
                                           [0.1, 1.0],
@@ -398,6 +708,8 @@ def main(weight: float=0.5,
     splits = np.linspace(dim_bounds[0, 0], dim_bounds[0, 1], N)
     toga_throttle = np.linspace(dim_bounds[1, 0], dim_bounds[1, 1], M)
     cruise_throttle = np.linspace(dim_bounds[2, 0], dim_bounds[2, 1], P)
+    
+    print(tensor.shape)
         
     ### TENSOR SHAPE DESCRIPTION ###
     # The tensor is expected to have the shape (N, M, P, Q) where:
@@ -435,15 +747,15 @@ def main(weight: float=0.5,
     scalar_field, selection_tensor = objective_function(weight, design, N_PAX)
     
     # Create a Pareto front plot
-    pareto_front(selection_tensor, fpath="data/plots/pareto_front_no_cons.png", dpi=600)
+    # pareto_front(selection_tensor, fpath="data/plots/pareto_front_no_cons.png", dpi=600)
     
     # # Generate a score distribution plot
-    # score_distribution(selection_tensor, fpath="data/plots/cost_gwp_distrib.png", dpi=600, method='kde')
+    score_distribution(selection_tensor, fpath="data/plots/cost_gwp_distrib.png", dpi=600, method='kde')
     constrained_selection_tensor = selection_tensor.copy()
     constrained_selection_tensor[~valid4d] = np.nan  # Apply the valid mask to the selection tensor
     
-    pareto_front(constrained_selection_tensor, fpath="data/plots/pareto_front.png", dpi=600)
-    # score_distribution(constrained_selection_tensor, fpath="data/plots/cost_gwp_distrib_constrained.png", dpi=600, method='kde')
+    # pareto_front(constrained_selection_tensor, fpath="data/plots/pareto_front.png", dpi=600)
+    score_distribution(constrained_selection_tensor, fpath="data/plots/cost_gwp_distrib_constrained.png", dpi=600, method='kde')
     
     # Save the scalar field and selection tensor to a pickle file
     with open('data/logs/CostnSus.pkl', 'wb') as f:
@@ -472,32 +784,45 @@ def main(weight: float=0.5,
     pareto_options[~pareto_boundary] = np.nan  # Apply the Pareto mask
     
     head = np.argwhere(
-        (pareto_options[..., 0] > 3.4325) & (pareto_options[..., 0] < 3.4350) &\
-            (pareto_options[..., 1] > 23.65) & (pareto_options[..., 1] < 23.70)
+        (pareto_options[..., 0] > 3.425) & (pareto_options[..., 0] < 3.43) &\
+            (pareto_options[..., 1] > 10.12) & (pareto_options[..., 1] < 10.14)
     )
+    # print(head)
         
     knee = np.argwhere(
         (pareto_options[..., 0] > 3.4450) & (pareto_options[..., 0] < 3.4475) &\
             (pareto_options[..., 1] > 23.598) & (pareto_options[..., 1] < 23.602)
     )
     
-    ankle = np.argwhere(
-        (pareto_options[..., 0] > -np.inf) & (pareto_options[..., 0] < np.inf) &\
-            (pareto_options[..., 1] > -np.inf) & (pareto_options[..., 1] < np.inf)
-    )
+    # ankle = np.argwhere(
+    #     (pareto_options[..., 0] > -np.inf) & (pareto_options[..., 0] < np.inf) &\
+    #         (pareto_options[..., 1] > -np.inf) & (pareto_options[..., 1] < np.inf)
+    # )
     
     toe = np.argwhere(
-        (pareto_options[..., 0] > 3.432) & (pareto_options[..., 0] < 3.434) &\
-            (pareto_options[..., 1] > 23.65) & (pareto_options[..., 1] < 23.7)
+        (pareto_options[..., 0] > 3.505) & (pareto_options[..., 0] < 3.506) &\
+            (pareto_options[..., 1] > 31.5) & (pareto_options[..., 1] < 31.55)
     )
+    # print(toe)
     
-    # toenail = np.argwhere(
-    #     (pareto_options[..., 0] > 3.4416) & (pareto_options[..., 0] < 3.4418) &\
-    #         (pareto_options[..., 1] > 23.61) & (pareto_options[..., 1] < 23.62)
-    # )
+    toenail = np.argwhere(
+        (pareto_options[..., 0] > 3.4315) & (pareto_options[..., 0] < 3.4320) &\
+            (pareto_options[..., 1] > 29.9) & (pareto_options[..., 1] < 30.0)
+    )
     
     # print(knee)
     # print(constrained_selection_tensor[*knee[0], ...])
+    
+    # Plot the convergence of MTOW
+    converged_mtow = convergence[0, 0, 0, :].ravel()
+    plt.figure(figsize=(10, 6))
+    plt.plot(converged_mtow, marker='o', linestyle='-', color='blue', markersize=4)
+    # plt.title('Convergence of MTOW')
+    plt.xlabel('Iteration')
+    plt.ylabel('MTOW [kg]')
+    plt.grid()
+    plt.tight_layout()
+    plt.savefig('data/plots/convergence_mtow.png', dpi=600)
     
     
     # print("\n=== PARETO OPTIMAL POINTS ===")
@@ -505,21 +830,22 @@ def main(weight: float=0.5,
     # # For the head point
     # print_design_point("head", tensor[*head[0], ...], N_PAX[*head[0]])
     # print(f"Configuration: Split = {splits[head[0, 0]]}, TOGA = {toga_throttle[head[0, 1]]}, Cruise = {cruise_throttle[head[0, 2]]}")
-
+    # print(f"Objectives: Cost = {constrained_selection_tensor[*head[0], 0]} M€/PAX, GWP = {constrained_selection_tensor[*head[0], 1]} kg CO₂e/PAX")
+    
     # # For the knee point
     # print_design_point("knee", tensor[*knee[0], ...], N_PAX[*knee[0]])
     # print(f"Configuration: Split = {splits[knee[0, 0]]}, TOGA = {toga_throttle[knee[0, 1]]}, Cruise = {cruise_throttle[knee[0, 2]]}")
     # # print(f"Objectives: Cost = {constrained_selection_tensor[*knee[0], 0]:.2f} M€/PAX, GWP = {constrained_selection_tensor[*knee[0], 1]:.2f} kg CO₂e/PAX")
 
     # For the ankle point
-    print_design_point("ankle", tensor[*ankle[0], ...], N_PAX[*ankle[0]])
-    print(f"Configuration: Split = {splits[ankle[0, 0]]}, TOGA = {toga_throttle[ankle[0, 1]]}, Cruise = {cruise_throttle[ankle[0, 2]]}")
-    print(f"Objectives: Cost = {constrained_selection_tensor[*ankle[0], 0]} M€/PAX, GWP = {constrained_selection_tensor[*ankle[0], 1]} kg CO₂e/PAX")
+    # print_design_point("ankle", tensor[*ankle[0], ...], N_PAX[*ankle[0]])
+    # print(f"Configuration: Split = {splits[ankle[0, 0]]}, TOGA = {toga_throttle[ankle[0, 1]]}, Cruise = {cruise_throttle[ankle[0, 2]]}")
+    # print(f"Objectives: Cost = {constrained_selection_tensor[*ankle[0], 0]} M€/PAX, GWP = {constrained_selection_tensor[*ankle[0], 1]} kg CO₂e/PAX")
 
     # # For the toe point
     # print_design_point("toe", tensor[*toe[0], ...], N_PAX[*toe[0]])
-    # print(f"Configuration: Split = {splits[toe[0, 0]]:.2f}, TOGA = {toga_throttle[toe[0, 1]]:.2f}, Cruise = {cruise_throttle[toe[0, 2]]:.2f}")
-    # print(f"Objectives: Cost = {constrained_selection_tensor[*toe[0], 0]:.2f} M€/PAX, GWP = {constrained_selection_tensor[*toe[0], 1]:.2f} kg CO₂e/PAX")
+    # print(f"Configuration: Split = {splits[toe[0, 0]]}, TOGA = {toga_throttle[toe[0, 1]]}, Cruise = {cruise_throttle[toe[0, 2]]}")
+    # print(f"Objectives: Cost = {constrained_selection_tensor[*toe[0], 0]} M€/PAX, GWP = {constrained_selection_tensor[*toe[0], 1]} kg CO₂e/PAX")
     
     # print_design_point("toenail", tensor[*toenail[0], ...], N_PAX[*toenail[0]])
     # print(f"Configuration: Split = {splits[toenail[0, 0]]:.2f}, TOGA = {toga_throttle[toenail[0, 1]]:.2f}, Cruise = {cruise_throttle[toenail[0, 2]]:.2f}")
@@ -540,8 +866,8 @@ def main(weight: float=0.5,
     y_sorted = y_valid[sort_idx]
 
     # Calculate percentage changes and slopes
-    x_percent_change = (x_sorted[1:] - x_sorted[:-1]) * 2 / (x_sorted[1:] + x_sorted[:-1])
-    y_percent_change = (y_sorted[1:] - y_sorted[:-1]) * 2 / (y_sorted[1:] + y_sorted[:-1])
+    x_percent_change = (x_sorted[3:] - x_sorted[:-3]) * 2 / (x_sorted[3:] + x_sorted[:-3])
+    y_percent_change = (y_sorted[3:] - y_sorted[:-3]) * 2 / (y_sorted[3:] + y_sorted[:-3])
 
     # Calculate slopes, handling possible division by zero
     with np.errstate(divide='ignore', invalid='ignore'):
@@ -554,24 +880,58 @@ def main(weight: float=0.5,
     print(f"Number of valid Pareto points: {len(x_valid)}")
     print(f"Number of valid slopes: {len(clean_slopes)}")
     
+    pareto_front(constrained_selection_tensor,
+                 fpath="data/plots/pareto_front_no_star.png",
+                 dpi=1200,
+                #  star_boy=np.array([3.4413104293093415, 29.287180605687336]),
+                # star_boy=np.array([3.425018682093658, 10.122170765960028])
+                # star_boy=np.array([3.5051841306121516, 31.5128137833263])
+                #  focus_point=(3.44, 29.29, 1)
+                 )
+    
+    pareto_front(constrained_selection_tensor,
+                 fpath="data/plots/pareto_front_star.png",
+                 dpi=1200,
+                 star_boy=np.array([3.4413104293093415, 29.287180605687336]),
+                # star_boy=np.array([3.425018682093658, 10.122170765960028])
+                # star_boy=np.array([3.5051841306121516, 31.5128137833263])
+                #  focus_point=(3.44, 29.29, 1)
+                 )
+    
     # Use the corresponding x values for plotting slopes
     # Since slopes are calculated between adjacent points, 
     # we'll use the x values at the start of each segment
-    plt.plot(x_sorted[:-1][valid_slopes], clean_slopes, 'o', markersize=2, label='Pareto Points')
-    plt.xlabel('Cost [M€/PAX]')
-    plt.ylabel('Slope (GWP change / Cost change)')
-    plt.show()
+    # plt.plot(x_sorted[:-3][valid_slopes], clean_slopes, 'o', markersize=2, label='Pareto Points')
+    # plt.xlabel('Cost [M€/PAX]')
+    # plt.ylabel('Slope (GWP change / Cost change)')
+    # plt.show()
+        
+    interactive_pareto_front(
+        constrained_selection_tensor,
+        tensor,
+        splits,
+        toga_throttle,
+        cruise_throttle,
+        N_PAX,
+        fpath="data/plots/interactive_pareto.html",
+        star_boy=np.array([3.44, 29.29])  # Optional: highlight a specific point
+    )
     
     
 if __name__ == "__main__":
     weight = 0.5  # Default weight for cost vs GWP
     main(
         weight=weight,
+        # dim_bounds=np.array([
+        #     [0.25, 0.35],
+        #     [0.2, 0.35],
+        #     [0.25, 0.4]
+        #     ]),
         dim_bounds=np.array([
-            [0.25, 0.35],
-            [0.2, 0.35],
-            [0.25, 0.4]
-            ]),
+            [0.1, 0.9],
+            [0.1, 1.0],
+            [0.1, 1.0]
+        ]),
         fpath_design='data/logs/result_tensor.pkl',
         fpath_loading='data/logs/loading_tensor.pkl'
     )

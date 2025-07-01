@@ -94,9 +94,9 @@ def main(minimum, maximum, no_of_splits, max_iter):
                 m_tms_aft = 0.0
                 m_tms_mid = 0.0
                 
+                print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}")
                 # Convergence of MTOW, stop if the change is less than 1% of the previous MTOW or reached max number of iterations
                 for i in range(max_iter):
-                    # print(f"Split: {split:.2f}, TOGA: {fc_toga_percentage:.2f}, Cruise: {fc_cruise_percentage:.2f}, ITER: {i}")
                     # --- FPP call ---
                     TMS_inputs, m_h2, FC_outputs, _, loading_vector, emissions, P_fc_max = fpp_main(
                         split,
@@ -164,7 +164,7 @@ def main(minimum, maximum, no_of_splits, max_iter):
                     m_tms_aft = tms_outputs[4]
                     m_tms_mid = tms_outputs[3]
                     
-                    print(f"MTOW:{MTOW:.2f}, AUX POWER {aux_power:.2f}, DRAG PENALTY {D_rad:.6f}")
+                    # print(f"MTOW:{MTOW:.2f}, AUX POWER {aux_power:.2f}, DRAG PENALTY {D_rad:.6f}")
                     
                     # ----------------------------------------------------------
                     # FIXED-POINT UPDATE WITH UNDER-RELAXATION
@@ -264,12 +264,18 @@ def main(minimum, maximum, no_of_splits, max_iter):
 if __name__=="__main__":
     # min_ = np.array([0.25, 0.2, 0.25])  # Minimum values for the splits
     # max_ = np.array([0.35, 0.35, 0.4])
-    min_ = np.array([0.33, 0.29, 0.30])  # Minimum values for the splits
-    max_ = np.array([0.33, 0.29, 0.30])
+    # min_ = np.array([0.32, 0.28, 0.30])  # Minimum values for the splits
+    # max_ = np.array([0.32, 0.28, 0.30])
+    min_ = np.array([0.1, 0.1, 0.1])  # Minimum values for the splits
+    max_ = np.array([0.9, 1.0, 1.0])
+    # min_ = np.array([0.3, 0.4, 0.45])  # Minimum values for the splits
+    # max_ = np.array([0.3, 0.4, 0.45])
+    # (max_-min_)/0.01 + 1, dtype=int
+    # np.array([11, 16, 16])
     
     main(
         minimum=min_,
         maximum=max_,
-        no_of_splits=np.array((max_-min_)/0.01 + 1, dtype=int),  # Number of splits for each parameter
+        no_of_splits=np.ceil(np.array((max_-min_)/0.05 + 1)).astype(int),  # Number of splits for each parameter
         max_iter=20
     )

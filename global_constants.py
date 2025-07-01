@@ -49,7 +49,7 @@ ROC, V_climb = 10.16, 73.43
 # 100 year GWP of gases (compared to CO2)
 GWP_CO2 = 1.0                                            # [-] Global Warming Potential of CO2
 GWP_NOx = 59                                             # [-] Global Warming Potential of NOx https://doi.org/10.3390/app122010429
-GWP_H2O = 0.0005                                         # [-] Global Warming Potential of H2O        https://iopscience.iop.org/article/10.1088/1748-9326/aae018/pdf
+GWP_H2O = 0.06                                          # [-] Global Warming Potential of H2O        https://iopscience.iop.org/article/10.1088/1748-9326/aae018/pdf
 GWP_beech = 335000 * 30/19                               # [-] Global Warming Potential of Beechcraft 1900D https://odr.chalmers.se/items/a33bc0b8-bf61-47cc-87b8-3ab92fe388ed
 GWP_H2 = 2                                              # [kgCO2e/kgH2] Global Warming Potential of Hydrogen https://doi.org/10.1016/j.apenergy.2023.122586    NOT THIS ONE https://doi.org/10.1038/s41560-024-01563-1
 
@@ -65,8 +65,8 @@ NOx_pPax_cruise = 0.000009341715 # [kg/s/PAX]
 ###########
 
 # Fuel Cell Stack Characteristics
-mass_specific_power = 5000                              # [W/kg] Specific power of the fuel cell stack (FZO Roadmap-report)
-volume_specific_power = 3100000                         # [W/m^3] Volume specific power of the fuel cell stack (FZO Roadmap-report)
+mass_specific_power = 5000 *3/5                             # [W/kg] Specific power of the fuel cell stack (FZO Roadmap-report)
+volume_specific_power = 3100000  *3/5                       # [W/m^3] Volume specific power of the fuel cell stack (FZO Roadmap-report)
 stoic_ratio_A = 1.05                                     # [-] Stoichiometric ratio of the anode
 stoic_ratio_C = 1.6                                     # [-] Stoichiometric ratio of the cathode
 pickle_path = 'fc/spline_eta_of_P.pkl'                     # Path to the efficiency function file

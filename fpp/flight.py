@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pickle
 
 # Local imports
 import sys
@@ -676,10 +677,10 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
     mission_H2 = FlightMission(ac_model_H2, wps, pws, R_LHV=42.8/120, dt=dt, total_range_m=707e3, throttle_cruise=throttle_cruise)
     
     # Extract power loading and wing loading for corners of phases:
-    takeoff = mission_H2.profile['phase'] == 'takeoff'
-    climb   = (mission_H2.profile['phase'] == 'climb1') | (mission_H2.profile['phase'] == 'climb2')
-    cruise  = mission_H2.profile['phase'] == 'cruise'
-    hold    = mission_H2.profile['phase'] == 'hold'
+    takeoff     =   mission_H2.profile['phase'] == 'takeoff'
+    climb       =   (mission_H2.profile['phase'] == 'climb1') | (mission_H2.profile['phase'] == 'climb2')
+    cruise      =   mission_H2.profile['phase'] == 'cruise'
+    hold        =   mission_H2.profile['phase'] == 'hold'
     
     PW1_takeoff = mission_H2.profile['Pa'][takeoff][0]/(mission_H2.profile['mass'][takeoff][0]*G_0)
     WS1_takeoff = mission_H2.profile['mass'][takeoff][0]*G_0/mission_H2.ac.wing_area
@@ -725,6 +726,19 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
         np.where(mission_H2.profile['phase'] == 'cruise')[0][0],
         np.where(mission_H2.profile['phase'] == 'hold')[0][0]
     ]
+    
+    # miguel_bullshit = (
+    #     mission_H2.profile['time'],
+    #     (mission_H2.profile['phase'] == 'taxi\\TO') | (mission_H2.profile['phase'] == 'taxi\\landing'),
+    #     takeoff | climb,
+    #     mission_H2.profile['phase'] == 'cruise',
+    #     (mission_H2.profile['phase'] == 'hold') | (mission_H2.profile['phase'] == 'descent1') | (mission_H2.profile['phase'] == 'descent2') | (mission_H2.profile['phase'] == 'approach'),
+    #     )
+    
+    # # Store miguel's bullshit as a pickle
+    # with open('miguel_bullshit.pkl', 'wb') as f:
+    #     pickle.dump(miguel_bullshit, f)
+    
     # Reshape the TMS inputs to match the indexes
     TMS_inputs = {key: np.array([mission_H2.TMS_inputs[key][i] for i in indexes]) for key in mission_H2.TMS_inputs.keys()}
 
@@ -768,30 +782,62 @@ def fpp_main(fc_split: float=0.0, throttle_TOGA: float = 0.85, throttle_cruise: 
     )
     
     P_elmo = mission_H2.profile['P_fc'].max() - delta_AP
+    
+    mdot_nox = (mission_H2.profile['mdot_NOx'][toga_mask][0]/2, mission_H2.profile['mdot_NOx'][toga_mask][-1]/2)
+    mdot_air = (mission_H2.profile['mdot_air'][toga_mask][0]/2, mission_H2.profile['mdot_air'][toga_mask][-1]/2)
+    
+    # Get the start and end times of each phase
+    phase_times = {}
+    for phase_name in np.unique(mission_H2.profile['phase']):
+        phase_mask = mission_H2.profile['phase'] == phase_name
+        if np.any(phase_mask):
+            start_time = mission_H2.profile['time'][phase_mask][0]
+            end_time = mission_H2.profile['time'][phase_mask][-1]
+            phase_times[phase_name] = (start_time, end_time)
+    
+    # print("Phase times:")
+    # for phase_name, (start_time, end_time) in phase_times.items():
+    #     print(f"{phase_name}: {start_time/3600:.2f} h to {end_time/3600:.2f} h")
+    # Print the total mission time
+    total_time = mission_H2.profile['time'][-1] - mission_H2.profile['time'][0]
         
-    return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile, loading_points, emissions_outputs, P_elmo
+    return TMS_inputs, H2_burnt, FC_outputs, mission_H2.profile, loading_points, emissions_outputs, P_elmo#, miguel_bullshit#, (mdot_air, mdot_nox)
 
 
 if __name__ == "__main__":
-    
     mission_H2 = fpp_main(
-        fc_split=0.33,
-        throttle_TOGA=0.29,
+        fc_split=0.32,
+        throttle_TOGA=0.28,
         throttle_cruise=0.30,
-        MTOW=7895.114629666458,
-        CD_RAD=0.001013,
-        delta_AP=160488.79,
+        MTOW=7910.834637986755,
+        CD_RAD=0.001007,
+        delta_AP=160850.39,
         dt=0.1
     )
+    # mission_H2 = fpp_main(
+    #     fc_split=0.25,
+    #     throttle_TOGA=0.25,
+    #     throttle_cruise=0.30,
+    #     MTOW=7988.399997076554,
+    #     CD_RAD=0.001265,
+    #     delta_AP=171828.66,
+    #     dt=0.1
+    # )
     
     print(mission_H2[5])
+    print(mission_H2[-1])
     
     # Add a cumulative FC/CC power split plot
     P_cc = mission_H2[3]['P_cc']/1e3  # Convert to kW
     P_fc = mission_H2[3]['P_fc']/1e3  # Convert to kW
-    t    = mission_H2[3]['time']
+    t    = mission_H2[3]['time']/3600
     
-    AP = 160488.79/1e3 + 2 * 8.4  # Auxiliary Power (kW)
+    with open('fpp/AP_flight_profile.pkl', 'rb') as f:
+        AP_flight_profile = pickle.load(f)
+    
+    
+    AP = AP_flight_profile/1e3 + 2 * 8.4  # Auxiliary Power (kW)
+    # AP = 0
     
     P_fc = P_fc + AP   # Add auxiliary power to fuel cell power
 
@@ -819,7 +865,7 @@ if __name__ == "__main__":
         P_fc,
         color=palette[1],
         alpha=0.6,
-        label="Auxiliary Power (AP)"
+        label="Auxiliary Power"
     )
 
     # Combustion chamber fill
@@ -827,7 +873,7 @@ if __name__ == "__main__":
         t,
         P_fc,  # Start from P_fc
         P_cc + P_fc,
-        color=palette[4],
+        color=palette[5],
         alpha=0.6,
         label="CC Power"
     )
@@ -865,7 +911,7 @@ if __name__ == "__main__":
         ax.text(
             x_mid,
             y_arrow + 0.02 * y_arrow,         # nudge up 2 % of the y-span
-            'Non-nominal Phase',
+            'Reserves',
             ha='center',
             va='bottom',
             color='r',
@@ -878,11 +924,12 @@ if __name__ == "__main__":
     ax.set_ylim(0, 1.1 * (P_cc.max() + P_fc.max()))
     ax.set_xlabel("Time [h]")
     ax.set_ylabel("Power [kW]")
-    ax.set_title("Flight Profile Power Split")
-    ax.legend()
+    ax.set_title("Power Profile")
+    # ax.legend()
 
     plt.tight_layout()
-    plt.show()
+    # plt.show()
+    plt.savefig("power_profile.png", dpi=600)
     
     # print(mission_H2[-1])
     # from mpl_toolkits.mplot3d import Axes3D
